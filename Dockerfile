@@ -31,5 +31,5 @@ RUN php artisan storage:link 2>/dev/null || true
 
 EXPOSE 8080 8085
 
-CMD php artisan migrate --force && php artisan db:seed --force && php artisan serve --host=0.0.0.0 --port=${PORT:-8080}
+CMD (php artisan migrate --force && php artisan db:seed --force) || echo 'Database migrations or seeding failed' ; php artisan serve --host=0.0.0.0 --port=${PORT:-8080}
 
