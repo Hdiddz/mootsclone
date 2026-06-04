@@ -1,17 +1,24 @@
-FROM php:8.4-cli
+FROM php:8.4-alpine
 
-# Configure apt retries to make package installation robust against network timeouts
-RUN echo "Acquire::Retries \"5\";" > /etc/apt/apt.conf.d/80-retries && \
-    apt-get update && apt-get install -y \
-    git unzip libpq-dev libzip-dev libpng-dev \
-    && docker-php-ext-install pdo_pgsql pdo_mysql zip pcntl gd \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
+# Set IPv4 precedence to avoid DNS/network timeout issues in cloud builds
+RUN echo "precedence ::ffff:0:0/96 100" >> /etc/gai.conf
 
+# Install git, unzip, and bash (required for Composer and scripts)
+RUN apk add --no-cache git unzip bash
+
+# Copy the pre-compiled PHP extension installer script
+COPY --from=mlocati/php-extension-installer /usr/bin/install-php-extensions /usr/local/bin/
+
+# Install PHP extensions (speeds up compilation and auto-installs system dependencies)
+RUN install-php-extensions gd pdo_mysql pdo_pgsql zip pcntl
+
+# Copy official composer binary
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# Configure composer environment to prevent network timeouts
+# Configure composer environment to prevent network timeouts and enforce IPv4
 ENV COMPOSER_ALLOW_SUPERUSER=1
 ENV COMPOSER_PROCESS_TIMEOUT=3600
+ENV COMPOSER_IPRESOLVE=4
 
 WORKDIR /app
 COPY composer.json composer.lock ./
@@ -25,3 +32,4 @@ RUN php artisan storage:link 2>/dev/null || true
 EXPOSE 8080 8085
 
 CMD php artisan migrate --force && php artisan db:seed --force && php artisan serve --host=0.0.0.0 --port=${PORT:-8080}
+
