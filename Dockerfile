@@ -1,3 +1,12 @@
+# Stage 1: Build frontend
+FROM node:20-alpine AS frontend
+WORKDIR /app
+COPY frontend/package*.json ./
+RUN npm install
+COPY frontend/ ./
+RUN npm run build
+
+# Stage 2: PHP backend
 FROM php:8.4-alpine
 
 # Set IPv4 precedence to avoid DNS/network timeout issues in cloud builds
@@ -28,6 +37,10 @@ COPY . .
 RUN composer run-script post-autoload-dump
 
 RUN php artisan storage:link 2>/dev/null || true
+
+# Copy built frontend assets to public directory
+COPY --from=frontend /app/dist/assets /app/public/assets
+COPY --from=frontend /app/dist/index.html /app/public/index.html
 
 # Copy startup script and normalize line endings for Linux/Alpine
 COPY start.sh ./
