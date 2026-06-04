@@ -29,7 +29,12 @@ RUN composer run-script post-autoload-dump
 
 RUN php artisan storage:link 2>/dev/null || true
 
+# Copy startup script and normalize line endings for Linux/Alpine
+COPY start.sh ./
+RUN sed -i 's/\r$//' start.sh && chmod +x start.sh
+
 EXPOSE 8080 8085
 
-CMD (php artisan migrate --force && php artisan db:seed --force) || echo 'Database migrations or seeding failed' ; php artisan serve --host=0.0.0.0 --port=${PORT:-8080}
+CMD ["/bin/sh", "/app/start.sh"]
+
 
