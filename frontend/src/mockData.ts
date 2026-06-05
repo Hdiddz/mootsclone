@@ -121,7 +121,7 @@ export const starterProfile: CandidateProfile = {
     "I saw your skills and think we could build a strong prototype team. Are you open to discussing roles?",
   avatarUrl: "https://lh3.googleusercontent.com/aida-public/AB6AXuDPDk4pHub8NGPABmj2-xqKPQvhCXXp9oL3wtVphFeA4h-G6751JbmjVdA2LusfwXMQLJEioYWLASijLvIrFgzy-K4b2y5UjlI56N6Pz0kCmDehf9y5j6Oz1hYSaMPJ47h2XWUeTklPEMoz-CBvEMAZtJ0DyeDYmBiTkV4NfBcdVN6rrBXaKSISC9TDP91IUrXZGXcfD__GsRCLQj3oDhiUK_Y30YENnJBlsCJ2sV7Cny_BMz7uTdmO7sPhbpfidcF6NG6274UCaWw",
   avatarPosition: "center 42%",
-  statusLabel: "Open to team up",
+  statusLabel: "",
   accent: "#ffc629",
   online: true,
   mutualInterest: false

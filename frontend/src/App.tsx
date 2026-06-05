@@ -115,6 +115,7 @@ type SymbioStore = {
   ) => void;
   rewindLast: () => void;
   resetDeck: () => void;
+  clearMatches: () => void;
   removeSaved: (candidateId: string) => void;
   clearFilters: () => void;
   markNotificationRead: (notificationId: string) => void;
@@ -181,6 +182,8 @@ const translations = {
     matchesEyebrow: "Matches",
     savedTitle: "Saved profiles",
     savedEyebrow: "Bookmarked",
+    suggestedProject: "Suggested project",
+    explore: "Explore",
     projectsTitle: "Your Projects",
     projectsEyebrow: "Projects",
     alertsTitle: "Notifications",
@@ -264,7 +267,244 @@ const translations = {
     keepSwiping: "Keep swiping",
     sendMessageBtn: "Send message",
     chatFollowed: "Chat Followed",
-    noChatUsers: "No users to chat with yet."
+    noChatUsers: "No users to chat with yet.",
+    closePanel: "Close",
+    home: "Home",
+    logoutTitle: "Are you sure you want to log out?",
+    logoutBody: "Choose the account session you want to end. Saved accounts can still be used to log in again.",
+    noActiveSession: "No active session.",
+    mutualizmUser: "Mutualizm user",
+    invalidLogin: "Invalid email or password. Hint: student@telkomuniversity.ac.id & hadidpassword, or use Google SSO.",
+    fullNameRequired: "Full name is required.",
+    emailUsernameRequired: "Email username is required.",
+    passwordMin: "Password must be at least 8 characters.",
+    passwordHint: "Must be at least 8 characters.",
+    resetToastTitle: "Mock reset link",
+    resetToastBody: "A password reset link was sent to your email.",
+    teluSso: "Tel-U Student SSO",
+    googleAccount: "Google Account",
+    authLegalPrefix: "By continuing, you agree to our",
+    and: "and",
+    landingHow: "How it works",
+    landingFeatures: "Features",
+    landingOpenApp: "Open App",
+    landingHeroEyebrow: "Skill-based campus collaboration",
+    landingHeroTitle: "Find teammates by skill, not by random group chats.",
+    landingHeroBody: "Mutualizm helps Telkom University students discover collaborators for projects, competitions, and startups through structured, skill-based discovery profile cards.",
+    landingStartMatching: "Start Matching",
+    landingTryDemo: "Try Demo",
+    landingMetricsRoles: "12+ Student Roles",
+    landingMetricsSwipe: "Swipe Deck Gesture",
+    landingMetricsChats: "Mock Matches & Chats",
+    landingHowTitle: "From profile to teammate in a few taps.",
+    landingStepProfileTitle: "Create Profile",
+    landingStepProfileBody: "Showcase your top skills and availability to stand out.",
+    landingStepSwipeTitle: "Swipe by Skill",
+    landingStepSwipeBody: "Discover peers with complementary abilities for your next big idea.",
+    landingStepBuildTitle: "Build Together",
+    landingStepBuildBody: "Match instantly and start collaborating on impactful projects.",
+    landingFeaturesTitle: "Mutualizm's core features.",
+    landingFeatureDiscover: "Discover by skill, role, and availability.",
+    landingFeatureSwipe: "Swipe deck with pass, save, and interest animations.",
+    landingFeatureChat: "Chat mockup for discussing with matches.",
+    landingFeatureSettings: "Profile, language, notification, and privacy settings.",
+    landingCtaTitle: "Ready to try Mutualizm?",
+    landingCtaBody: "Start from onboarding or jump straight into the discovery deck.",
+    landingOpenDiscover: "Open Discover",
+    settingsDrawerTitle: "Profile, Language, and Preferences",
+    settingsRulesTitle: "Profile rules",
+    settingsRulesBody: "Use real information, show your main skill, and keep your experience short so match suggestions stay accurate.",
+    profilePhoto: "Profile photo",
+    roleMain: "Main role",
+    statusBadge: "Status badge",
+    defaultStatus: "Default status",
+    lookingForProject: "Looking for project",
+    availableThisWeek: "Available this week",
+    busyMessageFirst: "Busy, message first",
+    websiteLanguage: "Website language",
+    aboutProfile: "About profile",
+    currentPassword: "Current password",
+    optionalDemo: "Optional for frontend demo",
+    newPassword: "New password",
+    confirmNewPassword: "Confirm new password",
+    passwordNewMinError: "New password must be at least 8 characters.",
+    passwordConfirmError: "Password confirmation does not match.",
+    settingsSavedTitle: "Settings saved",
+    settingsSavedBody: "Profile and language changes have been saved.",
+    deleteAccountConfirm: "Delete this demo account? Local profile data will be removed.",
+    notifyPreference: "Show match and new message notifications",
+    chatPreference: "Allow followed users to start a chat",
+    emailPreference: "Hide campus email from public profile",
+    logoutAccount: "Log out account",
+    deleteAccount: "Delete account",
+    qrTitle: "Scan Profile",
+    qrBody: "This QR opens the profile information page for",
+    copyLink: "Copy link",
+    openProfile: "Open profile",
+    linkCopiedTitle: "Profile link copied",
+    linkCopiedBody: "Profile link has been copied.",
+    realTimeUi: "Realtime UI",
+    ready: "Ready",
+    rightRailBody: "Online badges, typing indicators, match toasts, and unread counts are mocked for a future Laravel Reverb connection.",
+    recentMatches: "Recent matches",
+    view: "View",
+    unreadCount: "unread",
+    clearMatches: "Clear matches",
+    chatPreview: "Chat preview",
+    conversationWith: "Conversation with",
+    conversationNotFound: "Conversation not found.",
+    noChatSelected: "No chat selected",
+    noChatSelectedBody: "Open a match to preview the conversation UI.",
+    viewMatches: "View matches",
+    savedChatStarter: "Hey! Thanks for saving my profile. I'd love to chat about collaborating!",
+    statusCollaboration: "Collaboration status",
+    noAvailabilityDetail: "No availability detail yet.",
+    mainSkillsTitle: "Main skills",
+    noSkillsYet: "No skills yet.",
+    lookingForTitle: "Looking for",
+    noLookingForYet: "No team needs selected yet.",
+    experienceTitle: "Experience",
+    recent: "Recent",
+    noExperienceYet: "No experience yet.",
+    portfolioTitle: "Portfolio",
+    noPortfolioYet: "No portfolio link yet.",
+    aiAssistantTitle: "Mutualizm AI",
+    aiAssistantIntro: "Ask for teammate suggestions, skill fit, role ideas, or project search help.",
+    aiPlaceholder: "Ask what skills or teammate role you need...",
+    aiFindDesign: "Find UI/UX support",
+    aiFindBackend: "Find backend help",
+    aiFindPitch: "Find pitch deck teammate",
+    aiAsk: "Ask AI",
+    aiThinking: "Finding useful suggestions...",
+    aiMatches: "Suggested people",
+    aiNoMatches: "No strong local match yet. Try a more specific skill.",
+    aiError: "Sorry, the AI assistant could not respond right now.",
+    matchReadyCopy: "These collaborators are ready to meet you. Open a card to start a focused project conversation.",
+    removeAllSaved: "Remove all saved",
+    upload: "Upload",
+    noPhoto: "No photo",
+    horizontalCrop: "Horizontal crop",
+    verticalCrop: "Vertical crop",
+    centerCrop: "Center crop",
+    pastePhotoUrl: "or paste a photo URL",
+    yourName: "Your name",
+    mainRoleFallback: "Main role",
+    interest: "Interest",
+    openCollaboration: "Open collaboration",
+    lessInfo: "Less Info",
+    moreInfo: "More Info",
+    topSkills: "Top Skills",
+    lookingForPrefix: "Looking for",
+    collaborators: "Collaborators",
+    passProfile: "Pass profile",
+    saveProfile: "Save profile",
+    showInterest: "Show interest",
+    fullSummary: "Full summary",
+    skillsByCategory: "Skills by category",
+    experienceTimeline: "Experience timeline",
+    portfolioLinks: "Portfolio links",
+    collaborationFit: "Collaboration fit",
+    noExperienceProof: "No experience proof yet. Add project evidence from Profile.",
+    portfolioCanBeAdded: "Portfolio links can be added later.",
+    preferredRoleLabel: "Preferred role",
+    availabilityLabel: "Availability",
+    suggestedOpener: "Suggested opener"
+    ,
+    skipToDemo: "Skip to demo",
+    stepOf: "Step",
+    of: "of",
+    profileReadyTitle: "Profile ready",
+    profileReadyBody: "Your mock profile is saved for the demo.",
+    back: "Back",
+    continue: "Continue",
+    enterDiscover: "Enter Discover",
+    liveCardPreview: "Live card preview",
+    stepIdentity: "Identity",
+    stepCampus: "Campus",
+    stepRole: "Role",
+    stepSkills: "Skills",
+    stepSummary: "Summary",
+    stepExperience: "Experience",
+    stepTimeline: "Timeline",
+    stepPortfolio: "Portfolio",
+    stepAvailability: "Availability",
+    stepPreview: "Preview",
+    avatarColor: "Avatar color",
+    referenceYellow: "Reference yellow",
+    softHoney: "Soft honey",
+    warmCream: "Warm cream",
+    neutralGray: "Neutral gray",
+    facultyProgram: "Faculty / program",
+    mainRole: "Main Role",
+    technicalRole: "Technical",
+    businessRole: "Business",
+    designRole: "Design",
+    otherRole: "Other",
+    customRole: "Custom role",
+    customRolePlaceholder: "e.g. Data Storyteller, Game Artist, Research Writer",
+    mainSkillLabel: "Main skill",
+    otherSkill: "Other skill",
+    customMainSkill: "Custom main skill",
+    customMainSkillPlaceholder: "e.g. Motion Design, Public Speaking, GIS Mapping",
+    collaborationType: "Collaboration type",
+    skillHelper: "Select at least three skills. The first three appear on the card front.",
+    profileSummaryLabel: "Profile summary",
+    profileSummaryHint: "characters",
+    profileSummaryPlaceholder: "Frontend-focused student experienced in React, Laravel-ready UI, and campus innovation prototypes.",
+    experienceSummaryLabel: "Experience summary",
+    experienceSummaryHint: "characters. Keep it proof-oriented.",
+    experienceSummaryPlaceholder: "Built responsive frontend components for a campus lost-and-found prototype using React and Laravel-ready UI patterns.",
+    availabilityDetails: "Availability details",
+    availabilityPlaceholder: "Open after class and on weekends for competition work.",
+    lookingForLabel: "Looking for",
+    suggestedFirstMessage: "Suggested first message",
+    suggestedFirstMessagePlaceholder: "I saw your skills and think we could build a strong team. Are you open to discussing roles?",
+    additionalSkills: "Additional skills",
+    addCustom: "Add custom",
+    add: "Add",
+    addSkill: "Add skill",
+    titleRole: "Title / role",
+    projectOrganization: "Project / organization",
+    period: "Period",
+    description: "Description",
+    relatedSkills: "Related skills",
+    labelField: "Label",
+    urlField: "URL",
+    urlWarning: "Use a full URL starting with http or https.",
+    fullNameRequiredValidation: "Full name is required.",
+    campusRequired: "Campus is required.",
+    programRequired: "Faculty or program is required.",
+    mainRoleRequired: "Main role is required.",
+    mainSkillRequired: "Main skill is required.",
+    collaborationTypeRequired: "Select at least one collaboration type.",
+    skillRequired: "Select at least 3 skills.",
+    profileSummaryLimit: "Profile summary must stay under 180 characters.",
+    experienceSummaryLimit: "Experience summary must stay under 240 characters.",
+    experienceTitleRequired: "Experience title is required.",
+    projectRequired: "Project or organization is required.",
+    experienceDescriptionRequired: "Experience description is required.",
+    portfolioUrlInvalid: "URL should start with http or https.",
+    availabilityRequired: "Availability is required.",
+    lookingForRequired: "Select at least one role you are looking for.",
+    matchEyebrow: "It is a Mutualizm match",
+    matchTitlePrefix: "You and",
+    matchTitleSuffix: "are both interested in collaborating.",
+    suggestionMatch: "Suggestion match",
+    suggestionTitleSuffix: "matches your onboarding profile.",
+    whySuggested: "Why suggested",
+    skillCategory: "Skill category",
+    anyCategory: "Any category",
+    specificSkill: "Specific skill",
+    anySkill: "Any skill",
+    role: "Role",
+    anyRole: "Any role",
+    anyAvailability: "Any availability",
+    collaborationGoal: "Collaboration goal",
+    anyGoal: "Any goal",
+    anyProgram: "Any program",
+    experienceLevel: "Experience level",
+    anyLevel: "Any level",
+    applyFilters: "Apply filters"
   },
   id: {
     discover: "Temukan",
@@ -278,7 +518,9 @@ const translations = {
     matchesTitle: "Kecocokan Anda",
     matchesEyebrow: "Kecocokan",
     savedTitle: "Profil disimpan",
-    savedEyebrow: "Bookmark",
+    savedEyebrow: "Disimpan",
+    suggestedProject: "Proyek disarankan",
+    explore: "Jelajahi",
     projectsTitle: "Proyek Anda",
     projectsEyebrow: "Proyek",
     alertsTitle: "Notifikasi",
@@ -291,11 +533,11 @@ const translations = {
     photoUrl: "URL Foto Profil",
     language: "Bahasa",
     indonesian: "Bahasa Indonesia",
-    english: "Inggris (English)",
+    english: "Bahasa Inggris",
     save: "Simpan Perubahan",
     close: "Tutup",
     filters: "Filter",
-    reset: "Reset demo",
+    reset: "Mulai ulang demo",
     noCandidates: "Tidak ada kandidat yang cocok dengan filter",
     deckComplete: "Dek selesai",
     activeFilters: "Filter Aktif",
@@ -337,7 +579,7 @@ const translations = {
     offline: "Offline",
     open: "Buka",
     send: "Kirim",
-    resetDemo: "Reset demo",
+    resetDemo: "Mulai ulang demo",
     viewProfile: "Lihat Profil",
     whyMatchWorks: "Mengapa kecocokan ini berhasil",
     noMatchesYet: "Belum ada kecocokan",
@@ -362,9 +604,248 @@ const translations = {
     keepSwiping: "Lanjut swipe",
     sendMessageBtn: "Kirim pesan",
     chatFollowed: "Obrolan Diikuti",
-    noChatUsers: "Belum ada user yang bisa diajak chat."
+    noChatUsers: "Belum ada pengguna yang bisa diajak mengobrol.",
+    closePanel: "Tutup",
+    home: "Beranda",
+    logoutTitle: "Yakin ingin keluar?",
+    logoutBody: "Pilih sesi akun yang ingin dikeluarkan. Akun yang tersimpan tetap bisa dipakai masuk lagi.",
+    noActiveSession: "Tidak ada sesi aktif.",
+    mutualizmUser: "Pengguna Mutualizm",
+    invalidLogin: "Email atau kata sandi tidak valid. Petunjuk: student@telkomuniversity.ac.id & hadidpassword, atau gunakan Google SSO.",
+    fullNameRequired: "Nama lengkap wajib diisi.",
+    emailUsernameRequired: "Username email wajib diisi.",
+    passwordMin: "Kata sandi minimal 8 karakter.",
+    passwordHint: "Minimal 8 karakter.",
+    resetToastTitle: "Link reset demo",
+    resetToastBody: "Link reset kata sandi sudah dikirim ke email Anda.",
+    teluSso: "SSO Mahasiswa Tel-U",
+    googleAccount: "Akun Google",
+    authLegalPrefix: "Dengan melanjutkan, Anda menyetujui",
+    and: "dan",
+    landingHow: "Cara kerja",
+    landingFeatures: "Fitur",
+    landingOpenApp: "Buka Aplikasi",
+    landingHeroEyebrow: "Kolaborasi kampus berbasis keahlian",
+    landingHeroTitle: "Temukan rekan tim berdasarkan keahlian, bukan dari grup acak.",
+    landingHeroBody: "Mutualizm membantu mahasiswa Telkom University menemukan kolaborator untuk proyek, kompetisi, dan startup melalui kartu profil berbasis keahlian yang terstruktur.",
+    landingStartMatching: "Mulai Mencari",
+    landingTryDemo: "Coba Demo",
+    landingMetricsRoles: "12+ Peran Mahasiswa",
+    landingMetricsSwipe: "Gesture Kartu Swipe",
+    landingMetricsChats: "Kecocokan & Obrolan Demo",
+    landingHowTitle: "Dari profil ke rekan tim dalam beberapa ketukan.",
+    landingStepProfileTitle: "Buat Profil",
+    landingStepProfileBody: "Tampilkan keahlian utama dan ketersediaan agar lebih mudah ditemukan.",
+    landingStepSwipeTitle: "Geser Berdasarkan Keahlian",
+    landingStepSwipeBody: "Temukan teman dengan kemampuan pelengkap untuk ide besar berikutnya.",
+    landingStepBuildTitle: "Bangun Bersama",
+    landingStepBuildBody: "Dapatkan kecocokan dan mulai berkolaborasi pada proyek berdampak.",
+    landingFeaturesTitle: "Fitur utama Mutualizm.",
+    landingFeatureDiscover: "Temukan berdasarkan keahlian, peran, dan ketersediaan.",
+    landingFeatureSwipe: "Kartu geser dengan animasi lewati, simpan, dan minat.",
+    landingFeatureChat: "Mockup obrolan untuk berdiskusi dengan kecocokan.",
+    landingFeatureSettings: "Pengaturan profil, bahasa, notifikasi, dan privasi.",
+    landingCtaTitle: "Siap mencoba Mutualizm?",
+    landingCtaBody: "Mulai dari onboarding atau langsung masuk ke dek penemuan.",
+    landingOpenDiscover: "Buka Temukan",
+    settingsDrawerTitle: "Profil, Bahasa, dan Preferensi",
+    settingsRulesTitle: "Aturan profil",
+    settingsRulesBody: "Gunakan informasi asli, tampilkan keahlian utama, dan tulis pengalaman singkat agar saran kecocokan lebih akurat.",
+    profilePhoto: "Foto profil",
+    roleMain: "Peran utama",
+    statusBadge: "Badge status",
+    defaultStatus: "Status bawaan",
+    lookingForProject: "Mencari proyek",
+    availableThisWeek: "Tersedia minggu ini",
+    busyMessageFirst: "Sibuk, kirim pesan dulu",
+    websiteLanguage: "Bahasa website",
+    aboutProfile: "Tentang profil",
+    currentPassword: "Kata sandi saat ini",
+    optionalDemo: "Opsional untuk demo frontend",
+    newPassword: "Kata sandi baru",
+    confirmNewPassword: "Konfirmasi kata sandi baru",
+    passwordNewMinError: "Kata sandi baru minimal 8 karakter.",
+    passwordConfirmError: "Konfirmasi kata sandi belum sama.",
+    settingsSavedTitle: "Pengaturan disimpan",
+    settingsSavedBody: "Perubahan profil dan bahasa sudah disimpan.",
+    deleteAccountConfirm: "Hapus akun demo ini? Data profil lokal akan dihapus.",
+    notifyPreference: "Tampilkan notifikasi kecocokan dan pesan baru",
+    chatPreference: "Izinkan pengguna yang diikuti memulai obrolan",
+    emailPreference: "Sembunyikan email kampus dari profil publik",
+    logoutAccount: "Keluar akun",
+    deleteAccount: "Hapus akun",
+    qrTitle: "Pindai Profil",
+    qrBody: "QR ini membuka halaman info profil untuk",
+    copyLink: "Salin link",
+    openProfile: "Buka profil",
+    linkCopiedTitle: "Link profil disalin",
+    linkCopiedBody: "Link profil sudah disalin.",
+    realTimeUi: "UI realtime",
+    ready: "Siap",
+    rightRailBody: "Lencana online, indikator mengetik, notifikasi kecocokan, dan jumlah pesan belum dibaca disimulasikan untuk koneksi Laravel Reverb di masa depan.",
+    recentMatches: "Kecocokan terbaru",
+    view: "Lihat",
+    unreadCount: "belum dibaca",
+    clearMatches: "Hapus kecocokan",
+    chatPreview: "Pratinjau obrolan",
+    conversationWith: "Obrolan dengan",
+    conversationNotFound: "Obrolan tidak ditemukan.",
+    noChatSelected: "Belum ada obrolan dipilih",
+    noChatSelectedBody: "Buka kecocokan untuk melihat pratinjau UI obrolan.",
+    viewMatches: "Lihat kecocokan",
+    savedChatStarter: "Hai! Terima kasih sudah menyimpan profil saya. Saya tertarik membahas kolaborasi!",
+    statusCollaboration: "Status kolaborasi",
+    noAvailabilityDetail: "Belum ada detail ketersediaan.",
+    mainSkillsTitle: "Keahlian utama",
+    noSkillsYet: "Belum ada keahlian.",
+    lookingForTitle: "Mencari",
+    noLookingForYet: "Belum memilih kebutuhan tim.",
+    experienceTitle: "Pengalaman",
+    recent: "Terbaru",
+    noExperienceYet: "Belum ada pengalaman.",
+    portfolioTitle: "Portofolio",
+    noPortfolioYet: "Belum ada link portofolio.",
+    aiAssistantTitle: "AI Mutualizm",
+    aiAssistantIntro: "Minta saran rekan tim, kecocokan skill, ide peran, atau bantuan mencari proyek.",
+    aiPlaceholder: "Tanyakan skill atau peran rekan tim yang dibutuhkan...",
+    aiFindDesign: "Cari bantuan UI/UX",
+    aiFindBackend: "Cari bantuan backend",
+    aiFindPitch: "Cari rekan pitch deck",
+    aiAsk: "Tanya AI",
+    aiThinking: "Mencari saran yang berguna...",
+    aiMatches: "Orang yang disarankan",
+    aiNoMatches: "Belum ada kecocokan lokal yang kuat. Coba skill yang lebih spesifik.",
+    aiError: "Maaf, asisten AI belum bisa menjawab sekarang.",
+    matchReadyCopy: "Kolaborator ini siap bertemu dengan Anda. Buka kartu untuk memulai percakapan proyek terarah.",
+    removeAllSaved: "Hapus semua simpanan",
+    upload: "Unggah",
+    noPhoto: "Belum ada foto",
+    horizontalCrop: "Posisi horizontal",
+    verticalCrop: "Posisi vertikal",
+    centerCrop: "Tengahkan foto",
+    pastePhotoUrl: "atau tempel URL foto",
+    yourName: "Nama Anda",
+    mainRoleFallback: "Peran utama",
+    interest: "Minat",
+    openCollaboration: "Terbuka untuk kolaborasi",
+    lessInfo: "Lebih Sedikit",
+    moreInfo: "Info Lengkap",
+    topSkills: "Keahlian Teratas",
+    lookingForPrefix: "Mencari",
+    collaborators: "Kolaborator",
+    passProfile: "Lewati profil",
+    saveProfile: "Simpan profil",
+    showInterest: "Tunjukkan minat",
+    fullSummary: "Ringkasan lengkap",
+    skillsByCategory: "Keahlian per kategori",
+    experienceTimeline: "Linimasa pengalaman",
+    portfolioLinks: "Link portofolio",
+    collaborationFit: "Kecocokan kolaborasi",
+    noExperienceProof: "Belum ada bukti pengalaman. Tambahkan bukti proyek dari Profil.",
+    portfolioCanBeAdded: "Link portofolio bisa ditambahkan nanti.",
+    preferredRoleLabel: "Peran pilihan",
+    availabilityLabel: "Ketersediaan",
+    suggestedOpener: "Pembuka yang disarankan"
+    ,
+    skipToDemo: "Lewati ke demo",
+    stepOf: "Langkah",
+    of: "dari",
+    profileReadyTitle: "Profil siap",
+    profileReadyBody: "Profil demo Anda sudah disimpan.",
+    back: "Kembali",
+    continue: "Lanjut",
+    enterDiscover: "Masuk Temukan",
+    liveCardPreview: "Pratinjau kartu langsung",
+    stepIdentity: "Identitas",
+    stepCampus: "Kampus",
+    stepRole: "Peran",
+    stepSkills: "Keahlian",
+    stepSummary: "Ringkasan",
+    stepExperience: "Pengalaman",
+    stepTimeline: "Linimasa",
+    stepPortfolio: "Portofolio",
+    stepAvailability: "Ketersediaan",
+    stepPreview: "Pratinjau",
+    avatarColor: "Warna avatar",
+    referenceYellow: "Kuning acuan",
+    softHoney: "Madu lembut",
+    warmCream: "Krem hangat",
+    neutralGray: "Abu-abu netral",
+    facultyProgram: "Fakultas / program studi",
+    mainRole: "Peran Utama",
+    technicalRole: "Teknis",
+    businessRole: "Bisnis",
+    designRole: "Desain",
+    otherRole: "Lainnya",
+    customRole: "Peran khusus",
+    customRolePlaceholder: "mis. Pencerita Data, Seniman Gim, Penulis Riset",
+    mainSkillLabel: "Keahlian utama",
+    otherSkill: "Keahlian lainnya",
+    customMainSkill: "Keahlian utama khusus",
+    customMainSkillPlaceholder: "mis. Desain Gerak, Berbicara Publik, Pemetaan GIS",
+    collaborationType: "Jenis kolaborasi",
+    skillHelper: "Pilih minimal tiga keahlian. Tiga pertama tampil di bagian depan kartu.",
+    profileSummaryLabel: "Ringkasan profil",
+    profileSummaryHint: "karakter",
+    profileSummaryPlaceholder: "Mahasiswa fokus frontend yang berpengalaman dengan React, UI siap Laravel, dan prototipe inovasi kampus.",
+    experienceSummaryLabel: "Ringkasan pengalaman",
+    experienceSummaryHint: "karakter. Buat tetap berbasis bukti.",
+    experienceSummaryPlaceholder: "Membangun komponen frontend responsif untuk prototipe kampus menggunakan React dan pola UI siap Laravel.",
+    availabilityDetails: "Detail ketersediaan",
+    availabilityPlaceholder: "Tersedia setelah kelas dan akhir pekan untuk lomba.",
+    lookingForLabel: "Mencari",
+    suggestedFirstMessage: "Pesan pertama yang disarankan",
+    suggestedFirstMessagePlaceholder: "Saya melihat keahlian Anda dan merasa kita bisa membuat tim yang kuat. Mau membahas peran?",
+    additionalSkills: "Keahlian tambahan",
+    addCustom: "Tambah khusus",
+    add: "Tambah",
+    addSkill: "Tambah keahlian",
+    titleRole: "Judul / peran",
+    projectOrganization: "Proyek / organisasi",
+    period: "Periode",
+    description: "Deskripsi",
+    relatedSkills: "Keahlian terkait",
+    labelField: "Label",
+    urlField: "URL",
+    urlWarning: "Gunakan URL lengkap yang diawali http atau https.",
+    fullNameRequiredValidation: "Nama lengkap wajib diisi.",
+    campusRequired: "Kampus wajib diisi.",
+    programRequired: "Fakultas atau program studi wajib diisi.",
+    mainRoleRequired: "Peran utama wajib diisi.",
+    mainSkillRequired: "Keahlian utama wajib diisi.",
+    collaborationTypeRequired: "Pilih minimal satu jenis kolaborasi.",
+    skillRequired: "Pilih minimal 3 keahlian.",
+    profileSummaryLimit: "Ringkasan profil harus di bawah 180 karakter.",
+    experienceSummaryLimit: "Ringkasan pengalaman harus di bawah 240 karakter.",
+    experienceTitleRequired: "Judul pengalaman wajib diisi.",
+    projectRequired: "Proyek atau organisasi wajib diisi.",
+    experienceDescriptionRequired: "Deskripsi pengalaman wajib diisi.",
+    portfolioUrlInvalid: "URL harus diawali http atau https.",
+    availabilityRequired: "Ketersediaan wajib diisi.",
+    lookingForRequired: "Pilih minimal satu peran yang Anda cari.",
+    matchEyebrow: "Ini kecocokan Mutualizm",
+    matchTitlePrefix: "Anda dan",
+    matchTitleSuffix: "sama-sama tertarik berkolaborasi.",
+    suggestionMatch: "Saran kecocokan",
+    suggestionTitleSuffix: "cocok dengan profil onboarding Anda.",
+    whySuggested: "Kenapa disarankan",
+    skillCategory: "Kategori keahlian",
+    anyCategory: "Semua kategori",
+    specificSkill: "Keahlian spesifik",
+    anySkill: "Semua keahlian",
+    role: "Peran",
+    anyRole: "Semua peran",
+    anyAvailability: "Semua ketersediaan",
+    collaborationGoal: "Tujuan kolaborasi",
+    anyGoal: "Semua tujuan",
+    anyProgram: "Semua program",
+    experienceLevel: "Level pengalaman",
+    anyLevel: "Semua level",
+    applyFilters: "Terapkan filter"
   }
 };
+
+type TranslationSet = typeof translations.en;
 
 function useTranslations() {
   const { language } = useSymbio();
@@ -419,6 +900,7 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
 
 function AuthPage() {
   const { login, signup, isAuthenticated, addToast } = useSymbio();
+  const t = useTranslations();
   const navigate = useNavigate();
   const location = useLocation();
   const [mode, setMode] = useState<"login" | "signup">(
@@ -452,19 +934,19 @@ function AuthPage() {
       if (success) {
         navigate(from, { replace: true });
       } else {
-        setError("Invalid email or password. Hint: student@telkomuniversity.ac.id & hadidpassword, or use Google SSO.");
+        setError(t.invalidLogin);
       }
     } else {
       if (!fullName.trim()) {
-        setError("Full name is required.");
+        setError(t.fullNameRequired);
         return;
       }
       if (!emailPrefix.trim()) {
-        setError("Email username is required.");
+        setError(t.emailUsernameRequired);
         return;
       }
       if (password.length < 8) {
-        setError("Password must be at least 8 characters.");
+        setError(t.passwordMin);
         return;
       }
       const fullEmail = `${emailPrefix.trim()}@telkomuniversity.ac.id`;
@@ -497,17 +979,17 @@ function AuthPage() {
       <div className="auth-container">
         <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--primary)', fontWeight: 600, marginBottom: 16, textDecoration: 'none' }}>
           <span className="material-symbols-outlined" style={{ fontSize: 20 }}>arrow_back</span>
-          Beranda
+          {t.home}
         </Link>
         <div className="auth-header">
           <div className="auth-logo-wrap">
             <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>hub</span>
           </div>
-          <h1>{mode === "login" ? "Welcome Back" : "Create Account"}</h1>
+          <h1>{mode === "login" ? t.welcomeBack : t.createAccount}</h1>
           <p>
             {mode === "login"
-              ? "Log in to continue building your network."
-              : "Join the campus innovation ecosystem."}
+              ? t.loginSubtitle
+              : t.signupSubtitle}
           </p>
         </div>
 
@@ -520,7 +1002,7 @@ function AuthPage() {
         <form className="auth-form" onSubmit={handleSubmit}>
           {mode === "signup" ? (
             <div className="auth-field">
-              <label htmlFor="fullName">Full Name</label>
+              <label htmlFor="fullName">{t.fullName}</label>
               <input
                 id="fullName"
                 type="text"
@@ -534,7 +1016,7 @@ function AuthPage() {
           ) : null}
 
           <div className="auth-field">
-            <label htmlFor="email">Campus Email</label>
+            <label htmlFor="email">{t.campusEmail}</label>
             {mode === "signup" ? (
               <div className="auth-input-wrapper">
                 <input
@@ -565,10 +1047,10 @@ function AuthPage() {
 
           <div className="auth-field">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <label htmlFor="password">Password</label>
+              <label htmlFor="password">{t.password}</label>
               {mode === "login" ? (
-                <a href="#" className="auth-forgot-link" onClick={(e) => { e.preventDefault(); addToast("Mock reset link", "A password reset link was sent to your email."); }}>
-                  Forgot password?
+                <a href="#" className="auth-forgot-link" onClick={(e) => { e.preventDefault(); addToast(t.resetToastTitle, t.resetToastBody); }}>
+                  {t.forgotPassword}
                 </a>
               ) : null}
             </div>
@@ -595,25 +1077,25 @@ function AuthPage() {
             </div>
             {mode === "signup" ? (
               <p style={{ fontSize: '0.72rem', color: 'var(--muted)', margin: '4px 0 0' }}>
-                Must be at least 8 characters.
+                {t.passwordHint}
               </p>
             ) : null}
           </div>
 
           <button type="submit" className="auth-btn-primary">
-            {mode === "login" ? "Sign In" : "Create Account"}
+            {mode === "login" ? t.signIn : t.createAccount}
           </button>
         </form>
 
         <div className="auth-divider">
           <div className="auth-divider-line" />
-          <span className="auth-divider-text">Or continue with</span>
+          <span className="auth-divider-text">{t.orContinueWith}</span>
           <div className="auth-divider-line" />
         </div>
 
         <button type="button" className="auth-btn-social" onClick={() => handleSSOLogin("Student")}>
           <span className="material-symbols-outlined" style={{ color: 'var(--primary)' }}>hub</span>
-          Tel-U Student SSO
+          {t.teluSso}
         </button>
 
         <button type="button" className="auth-btn-social" onClick={() => handleSSOLogin("Google")}>
@@ -623,30 +1105,30 @@ function AuthPage() {
             <path d="M5.84 14.09c-.22-.66-.35-1.39-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l3.66-2.85z" fill="#FBBC05"></path>
             <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.85c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"></path>
           </svg>
-          Google Account
+          {t.googleAccount}
         </button>
 
         <div className="auth-footer">
           {mode === "login" ? (
             <>
-              Don't have an account?{" "}
+              {t.dontHaveAccount}{" "}
               <a href="#" onClick={(e) => { e.preventDefault(); setMode("signup"); setError(""); }}>
-                Sign Up
+                {t.signUp}
               </a>
             </>
           ) : (
             <>
-              Already have an account?{" "}
+              {t.alreadyHaveAccount}{" "}
               <a href="#" onClick={(e) => { e.preventDefault(); setMode("login"); setError(""); }}>
-                Sign In
+                {t.signIn}
               </a>
             </>
           )}
         </div>
 
         <div className="auth-legal">
-          By continuing, you agree to our <br />
-          <Link to="/terms">Terms of Service</Link> and <Link to="/privacy">Privacy Policy</Link>.
+          {t.authLegalPrefix} <br />
+          <Link to="/terms">{t.termsOfService}</Link> {t.and} <Link to="/privacy">{t.privacyPolicy}</Link>.
         </div>
       </div>
     </div>
@@ -708,12 +1190,12 @@ function App() {
 
       if (matchedUser) {
         setUser(matchedUser);
-        addToast("Welcome back!", `Logged in as ${matchedUser.name}`);
+        addToast(language === "id" ? "Selamat datang kembali!" : "Welcome back!", language === "id" ? `Masuk sebagai ${matchedUser.name}` : `Logged in as ${matchedUser.name}`);
         return true;
       }
       return false;
     },
-    [addToast, setProfile, setUser]
+    [addToast, language, setUser]
   );
 
   const signup = useCallback(
@@ -727,7 +1209,7 @@ function App() {
       );
 
       if (registeredUsers.some((u: any) => u.email.toLowerCase() === cleanEmail)) {
-        addToast("Error", "An account with this email already exists.");
+        addToast(language === "id" ? "Gagal" : "Error", language === "id" ? "Akun dengan email ini sudah ada." : "An account with this email already exists.");
         return;
       }
 
@@ -766,20 +1248,20 @@ function App() {
         preferredRole: "",
         suggestedMessage: "",
         avatarPosition: "center 42%",
-        statusLabel: "Open to team up",
+        statusLabel: "",
         mutualInterest: false
       };
 
       setProfile(newProfile);
-      addToast("Account created!", "Please complete your onboarding profile.");
+      addToast(language === "id" ? "Akun dibuat!" : "Account created!", language === "id" ? "Lengkapi profil onboarding Anda." : "Please complete your onboarding profile.");
     },
-    [addToast, setProfile, setUser]
+    [addToast, language, setProfile, setUser]
   );
 
   const logout = useCallback(() => {
     setUser(null);
-    addToast("Logged out", "You have been logged out of your session.");
-  }, [addToast, setUser]);
+    addToast(language === "id" ? "Keluar" : "Logged out", language === "id" ? "Anda sudah keluar dari sesi." : "You have been logged out of your session.");
+  }, [addToast, language, setUser]);
 
   const actOnCandidate = useCallback(
     (candidate: CandidateProfile, action: SwipeAction, createdMatch = false) => {
@@ -900,6 +1382,17 @@ function App() {
     setPreviousActions([]);
   }, [setInterestedIds, setPassedIds, setPreviousActions, setSavedIds]);
 
+  const clearMatches = useCallback(() => {
+    const matchIds = new Set(matches.map((match) => match.id));
+    setMatches([]);
+    setChats((current) =>
+      Object.fromEntries(Object.entries(current).filter(([matchId]) => !matchIds.has(matchId)))
+    );
+    setNotifications((current) =>
+      current.filter((notification) => !notification.id.startsWith("notif-match-"))
+    );
+  }, [matches, setChats, setMatches, setNotifications]);
+
   const removeSaved = useCallback(
     (candidateId: string) => {
       setSavedIds((current) => current.filter((id) => id !== candidateId));
@@ -980,6 +1473,7 @@ function App() {
       actOnCandidate,
       rewindLast,
       resetDeck,
+      clearMatches,
       removeSaved,
       clearFilters,
       markNotificationRead,
@@ -999,6 +1493,7 @@ function App() {
       addToast,
       chats,
       setChats,
+      clearMatches,
       clearFilters,
       filters,
       interestedIds,
@@ -1067,6 +1562,7 @@ function App() {
 
 function LandingPage() {
   const { isAuthenticated } = useSymbio();
+  const t = useTranslations();
   const [landingMenuOpen, setLandingMenuOpen] = useState(false);
   const scrollToSection = (sectionId: string) => {
     document.getElementById(sectionId)?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -1074,7 +1570,7 @@ function LandingPage() {
   };
 
   return (
-    <div className="landing-shell page-transition" style={{ paddingBottom: '40px' }}>
+    <div className="landing-shell page-transition">
       <div className="auth-bg-blob-1" />
       <div className="auth-bg-blob-2" />
 
@@ -1084,14 +1580,14 @@ function LandingPage() {
           <span>Mutualizm</span>
         </Link>
         <nav className="landing-links" aria-label="Landing navigation" style={{ fontWeight: "600" }}>
-          <a href="#how" onClick={(e) => { e.preventDefault(); scrollToSection("how"); }}>How it works</a>
-          <a href="#features" onClick={(e) => { e.preventDefault(); scrollToSection("features"); }}>Features</a>
+          <a href="#how" onClick={(e) => { e.preventDefault(); scrollToSection("how"); }}>{t.landingHow}</a>
+          <a href="#features" onClick={(e) => { e.preventDefault(); scrollToSection("features"); }}>{t.landingFeatures}</a>
           {isAuthenticated ? (
-            <Link to="/discover" className="button button-primary" style={{ minHeight: "38px", padding: "0 16px", borderRadius: "20px", fontSize: "0.85rem" }}>Open App</Link>
+            <Link to="/discover" className="button button-primary" style={{ minHeight: "38px", padding: "0 16px", borderRadius: "20px", fontSize: "0.85rem" }}>{t.landingOpenApp}</Link>
           ) : (
             <div style={{ display: "flex", gap: "10px" }}>
-              <Link to="/login" className="button button-ghost" style={{ minHeight: "38px", padding: "0 12px", fontSize: "0.85rem" }}>Sign In</Link>
-              <Link to="/signup" className="button button-primary" style={{ minHeight: "38px", padding: "0 16px", borderRadius: "20px", fontSize: "0.85rem" }}>Sign Up</Link>
+              <Link to="/login" className="button button-ghost" style={{ minHeight: "38px", padding: "0 12px", fontSize: "0.85rem" }}>{t.signIn}</Link>
+              <Link to="/signup" className="button button-primary" style={{ minHeight: "38px", padding: "0 16px", borderRadius: "20px", fontSize: "0.85rem" }}>{t.signUp}</Link>
             </div>
           )}
         </nav>
@@ -1106,14 +1602,14 @@ function LandingPage() {
       </header>
       {landingMenuOpen ? (
         <div className="landing-mobile-menu">
-          <a href="#how" onClick={(e) => { e.preventDefault(); scrollToSection("how"); }}>How it works</a>
-          <a href="#features" onClick={(e) => { e.preventDefault(); scrollToSection("features"); }}>Features</a>
+          <a href="#how" onClick={(e) => { e.preventDefault(); scrollToSection("how"); }}>{t.landingHow}</a>
+          <a href="#features" onClick={(e) => { e.preventDefault(); scrollToSection("features"); }}>{t.landingFeatures}</a>
           {isAuthenticated ? (
-            <Link to="/discover">Open App</Link>
+            <Link to="/discover">{t.landingOpenApp}</Link>
           ) : (
             <>
-              <Link to="/login">Sign In</Link>
-              <Link to="/signup">Sign Up</Link>
+              <Link to="/login">{t.signIn}</Link>
+              <Link to="/signup">{t.signUp}</Link>
             </>
           )}
         </div>
@@ -1122,26 +1618,25 @@ function LandingPage() {
       <main style={{ position: "relative", zIndex: 10 }}>
         <section className="landing-hero">
           <div className="hero-copy">
-            <p className="eyebrow" style={{ color: "var(--primary)", fontWeight: "700", letterSpacing: "0.05em" }}>Skill-based campus collaboration</p>
+            <p className="eyebrow" style={{ color: "var(--primary)", fontWeight: "700", letterSpacing: "0.05em" }}>{t.landingHeroEyebrow}</p>
             <h1 style={{ fontFamily: "Montserrat, sans-serif", fontWeight: "700", lineHeight: "1.1", color: "var(--ink)", margin: 0 }}>
-              Find teammates by skill, not by random group chats.
+              {t.landingHeroTitle}
             </h1>
             <p className="hero-lede" style={{ color: "var(--on-surface-variant)", lineHeight: "1.6" }}>
-              Mutualizm helps Telkom University students discover collaborators for projects,
-              competitions, and startups through structured, skill-based discovery profile cards.
+              {t.landingHeroBody}
             </p>
             <div className="hero-actions">
               <Link className="button button-primary" to={isAuthenticated ? "/discover" : "/signup"} style={{ padding: "0 32px", borderRadius: "30px", height: "48px", fontSize: "0.95rem" }}>
-                Start Matching
+                {t.landingStartMatching}
               </Link>
               <Link className="button button-secondary" to="/discover" style={{ padding: "0 32px", borderRadius: "30px", height: "48px", fontSize: "0.95rem" }}>
-                Try Demo
+                {t.landingTryDemo}
               </Link>
             </div>
             <div className="hero-metrics">
-              <span>12+ Student Roles</span>
-              <span>Swipe Deck Gesture</span>
-              <span>Mock Matches &amp; Chats</span>
+              <span>{t.landingMetricsRoles}</span>
+              <span>{t.landingMetricsSwipe}</span>
+              <span>{t.landingMetricsChats}</span>
             </div>
           </div>
 
@@ -1150,50 +1645,50 @@ function LandingPage() {
 
         <section className="section-band" id="how" style={{ borderTop: "1px solid var(--border)" }}>
           <div className="section-heading" style={{ textAlign: "center", margin: "0 auto 48px" }}>
-            <p className="eyebrow" style={{ color: "var(--primary)", fontWeight: "700", letterSpacing: "0.05em" }}>How it works</p>
-            <h2 style={{ fontFamily: "Montserrat, sans-serif", fontWeight: "700", fontSize: "2.2rem", color: "var(--ink)" }}>From profile to teammate in a few taps.</h2>
+            <p className="eyebrow" style={{ color: "var(--primary)", fontWeight: "700", letterSpacing: "0.05em" }}>{t.landingHow}</p>
+            <h2 style={{ fontFamily: "Montserrat, sans-serif", fontWeight: "700", fontSize: "2.2rem", color: "var(--ink)" }}>{t.landingHowTitle}</h2>
           </div>
           <div className="steps-grid">
             <StepCard
               number="01"
-              title="Create Profile"
-              body="Showcase your top skills and availability to stand out."
+              title={t.landingStepProfileTitle}
+              body={t.landingStepProfileBody}
             />
             <StepCard
               number="02"
-              title="Swipe by Skill"
-              body="Discover peers with complementary abilities for your next big idea."
+              title={t.landingStepSwipeTitle}
+              body={t.landingStepSwipeBody}
             />
             <StepCard
               number="03"
-              title="Build Together"
-              body="Match instantly and start collaborating on impactful projects."
+              title={t.landingStepBuildTitle}
+              body={t.landingStepBuildBody}
             />
           </div>
         </section>
 
         <section className="section-band feature-strip-section" id="features">
           <div className="section-heading">
-            <p className="eyebrow">Features</p>
-            <h2>Fitur utama Mutualizm.</h2>
+            <p className="eyebrow">{t.landingFeatures}</p>
+            <h2>{t.landingFeaturesTitle}</h2>
           </div>
           <div className="feature-grid">
-            <FeatureItem icon={<Search size={20} aria-hidden="true" />} text="Discover berdasarkan skill, role, dan availability." />
-            <FeatureItem icon={<Heart size={20} aria-hidden="true" />} text="Swipe deck dengan animasi pass, save, dan interest." />
-            <FeatureItem icon={<MessageCircle size={20} aria-hidden="true" />} text="Chat mockup untuk berdiskusi dengan match." />
-            <FeatureItem icon={<Settings size={20} aria-hidden="true" />} text="Settings profil, bahasa, notifikasi, dan privacy." />
+            <FeatureItem icon={<Search size={20} aria-hidden="true" />} text={t.landingFeatureDiscover} />
+            <FeatureItem icon={<Heart size={20} aria-hidden="true" />} text={t.landingFeatureSwipe} />
+            <FeatureItem icon={<MessageCircle size={20} aria-hidden="true" />} text={t.landingFeatureChat} />
+            <FeatureItem icon={<Settings size={20} aria-hidden="true" />} text={t.landingFeatureSettings} />
           </div>
         </section>
 
         <section className="cta-band">
-          <h2 style={{ fontFamily: "Montserrat, sans-serif", fontWeight: "700", fontSize: "2.2rem", color: "var(--ink)", margin: 0 }}>Ready to try Mutualizm?</h2>
-          <p style={{ color: "var(--on-surface-variant)", fontSize: "1.1rem", margin: "14px 0 32px" }}>Start from onboarding or jump straight into the discovery deck.</p>
+          <h2 style={{ fontFamily: "Montserrat, sans-serif", fontWeight: "700", fontSize: "2.2rem", color: "var(--ink)", margin: 0 }}>{t.landingCtaTitle}</h2>
+          <p style={{ color: "var(--on-surface-variant)", fontSize: "1.1rem", margin: "14px 0 32px" }}>{t.landingCtaBody}</p>
           <div className="hero-actions">
             <Link className="button button-primary" to={isAuthenticated ? "/discover" : "/signup"} style={{ padding: "0 32px", borderRadius: "30px", height: "48px", fontSize: "0.95rem" }}>
-              Start Matching
+              {t.landingStartMatching}
             </Link>
             <Link className="button button-secondary" to="/discover" style={{ padding: "0 32px", borderRadius: "30px", height: "48px", fontSize: "0.95rem" }}>
-              Open Discover
+              {t.landingOpenDiscover}
             </Link>
           </div>
         </section>
@@ -1467,6 +1962,7 @@ function AppShell() {
         {!isChatRoute ? <BottomNav unreadCount={unreadCount} /> : null}
       </main>
 
+      <AiAssistantBubble />
       {!isChatRoute ? <FollowChatBubble /> : null}
 
       {settingsOpen ? <SettingsDrawer onClose={() => setSettingsOpen(false)} onLogoutRequest={() => setLogoutOpen(true)} /> : null}
@@ -1574,6 +2070,7 @@ function SettingsDrawer({
   onLogoutRequest: () => void;
 }) {
   const { profile, setProfile, language, setLanguage, addToast, user, logout } = useSymbio();
+  const t = useTranslations();
   const navigate = useNavigate();
   const [draft, setDraft] = useState({
     name: profile.name,
@@ -1596,11 +2093,11 @@ function SettingsDrawer({
     setSettingsError("");
     if (draft.newPassword || draft.confirmPassword) {
       if (draft.newPassword.length < 8) {
-        setSettingsError("Password baru minimal 8 karakter.");
+        setSettingsError(t.passwordNewMinError);
         return;
       }
       if (draft.newPassword !== draft.confirmPassword) {
-        setSettingsError("Konfirmasi password belum sama.");
+        setSettingsError(t.passwordConfirmError);
         return;
       }
 
@@ -1631,7 +2128,7 @@ function SettingsDrawer({
       statusLabel: draft.statusLabel.trim()
     }));
     setLanguage(draft.language);
-    addToast("Settings saved", "Perubahan profil dan bahasa sudah disimpan.");
+    addToast(t.settingsSavedTitle, t.settingsSavedBody);
     onClose();
   };
 
@@ -1640,7 +2137,7 @@ function SettingsDrawer({
   };
 
   const deleteAccount = () => {
-    const confirmed = window.confirm("Hapus akun demo ini? Data profil lokal akan dihapus.");
+    const confirmed = window.confirm(t.deleteAccountConfirm);
     if (!confirmed) {
       return;
     }
@@ -1669,8 +2166,8 @@ function SettingsDrawer({
       >
         <header className="settings-drawer-header">
           <div>
-            <p className="eyebrow">Settings</p>
-            <h2>Profil, Bahasa, dan Preferensi</h2>
+            <p className="eyebrow">{t.settings}</p>
+            <h2>{t.settingsDrawerTitle}</h2>
           </div>
           <Button variant="circle" aria-label="Close settings" onClick={onClose}>
             <X size={18} aria-hidden="true" />
@@ -1678,48 +2175,47 @@ function SettingsDrawer({
         </header>
 
         <div className="settings-note">
-          <strong>Peraturan profil</strong>
-          <p>Gunakan informasi asli, tampilkan skill utama, dan isi experience singkat agar suggestion match lebih akurat.</p>
+          <strong>{t.settingsRulesTitle}</strong>
+          <p>{t.settingsRulesBody}</p>
         </div>
 
         <div className="settings-form-grid">
-          <TextField label="Nama" value={draft.name} onChange={(value) => updateDraft("name", value)} />
+          <TextField label={t.name} value={draft.name} onChange={(value) => updateDraft("name", value)} />
           <PhotoUploadField
-            label="Foto profil"
+            label={t.profilePhoto}
             value={draft.avatarUrl}
             position={draft.avatarPosition}
             onChange={(value) => updateDraft("avatarUrl", value)}
             onPositionChange={(value) => updateDraft("avatarPosition", value)}
           />
-          <TextField label="Kampus" value={draft.campus} onChange={(value) => updateDraft("campus", value)} />
-          <TextField label="Program studi" value={draft.program} onChange={(value) => updateDraft("program", value)} />
-          <TextField label="Role utama" value={draft.role} onChange={(value) => updateDraft("role", value)} />
-          <TextField label="Skill utama" value={draft.mainSkill} onChange={(value) => updateDraft("mainSkill", value)} />
+          <TextField label={t.campus} value={draft.campus} onChange={(value) => updateDraft("campus", value)} />
+          <TextField label={t.program} value={draft.program} onChange={(value) => updateDraft("program", value)} />
+          <TextField label={t.roleMain} value={draft.role} onChange={(value) => updateDraft("role", value)} />
+          <TextField label={t.mainSkill} value={draft.mainSkill} onChange={(value) => updateDraft("mainSkill", value)} />
           <label className="field settings-select-field">
-            <span>Badge status</span>
+            <span>{t.statusBadge}</span>
             <select
               value={draft.statusLabel}
               onChange={(event) => updateDraft("statusLabel", event.target.value)}
             >
-              <option value="">Default status</option>
-              <option value="Open to team up">Open to team up</option>
-              <option value="Looking for project">Looking for project</option>
-              <option value="Available this week">Available this week</option>
-              <option value="Busy, message first">Busy, message first</option>
+              <option value="">{t.defaultStatus}</option>
+              <option value="Looking for project">{t.lookingForProject}</option>
+              <option value="Available this week">{t.availableThisWeek}</option>
+              <option value="Busy, message first">{t.busyMessageFirst}</option>
             </select>
           </label>
           <label className="field settings-select-field">
-            <span>Bahasa website</span>
+            <span>{t.websiteLanguage}</span>
             <select
               value={draft.language}
               onChange={(event) => updateDraft("language", event.target.value)}
             >
-              <option value="id">Bahasa Indonesia</option>
-              <option value="en">English</option>
+              <option value="id">{t.indonesian}</option>
+              <option value="en">{t.english}</option>
             </select>
           </label>
           <TextAreaField
-            label="Tentang profil"
+            label={t.aboutProfile}
             value={draft.bio}
             onChange={(value) => updateDraft("bio", value)}
             minRows={4}
@@ -1728,21 +2224,21 @@ function SettingsDrawer({
 
         <div className="settings-security-grid">
           <TextField
-            label="Password saat ini"
+            label={t.currentPassword}
             value={draft.currentPassword}
             onChange={(value) => updateDraft("currentPassword", value)}
-            placeholder="Opsional untuk demo frontend"
+            placeholder={t.optionalDemo}
             type="password"
           />
           <TextField
-            label="Password baru"
+            label={t.newPassword}
             value={draft.newPassword}
             onChange={(value) => updateDraft("newPassword", value)}
-            placeholder="Minimal 8 karakter"
+            placeholder={t.passwordHint}
             type="password"
           />
           <TextField
-            label="Konfirmasi password baru"
+            label={t.confirmNewPassword}
             value={draft.confirmPassword}
             onChange={(value) => updateDraft("confirmPassword", value)}
             type="password"
@@ -1753,33 +2249,33 @@ function SettingsDrawer({
         <div className="settings-preference-list">
           <label>
             <input type="checkbox" defaultChecked />
-            Tampilkan notifikasi match dan pesan baru
+            {t.notifyPreference}
           </label>
           <label>
             <input type="checkbox" defaultChecked />
-            Izinkan user yang di-follow memulai chat
+            {t.chatPreference}
           </label>
           <label>
             <input type="checkbox" />
-            Sembunyikan email kampus dari publik
+            {t.emailPreference}
           </label>
         </div>
 
         <div className="settings-actions">
           <Button variant="ghostDanger" onClick={() => { onClose(); onLogoutRequest(); }}>
             <LogOut size={18} aria-hidden="true" />
-            Keluar akun
+            {t.logoutAccount}
           </Button>
           <Button variant="ghostDanger" onClick={deleteAccount}>
             <Trash2 size={18} aria-hidden="true" />
-            Hapus akun
+            {t.deleteAccount}
           </Button>
           <div>
             <Button variant="secondary" onClick={onClose}>
-              Batal
+              {t.cancel}
             </Button>
             <Button variant="primary" onClick={saveSettings}>
-              Simpan
+              {t.save}
             </Button>
           </div>
         </div>
@@ -1791,6 +2287,7 @@ function SettingsDrawer({
 
 function LogoutConfirmModal({ onClose }: { onClose: () => void }) {
   const { user, logout } = useSymbio();
+  const t = useTranslations();
   const navigate = useNavigate();
   const [selectedEmail, setSelectedEmail] = useState(user?.email ?? "");
   const accounts = useMemo(() => {
@@ -1815,8 +2312,8 @@ function LogoutConfirmModal({ onClose }: { onClose: () => void }) {
   return createPortal(
     <div className="overlay confirm-overlay" role="presentation" onClick={onClose}>
       <section className="confirm-modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
-        <h2>Are you sure want to log out?</h2>
-        <p>Pilih sesi akun yang ingin dikeluarkan. Akun yang tersimpan tetap bisa dipakai login lagi.</p>
+        <h2>{t.logoutTitle}</h2>
+        <p>{t.logoutBody}</p>
         <div className="account-choice-list">
           {accounts.length ? accounts.map((account) => (
             <label key={account.email} className={selectedEmail === account.email ? "selected" : ""}>
@@ -1828,20 +2325,20 @@ function LogoutConfirmModal({ onClose }: { onClose: () => void }) {
                 onChange={() => setSelectedEmail(account.email)}
               />
               <span>
-                <strong>{account.name || "Mutualizm user"}</strong>
+                <strong>{account.name || t.mutualizmUser}</strong>
                 <small>{account.email}</small>
               </span>
             </label>
           )) : (
-            <p className="muted-text">Tidak ada sesi aktif.</p>
+            <p className="muted-text">{t.noActiveSession}</p>
           )}
         </div>
         <div className="modal-actions">
           <Button variant="secondary" onClick={onClose}>
-            Batal
+            {t.cancel}
           </Button>
           <Button variant="danger" onClick={confirmLogout} disabled={!user}>
-            Keluar
+            {t.logout}
           </Button>
         </div>
       </section>
@@ -1852,6 +2349,7 @@ function LogoutConfirmModal({ onClose }: { onClose: () => void }) {
 
 function ProfileQrModal({ profile, onClose }: { profile: CandidateProfile; onClose: () => void }) {
   const { addToast } = useSymbio();
+  const t = useTranslations();
   const profileUrl =
     typeof window === "undefined"
       ? "/profile"
@@ -1860,7 +2358,7 @@ function ProfileQrModal({ profile, onClose }: { profile: CandidateProfile; onClo
 
   const copyLink = async () => {
     await navigator.clipboard?.writeText(profileUrl);
-    addToast("Profile link copied", "Link profil sudah disalin.");
+    addToast(t.linkCopiedTitle, t.linkCopiedBody);
   };
 
   return createPortal(
@@ -1869,18 +2367,18 @@ function ProfileQrModal({ profile, onClose }: { profile: CandidateProfile; onClo
         <Button variant="circle" className="modal-close" aria-label="Close QR modal" onClick={onClose}>
           <X size={18} aria-hidden="true" />
         </Button>
-        <h2>Scan Profile</h2>
-        <p>QR ini mengarah ke halaman info profil {profile.name}.</p>
+        <h2>{t.qrTitle}</h2>
+        <p>{t.qrBody} {profile.name}.</p>
         <img src={qrUrl} alt={`QR code for ${profile.name} profile`} />
         <a href={profileUrl} className="profile-url" target="_blank" rel="noreferrer">
           {profileUrl}
         </a>
         <div className="modal-actions">
           <Button variant="secondary" onClick={copyLink}>
-            Copy link
+            {t.copyLink}
           </Button>
           <Link className="button button-primary" to="/profile" onClick={onClose}>
-            Buka profil
+            {t.openProfile}
           </Link>
         </div>
       </section>
@@ -1906,7 +2404,7 @@ function FollowChatBubble() {
         <section className="chat-bubble-panel" aria-label="Followed user chat list">
           <div className="rail-heading">
             <h2>{t.chatFollowed}</h2>
-            <button className="text-link" onClick={() => setOpen(false)}>Close</button>
+            <button className="text-link" onClick={() => setOpen(false)}>{t.closePanel}</button>
           </div>
           <div className="compact-list">
             {chatItems.length ? chatItems.map(({ match, candidate }) => (
@@ -1914,7 +2412,7 @@ function FollowChatBubble() {
                 <Avatar profile={candidate} size="xs" />
                 <span>
                   <strong>{candidate.name}</strong>
-                  <small>{match.latestMessage}</small>
+                  <small>{localizeMatchMessage(match.latestMessage, t)}</small>
                 </span>
                 {match.unread > 0 ? <em>{match.unread}</em> : null}
               </Link>
@@ -1927,6 +2425,146 @@ function FollowChatBubble() {
       <button className="chat-bubble-button" type="button" aria-label="Open followed user chat" onClick={() => setOpen((current) => !current)}>
         <MessageCircle size={24} aria-hidden="true" />
         {totalUnread > 0 ? <span className="chat-bubble-badge">{totalUnread}</span> : null}
+      </button>
+    </div>
+  );
+}
+
+function AiAssistantBubble() {
+  const { language } = useSymbio();
+  const t = useTranslations();
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [response, setResponse] = useState("");
+  const [results, setResults] = useState<CandidateProfile[]>([]);
+
+  const presets = [
+    { label: t.aiFindDesign, prompt: "I need a UI/UX designer who can help with Figma, wireframes, and user testing." },
+    { label: t.aiFindBackend, prompt: "I need a backend developer who can help with Laravel, REST API, and database integration." },
+    { label: t.aiFindPitch, prompt: "I need a business strategist who can help with pitch deck, market research, and validation." }
+  ];
+
+  const askAssistant = async (promptOverride?: string) => {
+    const prompt = (promptOverride ?? query).trim();
+    if (!prompt) {
+      return;
+    }
+
+    setOpen(true);
+    setQuery(prompt);
+    setLoading(true);
+    setResponse("");
+    setResults(findCandidatesForQuery(prompt).slice(0, 3));
+
+    const siteContext = `
+You are Mutualizm AI, a website assistant for Mutualizm.
+Your job is not to interrupt chats. Help the user search for collaborators by skill, role, program, availability, and project goal.
+Reply in ${language === "id" ? "Indonesian" : "English"}.
+Available demo candidates:
+${candidates.map((candidate) => `- ${candidate.name}: ${candidate.role}, main skill ${candidate.mainSkill}, skills ${candidate.skills.map((skillItem) => skillItem.name).join(", ")}, goals ${candidate.collaborationGoals.join(", ")}, availability ${candidate.availabilityDetail}`).join("\n")}
+`;
+
+    try {
+      const request = await fetch("/api/ai/suggest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt,
+          context: siteContext
+        })
+      });
+      const data = await request.json();
+      if (!request.ok) {
+        throw new Error(data.message || "AI request failed.");
+      }
+      setResponse(data.message || "");
+    } catch {
+      setResponse(t.aiError);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className={`ai-assistant-bubble ${open ? "open" : ""}`}>
+      {open ? (
+        <section className="ai-assistant-panel" aria-label={t.aiAssistantTitle}>
+          <header>
+            <div>
+              <h2>
+                <Sparkles size={17} aria-hidden="true" />
+                {t.aiAssistantTitle}
+              </h2>
+              <p>{t.aiAssistantIntro}</p>
+            </div>
+            <button type="button" aria-label={t.close} onClick={() => setOpen(false)}>
+              <X size={18} aria-hidden="true" />
+            </button>
+          </header>
+
+          <div className="ai-assistant-presets">
+            {presets.map((preset) => (
+              <button type="button" key={preset.label} onClick={() => askAssistant(preset.prompt)}>
+                {preset.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="ai-assistant-response">
+            {loading ? (
+              <div className="ai-loading-state">
+                <span className="spinner" />
+                <p>{t.aiThinking}</p>
+              </div>
+            ) : response ? (
+              <p>{response}</p>
+            ) : null}
+
+            <div className="ai-result-list">
+              <strong>{t.aiMatches}</strong>
+              {results.length ? (
+                results.map((candidate) => (
+                  <article className="ai-result-card" key={candidate.id}>
+                    <Avatar profile={candidate} size="xs" />
+                    <span>
+                      <b>{candidate.name}</b>
+                      <small>{localizeRoleLabel(candidate.role, t)} · {candidate.mainSkill}</small>
+                    </span>
+                  </article>
+                ))
+              ) : (
+                <small className="muted-text">{t.aiNoMatches}</small>
+              )}
+            </div>
+          </div>
+
+          <form
+            className="ai-assistant-form"
+            onSubmit={(event) => {
+              event.preventDefault();
+              askAssistant();
+            }}
+          >
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder={t.aiPlaceholder}
+            />
+            <button type="submit" disabled={!query.trim() || loading}>
+              <Send size={16} aria-hidden="true" />
+              <span>{t.aiAsk}</span>
+            </button>
+          </form>
+        </section>
+      ) : null}
+      <button
+        className="ai-assistant-button"
+        type="button"
+        aria-label={t.aiAssistantTitle}
+        onClick={() => setOpen((current) => !current)}
+      >
+        <Sparkles size={23} aria-hidden="true" />
       </button>
     </div>
   );
@@ -1970,6 +2608,8 @@ function BottomNav({ unreadCount }: { unreadCount: number }) {
 }
 
 function MiniProfile({ profile, isCollapsed = false }: { profile: CandidateProfile; isCollapsed?: boolean }) {
+  const t = useTranslations();
+
   if (isCollapsed) {
     return (
       <section
@@ -1994,7 +2634,7 @@ function MiniProfile({ profile, isCollapsed = false }: { profile: CandidateProfi
       <Avatar profile={profile} size="sm" />
       <div>
         <strong>{profile.name}</strong>
-        <span>{profile.role}</span>
+        <span>{localizeRoleLabel(profile.role, t)}</span>
       </div>
       <AvailabilityBadge availability={profile.availability} label={profile.statusLabel} />
     </section>
@@ -2003,25 +2643,23 @@ function MiniProfile({ profile, isCollapsed = false }: { profile: CandidateProfi
 
 function RightRail() {
   const { matches, notifications } = useSymbio();
+  const t = useTranslations();
   const unread = notifications.filter((notification) => !notification.read);
 
   return (
     <div className="rail-stack">
       <section className="rail-section">
         <div className="rail-heading">
-          <h2>Realtime UI</h2>
-          <span className="status-dot">Ready</span>
+          <h2>{t.realTimeUi}</h2>
+          <span className="status-dot">{t.ready}</span>
         </div>
-        <p>
-          Online badges, typing indicators, match toasts, and unread counts are mocked for
-          a future Laravel Reverb connection.
-        </p>
+        <p>{t.rightRailBody}</p>
       </section>
 
       <section className="rail-section">
         <div className="rail-heading">
-          <h2>Recent matches</h2>
-          <Link to="/matches">View</Link>
+          <h2>{t.recentMatches}</h2>
+          <Link to="/matches">{t.view}</Link>
         </div>
         <div className="compact-list">
           {matches.slice(0, 3).map((match) => {
@@ -2042,16 +2680,16 @@ function RightRail() {
 
       <section className="rail-section">
         <div className="rail-heading">
-          <h2>Notifications</h2>
-          <Link to="/notifications">{unread.length} unread</Link>
+          <h2>{t.alertsTitle}</h2>
+          <Link to="/notifications">{unread.length} {t.unreadCount}</Link>
         </div>
         <div className="compact-list">
           {notifications.slice(0, 3).map((notification) => (
             <Link className="compact-row text-row" to="/notifications" key={notification.id}>
               <span className={notification.read ? "read-dot" : "unread-dot"} />
               <span>
-                <strong>{notification.title}</strong>
-                <small>{notification.body}</small>
+                <strong>{localizeNotification(notification, t).title}</strong>
+                <small>{localizeNotification(notification, t).body}</small>
               </span>
             </Link>
           ))}
@@ -2061,15 +2699,15 @@ function RightRail() {
       {mockProjects.length > 0 && (
         <section className="rail-section">
           <div className="rail-heading">
-            <h2>Suggested project</h2>
-            <Link to="/projects">Explore</Link>
+            <h2>{t.suggestedProject}</h2>
+            <Link to="/projects">{t.explore}</Link>
           </div>
           <p>
-            <strong>{mockProjects[0].title}</strong>
+            <strong>{localizeProject(mockProjects[0], t).title}</strong>
           </p>
           <div className="chip-row">
             {mockProjects[0].neededRoles.slice(0, 2).map((role) => (
-              <Chip key={role}>{role}</Chip>
+              <Chip key={role}>{localizeRoleLabel(role, t)}</Chip>
             ))}
           </div>
         </section>
@@ -2412,6 +3050,7 @@ function SwipeActionButtons({
 
 function OnboardingPage() {
   const { profile, setProfile, addToast } = useSymbio();
+  const t = useTranslations();
   const navigate = useNavigate();
   const [draft, setDraft] = useState<CandidateProfile>(() => ({
     ...profile,
@@ -2427,18 +3066,18 @@ function OnboardingPage() {
   const [step, setStep] = useState(0);
   const [touched, setTouched] = useState(false);
   const steps = [
-    "Identity",
-    "Campus",
-    "Role",
-    "Skills",
-    "Summary",
-    "Experience",
-    "Timeline",
-    "Portfolio",
-    "Availability",
-    "Preview"
+    t.stepIdentity,
+    t.stepCampus,
+    t.stepRole,
+    t.stepSkills,
+    t.stepSummary,
+    t.stepExperience,
+    t.stepTimeline,
+    t.stepPortfolio,
+    t.stepAvailability,
+    t.stepPreview
   ];
-  const errors = validateOnboardingStep(step, draft);
+  const errors = validateOnboardingStep(step, draft, t);
 
   const goNext = () => {
     if (errors.length) {
@@ -2449,7 +3088,7 @@ function OnboardingPage() {
     setTouched(false);
     if (step === steps.length - 1) {
       setProfile({ ...draft, id: "me", mutualInterest: false });
-      addToast("Profile ready", "Your mock profile is saved for the demo.");
+      addToast(t.profileReadyTitle, t.profileReadyBody);
       window.sessionStorage.setItem(
         "mutualizm.signupSuggestion",
         JSON.stringify({
@@ -2477,7 +3116,7 @@ function OnboardingPage() {
           <span>Mutualizm</span>
         </Link>
         <Link to="/discover" className="text-link">
-          Skip to demo
+          {t.skipToDemo}
         </Link>
       </header>
 
@@ -2485,7 +3124,7 @@ function OnboardingPage() {
         <section className="onboarding-form">
           <StepProgress steps={steps} activeStep={step} />
           <div className="form-panel">
-            <p className="eyebrow">Step {step + 1} of 10</p>
+            <p className="eyebrow">{t.stepOf} {step + 1} {t.of} 10</p>
             <h1>{steps[step]}</h1>
             <OnboardingStep step={step} draft={draft} setDraft={setDraft} />
             {touched && errors.length ? (
@@ -2498,10 +3137,10 @@ function OnboardingPage() {
             <div className="form-actions">
               <Button variant="secondary" onClick={goBack} disabled={step === 0}>
                 <ArrowLeft size={18} aria-hidden="true" />
-                Back
+                {t.back}
               </Button>
               <Button variant="primary" onClick={goNext}>
-                {step === steps.length - 1 ? "Enter Discover" : "Continue"}
+                {step === steps.length - 1 ? t.enterDiscover : t.continue}
                 <ArrowRight size={18} aria-hidden="true" />
               </Button>
             </div>
@@ -2510,7 +3149,7 @@ function OnboardingPage() {
 
         <aside className="preview-panel">
           <div className="sticky-preview">
-            <p className="eyebrow">Live card preview</p>
+            <p className="eyebrow">{t.liveCardPreview}</p>
             <CandidateCard profile={draft} isPreview onExpand={() => undefined} />
           </div>
         </aside>
@@ -2528,6 +3167,7 @@ function OnboardingStep({
   draft: CandidateProfile;
   setDraft: Dispatch<SetStateAction<CandidateProfile>>;
 }) {
+  const t = useTranslations();
   const update = (patch: Partial<CandidateProfile>) =>
     setDraft((current) => ({ ...current, ...patch }));
 
@@ -2535,27 +3175,27 @@ function OnboardingStep({
     return (
       <div className="field-grid">
         <TextField
-          label="Full name"
+          label={t.fullName}
           value={draft.name}
           onChange={(value) => update({ name: value })}
           placeholder="Alya Putri"
         />
         <PhotoUploadField
-          label="Profile photo"
+          label={t.profilePhoto}
           value={draft.avatarUrl ?? ""}
           position={draft.avatarPosition ?? "center 42%"}
           onChange={(value) => update({ avatarUrl: value })}
           onPositionChange={(value) => update({ avatarPosition: value })}
         />
         <SelectField
-          label="Avatar color"
+          label={t.avatarColor}
           value={draft.accent}
           onChange={(value) => update({ accent: value })}
           options={[
-            { label: "Reference yellow", value: "#ffc629" },
-            { label: "Soft honey", value: "#ffe48a" },
-            { label: "Warm cream", value: "#fff3c4" },
-            { label: "Neutral gray", value: "#777777" }
+            { label: t.referenceYellow, value: "#ffc629" },
+            { label: t.softHoney, value: "#ffe48a" },
+            { label: t.warmCream, value: "#fff3c4" },
+            { label: t.neutralGray, value: "#777777" }
           ]}
         />
       </div>
@@ -2566,13 +3206,13 @@ function OnboardingStep({
     return (
       <div className="field-grid">
         <TextField
-          label="Campus"
+          label={t.campus}
           value={draft.campus}
           onChange={(value) => update({ campus: value })}
           placeholder="Telkom University"
         />
         <TextField
-          label="Faculty / program"
+          label={t.facultyProgram}
           value={draft.program}
           onChange={(value) => update({ program: value })}
           placeholder="S1 Sistem Informasi"
@@ -2590,13 +3230,13 @@ function OnboardingStep({
     return (
       <div className="field-grid">
         <div className="field-group" style={{ display: 'flex', flexDirection: 'column', gap: '8px', gridColumn: 'span 2' }}>
-          <label className="field-label uppercase">Main Role</label>
+          <label className="field-label uppercase">{t.mainRole}</label>
           <div className="role-card-grid">
             {[
-              { id: "Technical", label: "Technical", icon: "code", color: "dev" },
-              { id: "Business", label: "Business", icon: "trending_up", color: "biz" },
-              { id: "Design", label: "Design", icon: "palette", color: "design" },
-              { id: "Other", label: "Other", icon: "extension", color: "other" }
+              { id: "Technical", label: t.technicalRole, icon: "code", color: "dev" },
+              { id: "Business", label: t.businessRole, icon: "trending_up", color: "biz" },
+              { id: "Design", label: t.designRole, icon: "palette", color: "design" },
+              { id: "Other", label: t.otherRole, icon: "extension", color: "other" }
             ].map((roleCard) => (
               <div
                 key={roleCard.id}
@@ -2617,14 +3257,14 @@ function OnboardingStep({
         </div>
         {isCustomRole ? (
           <TextField
-            label="Custom role"
+            label={t.customRole}
             value={draft.role}
             onChange={(value) => update({ role: value })}
-            placeholder="e.g. Data Storyteller, Game Artist, Research Writer"
+            placeholder={t.customRolePlaceholder}
           />
         ) : null}
         <SelectField
-          label="Main skill"
+          label={t.mainSkillLabel}
           value={isCustomSkill ? "__custom__" : draft.mainSkill}
           onChange={(value) =>
             setDraft((current) => ({
@@ -2635,12 +3275,12 @@ function OnboardingStep({
           }
           options={[
             ...uniqueSkillOptions.map((skillName) => ({ label: skillName, value: skillName })),
-            { label: "Other skill", value: "__custom__" }
+            { label: t.otherSkill, value: "__custom__" }
           ]}
         />
         {isCustomSkill || draft.mainSkill === "" ? (
           <TextField
-            label="Custom main skill"
+            label={t.customMainSkill}
             value={draft.mainSkill}
             onChange={(value) =>
               setDraft((current) => ({
@@ -2649,11 +3289,11 @@ function OnboardingStep({
                 skills: value ? ensureSkillSelected(current.skills, value) : current.skills
               }))
             }
-            placeholder="e.g. Motion Design, Public Speaking, GIS Mapping"
+            placeholder={t.customMainSkillPlaceholder}
           />
         ) : null}
         <MultiChipField
-          label="Collaboration type"
+          label={t.collaborationType}
           values={draft.collaborationGoals}
           options={collaborationGoalOptions}
           onChange={(values) => update({ collaborationGoals: values })}
@@ -2668,7 +3308,7 @@ function OnboardingStep({
         <SkillChecklist
           selected={draft.skills}
           onChange={(skills) => update({ skills })}
-          helper="Select at least three skills. The first three appear on the card front."
+          helper={t.skillHelper}
         />
       </div>
     );
@@ -2677,13 +3317,13 @@ function OnboardingStep({
   if (step === 4) {
     return (
       <TextAreaField
-        label="Profile summary"
+        label={t.profileSummaryLabel}
         value={draft.profileSummary}
         onChange={(value) => update({ profileSummary: value })}
         minRows={5}
         maxLength={180}
-        hint={`${draft.profileSummary.length}/180 characters.`}
-        placeholder="Frontend-focused student experienced in React, Laravel-ready UI, and campus innovation prototypes."
+        hint={`${draft.profileSummary.length}/180 ${t.profileSummaryHint}.`}
+        placeholder={t.profileSummaryPlaceholder}
       />
     );
   }
@@ -2691,13 +3331,13 @@ function OnboardingStep({
   if (step === 5) {
     return (
       <TextAreaField
-        label="Experience summary"
+        label={t.experienceSummaryLabel}
         value={draft.experienceSummary}
         onChange={(value) => update({ experienceSummary: value })}
         minRows={5}
         maxLength={240}
-        hint={`${draft.experienceSummary.length}/240 characters. Keep it proof-oriented.`}
-        placeholder="Built responsive frontend components for a campus lost-and-found prototype using React and Laravel-ready UI patterns."
+        hint={`${draft.experienceSummary.length}/240 ${t.experienceSummaryHint}`}
+        placeholder={t.experienceSummaryPlaceholder}
       />
     );
   }
@@ -2724,33 +3364,32 @@ function OnboardingStep({
     return (
       <div className="field-grid">
         <SelectField
-          label="Availability"
+          label={t.availabilityLabel}
           value={draft.availability}
           onChange={(value) => update({ availability: value as CandidateProfile["availability"] })}
           options={[
-            { label: "Available", value: "available" },
-            { label: "Limited", value: "limited" },
-            { label: "Busy", value: "busy" }
+            { label: localizeAvailabilityLabel("available", t), value: "available" },
+            { label: localizeAvailabilityLabel("limited", t), value: "limited" },
+            { label: localizeAvailabilityLabel("busy", t), value: "busy" }
           ]}
         />
         <SelectField
-          label="Profile badge"
+          label={t.statusBadge}
           value={draft.statusLabel ?? ""}
           onChange={(value) => update({ statusLabel: value })}
           options={[
-            { label: "Default status", value: "" },
-            { label: "Open to team up", value: "Open to team up" },
-            { label: "Looking for project", value: "Looking for project" },
-            { label: "Available this week", value: "Available this week" },
-            { label: "Busy, message first", value: "Busy, message first" }
+            { label: t.defaultStatus, value: "" },
+            { label: t.lookingForProject, value: "Looking for project" },
+            { label: t.availableThisWeek, value: "Available this week" },
+            { label: t.busyMessageFirst, value: "Busy, message first" }
           ]}
         />
         <TextAreaField
-          label="Availability details"
+          label={t.availabilityDetails}
           value={draft.availabilityDetail}
           onChange={(value) => update({ availabilityDetail: value })}
           minRows={3}
-          placeholder="Open after class and on weekends for competition work."
+          placeholder={t.availabilityPlaceholder}
         />
       </div>
     );
@@ -2759,17 +3398,17 @@ function OnboardingStep({
   return (
     <div className="field-grid">
       <MultiChipField
-        label="Looking for"
+        label={t.lookingForLabel}
         values={draft.lookingFor}
         options={roleOptions}
         onChange={(values) => update({ lookingFor: values })}
       />
       <TextAreaField
-        label="Suggested first message"
+        label={t.suggestedFirstMessage}
         value={draft.suggestedMessage}
         onChange={(value) => update({ suggestedMessage: value })}
         minRows={4}
-        placeholder="I saw your skills and think we could build a strong team. Are you open to discussing roles?"
+        placeholder={t.suggestedFirstMessagePlaceholder}
       />
       <div className="preview-inline mobile-only">
         <CandidateCard profile={draft} isPreview />
@@ -2798,7 +3437,7 @@ function ProfilePage() {
         <button aria-label="Open settings" onClick={() => setSettingsOpen(true)}>
           <Settings size={22} aria-hidden="true" />
         </button>
-        <button aria-label="Log Out" onClick={() => setLogoutOpen(true)} title="Log Out" style={{ color: 'var(--danger)', marginLeft: '8px', border: 'none', background: 'transparent' }}>
+        <button aria-label={t.logout} onClick={() => setLogoutOpen(true)} title={t.logout} style={{ color: 'var(--danger)', marginLeft: '8px', border: 'none', background: 'transparent' }}>
           <LogOut size={22} aria-hidden="true" />
         </button>
       </section>
@@ -2823,9 +3462,9 @@ function ProfilePage() {
           <p className="eyebrow">{t.yourSymbioCard}</p>
           <h2>{profile.mainSkill}</h2>
           <p style={{ color: 'var(--muted)', fontSize: '0.88rem', margin: '4px 0 12px' }}>
-            {profile.campus} · {profile.program} · {profile.role}
+            {profile.campus} · {profile.program} · {localizeRoleLabel(profile.role, t)}
           </p>
-          <p>{profile.profileSummary}</p>
+          <p>{localizeProfileSummary(profile, t)}</p>
         </div>
         <Button variant="secondary" onClick={() => setSettingsOpen(true)}>
           {t.edit}
@@ -2835,50 +3474,50 @@ function ProfilePage() {
       <div className="profile-detail-grid">
         <section className="profile-info-panel">
           <div className="rail-heading">
-            <h2>Status kolaborasi</h2>
+            <h2>{t.statusCollaboration}</h2>
             <AvailabilityBadge availability={profile.availability} label={profile.statusLabel} />
           </div>
-          <p>{profile.availabilityDetail || "Belum ada detail availability."}</p>
+          <p>{localizeAvailabilityDetail(profile, t) || t.noAvailabilityDetail}</p>
         </section>
 
         <section className="profile-info-panel">
-          <h2>Skill utama</h2>
+          <h2>{t.mainSkillsTitle}</h2>
           <div className="chip-row">
             {profile.skills.length ? profile.skills.map((skillItem) => (
               <Chip key={`${skillItem.name}-${skillItem.level}`}>{skillItem.name}</Chip>
-            )) : <span className="muted-text">Belum ada skill.</span>}
+            )) : <span className="muted-text">{t.noSkillsYet}</span>}
           </div>
         </section>
 
         <section className="profile-info-panel">
-          <h2>Looking for</h2>
+          <h2>{t.lookingForTitle}</h2>
           <div className="chip-row">
             {profile.lookingFor.length ? profile.lookingFor.map((role) => (
-              <Chip key={role} tone="soft">{role}</Chip>
-            )) : <span className="muted-text">Belum memilih kebutuhan tim.</span>}
+              <Chip key={role} tone="soft">{localizeRoleLabel(role, t)}</Chip>
+            )) : <span className="muted-text">{t.noLookingForYet}</span>}
           </div>
         </section>
 
         <section className="profile-info-panel">
-          <h2>Experience</h2>
+          <h2>{t.experienceTitle}</h2>
           {profile.experiences.length ? profile.experiences.slice(0, 2).map((experience) => (
             <article className="profile-experience-card" key={experience.id}>
-              <strong>{experience.title}</strong>
-              <span>{experience.organization} · {experience.period || "Recent"}</span>
-              <p>{experience.description}</p>
+              <strong>{localizeExperienceText(experience.title, t)}</strong>
+              <span>{localizeExperienceText(experience.organization, t)} · {localizeTimeLabel(experience.period || t.recent, t)}</span>
+              <p>{localizeExperienceText(experience.description, t)}</p>
             </article>
-          )) : <p className="muted-text">Belum ada experience.</p>}
+          )) : <p className="muted-text">{t.noExperienceYet}</p>}
         </section>
 
         <section className="profile-info-panel">
-          <h2>Portfolio</h2>
+          <h2>{t.portfolioTitle}</h2>
           <div className="portfolio-list">
             {profile.portfolioLinks.filter((link) => link.url).length ? profile.portfolioLinks.filter((link) => link.url).map((link) => (
               <a href={link.url} key={`${link.label}-${link.url}`} target="_blank" rel="noreferrer">
                 <LinkIcon size={16} aria-hidden="true" />
                 {link.label}
               </a>
-            )) : <span className="muted-text">Belum ada portfolio link.</span>}
+            )) : <span className="muted-text">{t.noPortfolioYet}</span>}
           </div>
         </section>
       </div>
@@ -3081,7 +3720,7 @@ function ProfilePage() {
 }
 
 function MatchesPage() {
-  const { matches, language } = useSymbio();
+  const { matches, clearMatches } = useSymbio();
   const t = useTranslations();
   const [selectedId, setSelectedId] = useState(matches[0]?.id ?? "");
   const [detailProfile, setDetailProfile] = useState<CandidateProfile | null>(null);
@@ -3115,6 +3754,12 @@ function MatchesPage() {
   return (
     <div className="page-stack beeline-page page-transition">
       <BeelineIntro />
+      <div className="page-inline-actions">
+        <Button variant="secondary" onClick={clearMatches}>
+          <Trash2 size={17} aria-hidden="true" />
+          {t.clearMatches}
+        </Button>
+      </div>
       <div className="matches-grid">
         <section className="match-list" aria-label="Match list">
           {matches.map((match) => {
@@ -3139,8 +3784,8 @@ function MatchesPage() {
                 <Avatar profile={candidate} size="sm" />
                 <span>
                   <strong>{candidate.name}</strong>
-                  <small>{candidate.role} · {candidate.mainSkill}</small>
-                  <em>{match.latestMessage}</em>
+                  <small>{localizeRoleLabel(candidate.role, t)} · {candidate.mainSkill}</small>
+                  <em>{localizeMatchMessage(match.latestMessage, t)}</em>
                 </span>
                 {match.unread ? <b>{match.unread}</b> : null}
                 <Link
@@ -3149,7 +3794,7 @@ function MatchesPage() {
                   onClick={(event) => event.stopPropagation()}
                   style={{ zIndex: 5 }}
                 >
-                  Chat
+                  {t.chat}
                 </Link>
                 <button
                   type="button"
@@ -3160,7 +3805,7 @@ function MatchesPage() {
                   }}
                   style={{ zIndex: 5 }}
                 >
-                  Profile
+                  {t.profile}
                 </button>
               </article>
             );
@@ -3175,16 +3820,13 @@ function MatchesPage() {
 }
 
 function BeelineIntro() {
-  const { language } = useSymbio();
   const t = useTranslations();
   return (
     <section className="beeline-intro">
       <Heart size={28} aria-hidden="true" />
       <h1>{t.matchesTitle}</h1>
       <p>
-        {language === "en"
-          ? "These collaborators are ready to meet you. Open a card to start a focused project conversation."
-          : "Kolaborator ini siap bertemu dengan Anda. Buka kartu untuk memulai percakapan proyek terarah."}
+        {t.matchReadyCopy}
       </p>
       <span className="bee-orbit bee-one">✦</span>
       <span className="bee-orbit bee-two">✦</span>
@@ -3194,6 +3836,7 @@ function BeelineIntro() {
 
 function ChatPage() {
   const { matches } = useSymbio();
+  const t = useTranslations();
   const { matchId } = useParams();
   const match = matches.find((item) => item.id === matchId);
   const candidate = match ? getCandidate(match.candidateId) : null;
@@ -3201,13 +3844,13 @@ function ChatPage() {
   if (!match || !candidate) {
     return (
       <div className="page-stack page-transition">
-        <PageHeader eyebrow="Chat" title="Conversation not found." />
+        <PageHeader eyebrow={t.chat} title={t.conversationNotFound} />
         <EmptyState
-          title="No chat selected"
-          body="Open a match to preview the conversation UI."
+          title={t.noChatSelected}
+          body={t.noChatSelectedBody}
           action={
             <Link className="button button-primary" to="/matches">
-              View matches
+              {t.viewMatches}
             </Link>
           }
         />
@@ -3217,7 +3860,7 @@ function ChatPage() {
 
   return (
     <div className="page-stack chat-page page-transition">
-      <PageHeader eyebrow="Chat preview" title={`Conversation with ${candidate.name}`} />
+      <PageHeader eyebrow={t.chatPreview} title={`${t.conversationWith} ${candidate.name}`} />
       <ChatWindow match={match} candidate={candidate} />
     </div>
   );
@@ -3244,7 +3887,7 @@ function SavedPage() {
           {
             id: `saved-init-${candidate.id}`,
             sender: "them",
-            text: `Hey! Thanks for saving my profile. I'd love to chat about collaborating!`,
+            text: t.savedChatStarter,
             timestamp: "Just now"
           }
         ]
@@ -3264,11 +3907,11 @@ function SavedPage() {
                 <Avatar profile={candidate} size="md" />
                 <div>
                   <h2>{candidate.name}</h2>
-                  <p>{candidate.role} · {candidate.mainSkill}</p>
+                  <p>{localizeRoleLabel(candidate.role, t)} · {candidate.mainSkill}</p>
                 </div>
                 <AvailabilityBadge availability={candidate.availability} label={candidate.statusLabel} />
               </div>
-              <p className="clamp-3">{candidate.profileSummary}</p>
+              <p className="clamp-3">{localizeProfileSummary(candidate, t)}</p>
               <div className="chip-row">
                 {candidate.skills.slice(0, 3).map((skillItem) => (
                   <Chip key={skillItem.name}>{skillItem.name}</Chip>
@@ -3327,48 +3970,51 @@ function NotificationsPage() {
         }
       />
       <div className="notification-list">
-        {notifications.map((notification) => (
-          <article
-            className={`notification-card ${notification.read ? "read" : "unread"}`}
-            key={notification.id}
-            style={{ cursor: 'pointer' }}
-            onClick={() => {
-              markNotificationRead(notification.id);
-              setSelectedNotification(notification);
-            }}
-          >
-            <span className="notification-type">{notification.type}</span>
-            <div>
-              <h2>{notification.title}</h2>
-              <p>{notification.body}</p>
-              <small>{notification.time}</small>
-            </div>
-            {!notification.read ? (
-              <Button
-                variant="ghost"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  markNotificationRead(notification.id);
-                }}
-              >
-                {t.markRead}
-              </Button>
-            ) : null}
-          </article>
-        ))}
+        {notifications.map((notification) => {
+          const displayedNotification = localizeNotification(notification, t);
+          return (
+            <article
+              className={`notification-card ${notification.read ? "read" : "unread"}`}
+              key={notification.id}
+              style={{ cursor: 'pointer' }}
+              onClick={() => {
+                markNotificationRead(notification.id);
+                setSelectedNotification(notification);
+              }}
+            >
+              <span className="notification-type">{displayedNotification.type}</span>
+              <div>
+                <h2>{displayedNotification.title}</h2>
+                <p>{displayedNotification.body}</p>
+                <small>{displayedNotification.time}</small>
+              </div>
+              {!notification.read ? (
+                <Button
+                  variant="ghost"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    markNotificationRead(notification.id);
+                  }}
+                >
+                  {t.markRead}
+                </Button>
+              ) : null}
+            </article>
+          );
+        })}
       </div>
 
       {selectedNotification ? createPortal(
         <div className="overlay notification-detail-overlay" role="presentation" onClick={() => setSelectedNotification(null)}>
           <div className="modal-sheet notification-detail-modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
             <span className="notification-detail-type">
-              {selectedNotification.type}
+              {localizeNotification(selectedNotification, t).type}
             </span>
-            <h2>{selectedNotification.title}</h2>
+            <h2>{localizeNotification(selectedNotification, t).title}</h2>
             <p>
-              {selectedNotification.body}
+              {localizeNotification(selectedNotification, t).body}
             </p>
-            <small>{selectedNotification.time}</small>
+            <small>{localizeNotification(selectedNotification, t).time}</small>
             <div className="notification-detail-actions">
               <Button variant="primary" onClick={() => setSelectedNotification(null)}>
                 {t.close}
@@ -3392,16 +4038,18 @@ function ProjectsPage() {
         title={t.projectsDesc}
       />
       <div className="project-grid">
-        {mockProjects.map((project) => (
+        {mockProjects.map((project) => {
+          const displayedProject = localizeProject(project, t);
+          return (
           <article className="project-card" key={project.id}>
-            <span className="project-status">{project.status}</span>
-            <h2>{project.title}</h2>
-            <p>{project.summary}</p>
+            <span className="project-status">{displayedProject.status}</span>
+            <h2>{displayedProject.title}</h2>
+            <p>{displayedProject.summary}</p>
             <div>
               <strong>{t.neededRoles}</strong>
               <div className="chip-row">
                 {project.neededRoles.map((role) => (
-                  <Chip key={role}>{role}</Chip>
+                  <Chip key={role}>{localizeRoleLabel(role, t)}</Chip>
                 ))}
               </div>
             </div>
@@ -3416,26 +4064,27 @@ function ProjectsPage() {
               </div>
             </div>
             <div className="project-footer">
-              <span>{project.deadline}</span>
+              <span>{displayedProject.deadline}</span>
               <Button variant="secondary" onClick={() => setSelectedProject(project)}>{t.viewProject}</Button>
             </div>
           </article>
-        ))}
+          );
+        })}
       </div>
       {selectedProject ? createPortal(
         <div className="overlay" role="presentation" onClick={() => setSelectedProject(null)}>
           <div className="project-detail-modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h2>{selectedProject.title}</h2>
+              <h2>{localizeProject(selectedProject, t).title}</h2>
               <button type="button" onClick={() => setSelectedProject(null)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} /></button>
             </div>
-            <span className="chip">{selectedProject.status}</span>
-            <p>{selectedProject.summary}</p>
+            <span className="chip">{localizeProject(selectedProject, t).status}</span>
+            <p>{localizeProject(selectedProject, t).summary}</p>
             <div>
               <strong>{t.neededRoles}</strong>
               <div className="chip-row" style={{ marginTop: 6 }}>
                 {selectedProject.neededRoles.map((role) => (
-                  <Chip key={role}>{role}</Chip>
+                  <Chip key={role}>{localizeRoleLabel(role, t)}</Chip>
                 ))}
               </div>
             </div>
@@ -3447,7 +4096,7 @@ function ProjectsPage() {
                 ))}
               </div>
             </div>
-            <p style={{ color: 'var(--muted)', fontSize: '0.88rem' }}>{selectedProject.deadline}</p>
+            <p style={{ color: 'var(--muted)', fontSize: '0.88rem' }}>{localizeProject(selectedProject, t).deadline}</p>
           </div>
         </div>,
         document.body
@@ -3472,73 +4121,6 @@ function ChatWindow({
   const [showScrollBtn, setShowScrollBtn] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
   const messages = chats[match.id] ?? [];
-
-  const [showAi, setShowAi] = useState(false);
-  const [aiLoading, setAiLoading] = useState(false);
-  const [aiQuery, setAiQuery] = useState("");
-  const [aiResponse, setAiResponse] = useState("");
-
-  const copyToInput = () => {
-    setMessage(aiResponse);
-    setShowAi(false);
-  };
-
-  const runAiCommand = async (cmd: "opener" | "synergy" | "tips" | "custom") => {
-    setAiLoading(true);
-    setAiResponse("");
-
-    let promptText = "";
-    if (cmd === "opener") {
-      promptText = "Generate a personalized message starter I can send to this candidate to pitch them a collaboration. Keep it casual and friendly.";
-    } else if (cmd === "synergy") {
-      promptText = `Explain briefly how our skills fit together. Hadid has React/TypeScript/Tailwind/Laravel, candidate has ${candidate.skills.map(s => s.name).join(", ")}. Write a very concise synergy report.`;
-    } else if (cmd === "tips") {
-      promptText = `Give 3 short tips on how Hadid and ${candidate.name} can kick off their project.`;
-    } else {
-      promptText = aiQuery;
-    }
-
-    const siteContext = `
-You are an AI Assistant inside "Mutualizm", a campus collaboration application for Telkom University.
-The website helps students find teammates by skills, program major, and collaboration goals (e.g., competition teams, startup prototypes, assignments).
-The current logged-in user is Hadid Arkan, a S1 Informatika student and Frontend Developer at Telkom University.
-The candidate they are chatting with is:
-Name: ${candidate.name}
-Role: ${candidate.role}
-Main Skill: ${candidate.mainSkill}
-Skills: ${candidate.skills.map(s => `${s.name} (${s.level})`).join(", ")}
-Availability: ${candidate.availability} (${candidate.availabilityDetail})
-Goals: ${candidate.collaborationGoals.join(", ")}
-Bio: ${candidate.profileSummary}
-
-Please assist the user by suggesting messages to send, explaining how this match is beneficial, or providing tips on how they can collaborate. Keep responses concise (under 3 sentences) and professional, matching a friendly student networking tone. You can reply in English or Indonesian depending on the query.
-`;
-
-    try {
-      const response = await fetch("/api/ai/suggest", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          prompt: promptText,
-          context: siteContext,
-          candidate
-        })
-      });
-
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.message || "AI request failed.");
-      }
-      const text = data.message || "Sorry, I couldn't generate a response.";
-      setAiResponse(text.trim());
-    } catch (err) {
-      setAiResponse("Maaf, terjadi kesalahan saat menghubungi server AI.");
-    } finally {
-      setAiLoading(false);
-    }
-  };
 
   const scrollToBottom = () => {
     if (listRef.current) {
@@ -3577,7 +4159,7 @@ Please assist the user by suggesting messages to send, explaining how this match
 
       <div className="match-reason">
         <strong>{t.whyMatchWorks}</strong>
-        {match.summary.map((item) => (
+        {localizeMatchSummary(match, candidate, t).map((item) => (
           <p key={item}>{item}</p>
         ))}
       </div>
@@ -3586,8 +4168,8 @@ Please assist the user by suggesting messages to send, explaining how this match
         {messages.length ? (
           messages.map((chatMessage) => (
             <div className={`message ${chatMessage.sender}`} key={chatMessage.id}>
-              <p>{chatMessage.text}</p>
-              <span>{chatMessage.timestamp}</span>
+              <p>{localizeChatMessage(chatMessage.text, t)}</p>
+              <span>{localizeTimeLabel(chatMessage.timestamp, t)}</span>
             </div>
           ))
         ) : (
@@ -3610,15 +4192,6 @@ Please assist the user by suggesting messages to send, explaining how this match
       </div>
 
       <div className="chat-input">
-        <button
-          type="button"
-          className={`button button-secondary ai-toggle-btn ${showAi ? "active" : ""}`}
-          onClick={() => setShowAi(!showAi)}
-          title="Mutualizm AI Helper"
-          style={{ padding: '0 12px', minWidth: 44, display: 'grid', placeItems: 'center' }}
-        >
-          <Sparkles size={18} style={{ color: 'var(--primary-strong)' }} />
-        </button>
         <input
           value={message}
           onChange={(event) => setMessage(event.target.value)}
@@ -3634,65 +4207,6 @@ Please assist the user by suggesting messages to send, explaining how this match
           {t.send}
         </Button>
       </div>
-
-      {showAi && (
-        <div className="chat-ai-panel">
-          <div className="chat-ai-header">
-            <h3><Sparkles size={16} /> Mutualizm AI</h3>
-            <button className="chat-ai-close" onClick={() => setShowAi(false)}>&times;</button>
-          </div>
-          <div className="chat-ai-body">
-            {aiLoading ? (
-              <div className="chat-ai-loading">
-                <span className="spinner" />
-                <p>Generating response...</p>
-              </div>
-            ) : aiResponse ? (
-              <div className="chat-ai-response">
-                <p>{aiResponse}</p>
-                <div className="chat-ai-response-actions">
-                  <Button variant="primary" onClick={copyToInput}>
-                    Use in Chat
-                  </Button>
-                  <Button variant="secondary" onClick={() => { setAiResponse(""); setAiQuery(""); }}>
-                    Clear
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <div className="chat-ai-prompts">
-                <p className="chat-ai-intro">How can I help you collaborate with {candidate.name}?</p>
-                <button type="button" onClick={() => runAiCommand("opener")}>
-                  Suggest message opener
-                </button>
-                <button type="button" onClick={() => runAiCommand("synergy")}>
-                  Analyze skill synergy
-                </button>
-                <button type="button" onClick={() => runAiCommand("tips")}>
-                  Collaboration tips
-                </button>
-              </div>
-            )}
-            
-            <div className="chat-ai-input-container">
-              <input
-                type="text"
-                placeholder="Ask AI anything..."
-                value={aiQuery}
-                onChange={(e) => setAiQuery(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    runAiCommand("custom");
-                  }
-                }}
-              />
-              <button type="button" onClick={() => runAiCommand("custom")} disabled={!aiQuery.trim()}>
-                <Send size={14} />
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {showProfile ? (
         <div className="chat-profile-overlay" role="presentation" onClick={() => setShowProfile(false)}>
@@ -3750,18 +4264,20 @@ function CandidateCard({
   onPointerUp?: PointerEventHandler<HTMLElement>;
   onPointerCancel?: PointerEventHandler<HTMLElement>;
 }) {
+  const t = useTranslations();
   const cat = getRoleCategory(profile.role);
   const cardStyle = { ...(style ?? {}), "--accent": `var(--category-${cat})` } as CSSProperties;
   const [expanded, setExpanded] = useState(false);
   const [showAllSkills, setShowAllSkills] = useState(false);
+  const localizedActionHint = localizeActionHint(actionHint, t);
   const topSkills = profile.skills.slice(0, 2);
   const interests = profile.collaborationGoals.length
-    ? profile.collaborationGoals.slice(0, 2).join(", ")
-    : profile.lookingFor.slice(0, 2).join(", ");
+    ? profile.collaborationGoals.slice(0, 2).map((goal) => localizeCollaborationGoal(goal, t)).join(", ")
+    : profile.lookingFor.slice(0, 2).map((role) => localizeRoleLabel(role, t)).join(", ");
   const experienceLine =
-    profile.experienceSummary ||
-    profile.experiences[0]?.description ||
-    "Belum ada experience yang ditampilkan.";
+    localizeExperienceSummary(profile, t) ||
+    localizeExperienceText(profile.experiences[0]?.description || "", t) ||
+    t.noExperienceYet;
 
   useEffect(() => {
     setExpanded(false);
@@ -3775,9 +4291,9 @@ function CandidateCard({
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerCancel}
-      aria-label={`${profile.name}, ${profile.role}, main skill ${profile.mainSkill}`}
+      aria-label={`${profile.name}, ${localizeRoleLabel(profile.role, t)}, ${t.mainSkillLabel} ${profile.mainSkill}`}
     >
-      {actionHint ? <div className={`action-hint ${actionHint.toLowerCase()}`}>{actionHint}</div> : null}
+      {actionHint ? <div className={`action-hint ${actionHint.toLowerCase()}`}>{localizedActionHint}</div> : null}
       
       {/* Card Header Image Area */}
       <div className="card-cover">
@@ -3796,9 +4312,9 @@ function CandidateCard({
       {/* Card Body (Scrollable content) */}
       <div className={`candidate-body ${expanded ? "expanded" : ""}`}>
         <div className="candidate-identity-row" onClick={onExpand} style={{ cursor: onExpand ? 'pointer' : 'default' }}>
-          <h2>{profile.name || "Your name"}</h2>
+          <h2>{profile.name || t.yourName}</h2>
           <p className={`candidate-role-subtitle text-cat-${cat}`}>
-            {(profile.role || "Main role").toUpperCase()}
+            {localizeRoleLabel(profile.role || t.mainRoleFallback, t).toUpperCase()}
           </p>
         </div>
 
@@ -3814,11 +4330,11 @@ function CandidateCard({
             ) : null}
           </div>
           <p>
-            <strong>Interest</strong>
-            <span>{interests || "Open collaboration"}</span>
+            <strong>{t.interest}</strong>
+            <span>{interests || t.openCollaboration}</span>
           </p>
           <p>
-            <strong>Experience</strong>
+            <strong>{t.experienceTitle}</strong>
             <span>{experienceLine}</span>
           </p>
         </div>
@@ -3835,16 +4351,16 @@ function CandidateCard({
               setExpanded((current) => !current);
             }}
           >
-            {expanded ? "Less Info" : "More Info"}
+            {expanded ? t.lessInfo : t.moreInfo}
           </button>
         ) : null}
 
         {!isPreview && expanded ? (
           <div className="candidate-expanded-info card-expanded-content">
-            <p className="candidate-summary-desc">{profile.profileSummary}</p>
+            <p className="candidate-summary-desc">{localizeProfileSummary(profile, t)}</p>
 
             <div className="candidate-section-group">
-              <h3>Top Skills</h3>
+              <h3>{t.topSkills}</h3>
               <div className="chip-row">
                 {profile.skills.slice(0, 5).map((skillItem) => (
                   <Chip key={skillItem.name}>{skillItem.name}</Chip>
@@ -3854,16 +4370,16 @@ function CandidateCard({
 
             {profile.experienceSummary || (profile.experiences && profile.experiences[0]) ? (
               <div className="candidate-section-group">
-                <h3>Experience</h3>
+                <h3>{t.experienceTitle}</h3>
                 <div className="experience-preview-box">
-                  <p>{profile.experienceSummary || profile.experiences[0]?.description}</p>
+                  <p>{localizeExperienceSummary(profile, t) || localizeExperienceText(profile.experiences[0]?.description || "", t)}</p>
                 </div>
               </div>
             ) : null}
 
             <div className="looking-for-row">
               <Search size={16} aria-hidden="true" />
-              <span>Looking for {profile.lookingFor.join(", ") || "Collaborators"}</span>
+              <span>{t.lookingForPrefix} {profile.lookingFor.map((role) => localizeRoleLabel(role, t)).join(", ") || t.collaborators}</span>
             </div>
           </div>
         ) : null}
@@ -3881,7 +4397,7 @@ function CandidateCard({
           <button
             type="button"
             className="card-btn card-btn-pass"
-            title="Pass profile"
+            title={t.passProfile}
             onClick={(e) => {
               e.stopPropagation();
               onPass?.();
@@ -3892,7 +4408,7 @@ function CandidateCard({
           <button
             type="button"
             className="card-btn card-btn-bookmark"
-            title="Save profile"
+            title={t.saveProfile}
             onClick={(e) => {
               e.stopPropagation();
               onSave?.();
@@ -3903,7 +4419,7 @@ function CandidateCard({
           <button
             type="button"
             className="card-btn card-btn-check"
-            title="Show interest"
+            title={t.showInterest}
             onClick={(e) => {
               e.stopPropagation();
               onInterest?.();
@@ -3924,6 +4440,7 @@ function CandidateDetailSheet({
   profile: CandidateProfile;
   onClose: () => void;
 }) {
+  const t = useTranslations();
   const groupedSkills = groupSkills(profile.skills);
 
   useEffect(() => {
@@ -3950,28 +4467,28 @@ function CandidateDetailSheet({
             <Avatar profile={profile} size="md" />
             <div>
               <h2>{profile.name}</h2>
-              <p>{profile.role} · {profile.mainSkill}</p>
+              <p>{localizeRoleLabel(profile.role, t)} · {profile.mainSkill}</p>
             </div>
           </div>
-          <Button variant="circle" aria-label="Close details" onClick={onClose}>
+          <Button variant="circle" aria-label={t.close} onClick={onClose}>
             <X size={20} aria-hidden="true" />
           </Button>
         </div>
 
         <div className="detail-content">
-          <DetailSection title="Full summary">
-            <p>{profile.profileSummary}</p>
-            <p>{profile.experienceSummary}</p>
+          <DetailSection title={t.fullSummary}>
+            <p>{localizeProfileSummary(profile, t)}</p>
+            <p>{localizeExperienceSummary(profile, t)}</p>
           </DetailSection>
 
-          <DetailSection title="Skills by category">
+          <DetailSection title={t.skillsByCategory}>
             {Object.entries(groupedSkills).map(([category, items]) => (
               <div className="skill-group" key={category}>
-                <strong>{category}</strong>
+                <strong>{localizeSkillCategory(category, t)}</strong>
                 <div className="chip-row">
                   {items.map((skillItem) => (
                     <Chip key={`${category}-${skillItem.name}`} tone="soft">
-                      {skillItem.name} · {skillItem.level}
+                      {skillItem.name} · {localizeSkillLevel(skillItem.level, t)}
                     </Chip>
                   ))}
                 </div>
@@ -3979,15 +4496,15 @@ function CandidateDetailSheet({
             ))}
           </DetailSection>
 
-          <DetailSection title="Experience timeline">
+          <DetailSection title={t.experienceTimeline}>
             {profile.experiences.length ? (
               <div className="timeline">
                 {profile.experiences.map((experience) => (
                   <article className="timeline-item" key={experience.id}>
-                    <span>{experience.period || "Recent"}</span>
-                    <h3>{experience.title}</h3>
-                    <p className="timeline-org">{experience.organization}</p>
-                    <p>{experience.description}</p>
+                    <span>{localizeTimeLabel(experience.period || t.recent, t)}</span>
+                    <h3>{localizeExperienceText(experience.title, t)}</h3>
+                    <p className="timeline-org">{localizeExperienceText(experience.organization, t)}</p>
+                    <p>{localizeExperienceText(experience.description, t)}</p>
                     <div className="chip-row">
                       {experience.relatedSkills.map((skillName) => (
                         <Chip key={skillName}>{skillName}</Chip>
@@ -3997,11 +4514,11 @@ function CandidateDetailSheet({
                 ))}
               </div>
             ) : (
-              <p className="muted-text">No experience proof yet. Add project evidence from Profile.</p>
+              <p className="muted-text">{t.noExperienceProof}</p>
             )}
           </DetailSection>
 
-          <DetailSection title="Portfolio links">
+          <DetailSection title={t.portfolioLinks}>
             {profile.portfolioLinks.filter((link) => link.url).length ? (
               <div className="portfolio-list">
                 {profile.portfolioLinks
@@ -4014,26 +4531,26 @@ function CandidateDetailSheet({
                   ))}
               </div>
             ) : (
-              <p className="muted-text">Portfolio links can be added later.</p>
+              <p className="muted-text">{t.portfolioCanBeAdded}</p>
             )}
           </DetailSection>
 
-          <DetailSection title="Collaboration fit">
+          <DetailSection title={t.collaborationFit}>
             <div className="detail-facts">
               <p>
-                <strong>Preferred role:</strong> {profile.preferredRole}
+                <strong>{t.preferredRoleLabel}:</strong> {localizePreferredRole(profile, t)}
               </p>
               <p>
-                <strong>Availability:</strong> {profile.availabilityDetail}
+                <strong>{t.availabilityLabel}:</strong> {localizeAvailabilityDetail(profile, t)}
               </p>
               <p>
-                <strong>Suggested opener:</strong> {profile.suggestedMessage}
+                <strong>{t.suggestedOpener}:</strong> {localizeMatchMessage(profile.suggestedMessage, t)}
               </p>
             </div>
             <div className="chip-row">
               {profile.collaborationGoals.map((goal) => (
                 <Chip key={goal} tone="soft">
-                  {goal}
+                  {localizeCollaborationGoal(goal, t)}
                 </Chip>
               ))}
             </div>
@@ -4069,11 +4586,11 @@ function MatchModal({
           <Heart size={28} aria-hidden="true" />
           <Avatar profile={candidate} size="lg" />
         </div>
-        <p className="eyebrow">It is a Mutualizm match</p>
-        <h2>You and {candidate.name} are both interested in collaborating.</h2>
+        <p className="eyebrow">{t.matchEyebrow}</p>
+        <h2>{t.matchTitlePrefix} {candidate.name} {t.matchTitleSuffix}</h2>
         <div className="match-reason">
           <strong>{t.whyMatchWorks}</strong>
-          {match.summary.map((item) => (
+          {localizeMatchSummary(match, candidate, t).map((item) => (
             <p key={item}>{item}</p>
           ))}
         </div>
@@ -4108,6 +4625,7 @@ function SignupSuggestionModal({
   onViewProfile: () => void;
 }) {
   const match = createMatchFor(candidate);
+  const t = useTranslations();
 
   return createPortal(
     <div className="overlay" role="presentation" onClick={onClose}>
@@ -4118,21 +4636,21 @@ function SignupSuggestionModal({
         <div className="match-avatars">
           <Avatar profile={candidate} size="lg" />
         </div>
-        <p className="eyebrow">Suggestion Match</p>
-        <h2>{candidate.name} cocok dengan profil onboarding Anda.</h2>
+        <p className="eyebrow">{t.suggestionMatch}</p>
+        <h2>{candidate.name} {t.suggestionTitleSuffix}</h2>
         <div className="match-reason">
-          <strong>Kenapa disarankan</strong>
-          {match.summary.map((item) => (
+          <strong>{t.whySuggested}</strong>
+          {localizeMatchSummary(match, candidate, t).map((item) => (
             <p key={item}>{item}</p>
           ))}
         </div>
         <div className="modal-actions">
           <Button variant="primary" onClick={onViewProfile}>
             <Eye size={18} aria-hidden="true" />
-            Lihat profil
+            {t.viewProfile}
           </Button>
           <Button variant="secondary" onClick={onClose}>
-            Lanjut swipe
+            {t.keepSwiping}
           </Button>
         </div>
       </section>
@@ -4149,6 +4667,7 @@ function FilterPanel({
   onApplied?: () => void;
 }) {
   const { filters, setFilters, clearFilters } = useSymbio();
+  const t = useTranslations();
   const programs = uniquePrograms();
   const skills = uniqueSkills();
 
@@ -4159,86 +4678,86 @@ function FilterPanel({
   return (
     <section className={`filter-panel ${variant}`}>
       <div className="rail-heading">
-        <h2>Filters</h2>
+        <h2>{t.filters}</h2>
         <button className="text-link" onClick={clearFilters}>
-          Clear all
+          {t.clearAll}
         </button>
       </div>
       <SelectField
-        label="Skill category"
+        label={t.skillCategory}
         value={filters.skillCategory}
         onChange={(value) => updateFilter("skillCategory", value)}
         options={[
-          { label: "Any category", value: "" },
-          ...skillCategories.map((category) => ({ label: category, value: category }))
+          { label: t.anyCategory, value: "" },
+          ...skillCategories.map((category) => ({ label: localizeSkillCategory(category, t), value: category }))
         ]}
       />
       <SelectField
-        label="Specific skill"
+        label={t.specificSkill}
         value={filters.specificSkill}
         onChange={(value) => updateFilter("specificSkill", value)}
         options={[
-          { label: "Any skill", value: "" },
+          { label: t.anySkill, value: "" },
           ...skills.map((skillName) => ({ label: skillName, value: skillName }))
         ]}
       />
       <SelectField
-        label="Role"
+        label={t.role}
         value={filters.role}
         onChange={(value) => updateFilter("role", value)}
         options={[
-          { label: "Any role", value: "" },
-          ...roleOptions.map((role) => ({ label: role, value: role }))
+          { label: t.anyRole, value: "" },
+          ...roleOptions.map((role) => ({ label: localizeRoleLabel(role, t), value: role }))
         ]}
       />
       <SelectField
-        label="Availability"
+        label={t.availabilityLabel}
         value={filters.availability}
         onChange={(value) => updateFilter("availability", value)}
         options={[
-          { label: "Any availability", value: "" },
-          { label: "Available", value: "available" },
-          { label: "Limited", value: "limited" },
-          { label: "Busy", value: "busy" }
+          { label: t.anyAvailability, value: "" },
+          { label: localizeAvailabilityLabel("available", t), value: "available" },
+          { label: localizeAvailabilityLabel("limited", t), value: "limited" },
+          { label: localizeAvailabilityLabel("busy", t), value: "busy" }
         ]}
       />
       <SelectField
-        label="Collaboration goal"
+        label={t.collaborationGoal}
         value={filters.collaborationGoal}
         onChange={(value) => updateFilter("collaborationGoal", value)}
         options={[
-          { label: "Any goal", value: "" },
-          ...collaborationGoalOptions.map((goal) => ({ label: goal, value: goal }))
+          { label: t.anyGoal, value: "" },
+          ...collaborationGoalOptions.map((goal) => ({ label: localizeCollaborationGoal(goal, t), value: goal }))
         ]}
       />
       <SelectField
-        label="Program"
+        label={t.program}
         value={filters.program}
         onChange={(value) => updateFilter("program", value)}
         options={[
-          { label: "Any program", value: "" },
+          { label: t.anyProgram, value: "" },
           ...programs.map((program) => ({ label: program, value: program }))
         ]}
       />
       <SelectField
-        label="Experience level"
+        label={t.experienceLevel}
         value={filters.level}
         onChange={(value) => updateFilter("level", value)}
         options={[
-          { label: "Any level", value: "" },
-          { label: "Beginner", value: "Beginner" },
-          { label: "Intermediate", value: "Intermediate" },
-          { label: "Advanced", value: "Advanced" },
-          { label: "Project-ready", value: "Project-ready" }
+          { label: t.anyLevel, value: "" },
+          { label: localizeSkillLevel("Beginner", t), value: "Beginner" },
+          { label: localizeSkillLevel("Intermediate", t), value: "Intermediate" },
+          { label: localizeSkillLevel("Advanced", t), value: "Advanced" },
+          { label: localizeSkillLevel("Project-ready", t), value: "Project-ready" }
         ]}
       />
       {variant === "mobile" ? (
         <div className="filter-mobile-actions">
           <Button variant="secondary" onClick={clearFilters}>
-            Reset
+            {t.reset}
           </Button>
           <Button variant="primary" onClick={onApplied}>
-            Apply filters
+            {t.applyFilters}
           </Button>
         </div>
       ) : null}
@@ -4248,6 +4767,7 @@ function FilterPanel({
 
 function ActiveFilterChips() {
   const { filters, setFilters, clearFilters } = useSymbio();
+  const t = useTranslations();
   const entries = Object.entries(filters).filter(([, value]) => value);
 
   if (!entries.length) {
@@ -4261,20 +4781,21 @@ function ActiveFilterChips() {
           key={key}
           onClick={() => setFilters((current) => ({ ...current, [key]: "" }))}
         >
-          {value}
+          {localizeFilterValue(key, value, t)}
           <X size={14} aria-hidden="true" />
         </button>
       ))}
-      <button onClick={clearFilters}>Clear all</button>
+      <button onClick={clearFilters}>{t.clearAll}</button>
     </div>
   );
 }
 
 function ClearFiltersButton() {
   const { clearFilters } = useSymbio();
+  const t = useTranslations();
   return (
     <Button variant="primary" onClick={clearFilters}>
-      Clear filters
+      {t.clearAll}
     </Button>
   );
 }
@@ -4380,8 +4901,9 @@ function AvailabilityBadge({
   availability: CandidateProfile["availability"];
   label?: string;
 }) {
-  const fallback = availability === "available" ? "Available" : availability === "limited" ? "Limited" : "Busy";
-  return <span className={`availability availability-${availability}`}>{label || fallback}</span>;
+  const t = useTranslations();
+  const fallback = localizeAvailabilityLabel(availability, t);
+  return <span className={`availability availability-${availability}`}>{localizeStatusLabel(label, t) || fallback}</span>;
 }
 
 function Avatar({ profile, size }: { profile: CandidateProfile; size: "xs" | "sm" | "md" | "lg" }) {
@@ -4443,8 +4965,9 @@ function PhotoUploadField({
   onChange: (value: string) => void;
   onPositionChange: (value: string) => void;
 }) {
+  const t = useTranslations();
   const [x, y] = position.split(" ");
-  
+
   let xNum = 50;
   if (x) {
     if (x === "center") {
@@ -4493,24 +5016,24 @@ function PhotoUploadField({
         ) : (
           <div className="photo-preview-empty">
             <User size={28} aria-hidden="true" />
-            <small>No photo</small>
+            <small>{t.noPhoto}</small>
           </div>
         )}
       </div>
       <div className="photo-upload-actions">
         <label className="button button-secondary">
-          Upload
+          {t.upload}
           <input type="file" accept="image/*" onChange={handleFile} />
         </label>
         <input
           value={value}
           onChange={(event) => onChange(event.target.value)}
-          placeholder="atau tempel URL foto"
+          placeholder={t.pastePhotoUrl}
         />
       </div>
       <div className="crop-control-grid">
         <label>
-          <span>Horizontal crop <small>{xNum}%</small></span>
+          <span>{t.horizontalCrop} <small>{xNum}%</small></span>
           <input
             type="range"
             min="0"
@@ -4520,7 +5043,7 @@ function PhotoUploadField({
           />
         </label>
         <label>
-          <span>Vertical crop <small>{yNum}%</small></span>
+          <span>{t.verticalCrop} <small>{yNum}%</small></span>
           <input
             type="range"
             min="0"
@@ -4530,25 +5053,9 @@ function PhotoUploadField({
           />
         </label>
         <button type="button" className="crop-reset-button" onClick={() => updatePosition(50, 42)}>
-          Center crop
+          {t.centerCrop}
         </button>
       </div>
-      {value ? (
-        <div className="photo-crop-preview-grid">
-          <div className="photo-crop-preview">
-            <small style={{ display: 'block', color: 'var(--muted)', marginBottom: 4, fontWeight: 700 }}>Horizontal preview</small>
-            <div style={{ width: 180, height: 100, borderRadius: 8, overflow: 'hidden', border: '1px solid var(--border)' }}>
-              <img src={value} alt="Horizontal preview" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: position }} draggable={false} />
-            </div>
-          </div>
-          <div className="photo-crop-preview">
-            <small style={{ display: 'block', color: 'var(--muted)', marginBottom: 4, fontWeight: 700 }}>Vertical preview</small>
-            <div style={{ width: 100, height: 140, borderRadius: 8, overflow: 'hidden', border: '1px solid var(--border)' }}>
-              <img src={value} alt="Vertical preview" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: position }} draggable={false} />
-            </div>
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }
@@ -4642,6 +5149,7 @@ function MultiChipField({
   options: string[];
   onChange: (values: string[]) => void;
 }) {
+  const t = useTranslations();
   const [customValue, setCustomValue] = useState("");
   const toggle = (value: string) => {
     onChange(values.includes(value) ? values.filter((item) => item !== value) : [...values, value]);
@@ -4667,7 +5175,7 @@ function MultiChipField({
             className={values.includes(option) ? "selected" : ""}
             onClick={() => toggle(option)}
           >
-            {option}
+            {localizeOptionLabel(option, t)}
           </button>
         ))}
       </div>
@@ -4681,10 +5189,10 @@ function MultiChipField({
               addCustom();
             }
           }}
-          placeholder={`Add custom ${label.toLowerCase()}`}
+          placeholder={`${t.addCustom} ${label.toLowerCase()}`}
         />
         <Button type="button" variant="secondary" onClick={addCustom}>
-          Add
+          {t.add}
         </Button>
       </div>
     </fieldset>
@@ -4700,6 +5208,7 @@ function SkillChecklist({
   onChange: (skills: Skill[]) => void;
   helper?: string;
 }) {
+  const t = useTranslations();
   const selectedNames = selected.map((skillItem) => skillItem.name);
   const grouped = groupSkills(allSkills);
   const [customSkill, setCustomSkill] = useState("");
@@ -4729,12 +5238,12 @@ function SkillChecklist({
   return (
     <div className="skill-picker">
       <div className="field-label">
-        <span>Additional skills</span>
+        <span>{t.additionalSkills}</span>
         {helper ? <small>{helper}</small> : null}
       </div>
       {Object.entries(grouped).map(([category, skills]) => (
         <div className="skill-picker-group" key={category}>
-          <strong>{category}</strong>
+          <strong>{localizeSkillCategory(category, t)}</strong>
           <div className="toggle-grid">
             {skills.map((skillItem) => (
               <button
@@ -4759,10 +5268,10 @@ function SkillChecklist({
               addCustomSkill();
             }
           }}
-          placeholder="Add custom skill"
+          placeholder={t.addSkill}
         />
         <Button type="button" variant="secondary" onClick={addCustomSkill}>
-          Add skill
+          {t.addSkill}
         </Button>
       </div>
     </div>
@@ -4776,37 +5285,38 @@ function ExperienceEditor({
   experience: Experience;
   onChange: (experience: Experience) => void;
 }) {
+  const t = useTranslations();
   const update = (patch: Partial<Experience>) => onChange({ ...experience, ...patch });
 
   return (
     <div className="field-grid">
       <TextField
-        label="Title / role"
+        label={t.titleRole}
         value={experience.title}
         onChange={(title) => update({ title })}
         placeholder="Frontend Developer"
       />
       <TextField
-        label="Project / organization"
+        label={t.projectOrganization}
         value={experience.organization}
         onChange={(organization) => update({ organization })}
         placeholder="Tel-U Lost and Found"
       />
       <TextField
-        label="Period"
+        label={t.period}
         value={experience.period ?? ""}
         onChange={(period) => update({ period })}
         placeholder="2026"
       />
       <TextAreaField
-        label="Description"
+        label={t.description}
         value={experience.description}
         onChange={(description) => update({ description })}
         minRows={4}
-        placeholder="Built responsive UI, integrated frontend flow, and prepared deployment interface."
+        placeholder={t.experienceSummaryPlaceholder}
       />
       <MultiChipField
-        label="Related skills"
+        label={t.relatedSkills}
         values={experience.relatedSkills}
         options={uniqueSkills()}
         onChange={(relatedSkills) => update({ relatedSkills })}
@@ -4822,6 +5332,7 @@ function PortfolioEditor({
   links: PortfolioLink[];
   onChange: (links: PortfolioLink[]) => void;
 }) {
+  const t = useTranslations();
   const normalized = links.length
     ? links
     : [
@@ -4841,18 +5352,18 @@ function PortfolioEditor({
         return (
           <div className="portfolio-field" key={`${link.label}-${index}`}>
             <TextField
-              label="Label"
+              label={t.labelField}
               value={link.label}
               onChange={(label) => update(index, { label })}
               placeholder="GitHub"
             />
             <TextField
-              label="URL"
+              label={t.urlField}
               value={link.url}
               onChange={(url) => update(index, { url })}
               placeholder="https://example.com"
             />
-            {hasWarning ? <small className="warning-text">Use a full URL starting with http or https.</small> : null}
+            {hasWarning ? <small className="warning-text">{t.urlWarning}</small> : null}
           </div>
         );
       })}
@@ -4898,6 +5409,393 @@ function usePrefersReducedMotion() {
   return prefersReducedMotion;
 }
 
+function isIndonesian(t: TranslationSet) {
+  return t.discover === translations.id.discover;
+}
+
+function localizeStatusLabel(label: string | undefined, t: TranslationSet) {
+  if (!label || label === "Open to team up") {
+    return "";
+  }
+
+  const idLabels: Record<string, string> = {
+    "Ready this week": "Siap minggu ini",
+    "Weekend backend": "Backend akhir pekan",
+    "Pitch ready": "Siap pitching",
+    "Limited slots": "Slot terbatas",
+    "Lab ready": "Siap di lab",
+    "Looking for project": t.lookingForProject,
+    "Available this week": t.availableThisWeek,
+    "Busy, message first": t.busyMessageFirst
+  };
+
+  if (isIndonesian(t)) {
+    return idLabels[label] ?? label;
+  }
+
+  return label;
+}
+
+function localizeAvailabilityLabel(availability: CandidateProfile["availability"], t: TranslationSet) {
+  if (availability === "available") {
+    return isIndonesian(t) ? "Tersedia" : "Available";
+  }
+  if (availability === "limited") {
+    return isIndonesian(t) ? "Terbatas" : "Limited";
+  }
+  return isIndonesian(t) ? "Sibuk" : "Busy";
+}
+
+function localizeNotification(notification: NotificationItem, t: TranslationSet) {
+  if (!isIndonesian(t)) {
+    return {
+      ...notification,
+      type: notification.type === "match" ? "Match" : notification.type === "message" ? "Message" : "Project"
+    };
+  }
+
+  const known: Record<string, Partial<NotificationItem>> = {
+    "notif-match-naya": {
+      title: "Kecocokan baru dengan Naya",
+      body: "Naya adalah UI/UX Designer dengan keahlian Figma, prototyping, dan riset pengguna.",
+      time: "5 menit lalu"
+    },
+    "notif-message-rafi": {
+      title: "Rafi mengirim catatan backend",
+      body: "Dia bisa membantu menghubungkan frontend Anda ke API Laravel dan data Supabase.",
+      time: "1 jam lalu"
+    },
+    "notif-project-demo": {
+      title: "Saran proyek siap",
+      body: "Demo Campus Skill Match membutuhkan dukungan desain, backend, dan pitch.",
+      time: "Hari ini"
+    }
+  };
+
+  const type = notification.type === "match" ? "Kecocokan" : notification.type === "message" ? "Pesan" : "Proyek";
+  return { ...notification, type, ...(known[notification.id] ?? {}) };
+}
+
+function localizeProject(project: typeof mockProjects[number], t: TranslationSet) {
+  if (!isIndonesian(t)) {
+    return project;
+  }
+
+  const known: Record<string, Partial<typeof project>> = {
+    "project-campus-skill-match": {
+      title: "Demo Campus Skill Match",
+      summary: "Prototipe untuk mencocokkan mahasiswa berdasarkan keahlian, peran, ketersediaan, dan tujuan kolaborasi.",
+      status: "Terbuka",
+      deadline: "3 minggu lagi"
+    },
+    "project-smart-event": {
+      title: "Pendamping Smart Event",
+      summary: "Asisten acara mobile-first untuk presensi, pengingat, dan koordinasi tim.",
+      status: "Merekrut",
+      deadline: "2 minggu lagi"
+    }
+  };
+
+  return { ...project, ...(known[project.id] ?? {}) };
+}
+
+function localizeRoleLabel(role: string, t: TranslationSet) {
+  if (!isIndonesian(t)) {
+    return role;
+  }
+
+  const roles: Record<string, string> = {
+    "Frontend Developer": "Pengembang Frontend",
+    "Backend Developer": "Pengembang Backend",
+    "UI/UX Designer": "Desainer UI/UX",
+    "Product Designer": "Desainer Produk",
+    "Business Strategist": "Strategis Bisnis",
+    "Data Analyst": "Analis Data",
+    "IoT Builder": "Perakit IoT",
+    "Content Creator": "Kreator Konten",
+    Researcher: "Peneliti",
+    "Pitch Deck Writer": "Penulis Pitch Deck",
+    Technical: t.technicalRole,
+    Business: t.businessRole,
+    Design: t.designRole,
+    Other: t.otherRole
+  };
+
+  return roles[role] ?? role;
+}
+
+function localizeCollaborationGoal(goal: string, t: TranslationSet) {
+  if (!isIndonesian(t)) {
+    return goal;
+  }
+
+  const goals: Record<string, string> = {
+    "Competition team": "Tim lomba",
+    "Startup prototype": "Prototipe startup",
+    "Campus assignment": "Tugas kampus",
+    "Research project": "Proyek riset",
+    "Organization event": "Acara organisasi",
+    "Freelance project": "Proyek freelance",
+    "Innovation program": "Program inovasi"
+  };
+
+  return goals[goal] ?? goal;
+}
+
+function localizeSkillCategory(category: string, t: TranslationSet) {
+  if (!isIndonesian(t)) {
+    return category;
+  }
+
+  const categories: Record<string, string> = {
+    Development: "Pengembangan",
+    Design: "Desain",
+    Business: "Bisnis",
+    Content: "Konten",
+    Research: "Riset",
+    Data: "Data",
+    "Hardware/IoT": "Perangkat Keras/IoT",
+    Communication: "Komunikasi",
+    Other: "Lainnya"
+  };
+
+  return categories[category] ?? category;
+}
+
+function localizeSkillLevel(level: string, t: TranslationSet) {
+  if (!isIndonesian(t)) {
+    return level;
+  }
+
+  const levels: Record<string, string> = {
+    Beginner: "Pemula",
+    Intermediate: "Menengah",
+    Advanced: "Mahir",
+    "Project-ready": "Siap proyek"
+  };
+
+  return levels[level] ?? level;
+}
+
+function localizeOptionLabel(value: string, t: TranslationSet) {
+  if (roleOptions.includes(value)) {
+    return localizeRoleLabel(value, t);
+  }
+  if (collaborationGoalOptions.includes(value)) {
+    return localizeCollaborationGoal(value, t);
+  }
+  if (skillCategories.includes(value)) {
+    return localizeSkillCategory(value, t);
+  }
+  return value;
+}
+
+function localizeFilterValue(key: string, value: string, t: TranslationSet) {
+  if (key === "availability") {
+    return localizeAvailabilityLabel(value as CandidateProfile["availability"], t);
+  }
+  if (key === "level") {
+    return localizeSkillLevel(value, t);
+  }
+  return localizeOptionLabel(value, t);
+}
+
+function localizeActionHint(actionHint: string | undefined, t: TranslationSet) {
+  if (!actionHint) {
+    return "";
+  }
+  if (actionHint === "Save") {
+    return t.saveProfile;
+  }
+  if (actionHint === "Interested") {
+    return t.showInterest;
+  }
+  if (actionHint === "Pass") {
+    return t.passProfile;
+  }
+  return actionHint;
+}
+
+function localizeMatchMessage(message: string, t: TranslationSet) {
+  if (!isIndonesian(t)) {
+    return message;
+  }
+
+  const messages: Record<string, string> = {
+    "Your React skills fit my product flow. Want to plan a quick prototype sprint?":
+      "Keahlian React Anda cocok dengan alur produk saya. Mau merencanakan sprint prototipe singkat?",
+    "I can help connect your React UI to a real Laravel API this weekend.":
+      "Saya bisa membantu menghubungkan UI React Anda ke API Laravel nyata akhir pekan ini.",
+    "Your prototype can be stronger with a tighter pitch story. Want to team up?":
+      "Prototipe Anda bisa lebih kuat dengan cerita pitch yang rapi. Mau bergabung?",
+    "I can help turn your user survey into a dashboard for the prototype.":
+      "Saya bisa membantu mengubah survei pengguna Anda menjadi dashboard untuk prototipe.",
+    "If your project needs a physical demo, I can handle sensors and Arduino.":
+      "Jika proyek Anda butuh demo fisik, saya bisa menangani sensor dan Arduino.",
+    "I saw your skills and think we could build a strong prototype team. Are you open to discussing roles?":
+      "Saya melihat keahlian Anda dan merasa kita bisa membangun tim prototipe yang kuat. Mau membahas peran?",
+    "Hey! Thanks for saving my profile. I'd love to chat about collaborating!":
+      "Hai! Terima kasih sudah menyimpan profil saya. Saya tertarik membahas kolaborasi!",
+    "Hi Hadid, your React prototype work looks relevant. Want to discuss a competition team?":
+      "Hai Hadid, karya prototipe React Anda terlihat relevan. Mau membahas tim lomba?"
+  };
+
+  return messages[message] ?? message;
+}
+
+function localizeChatMessage(message: string, t: TranslationSet) {
+  return localizeMatchMessage(message, t);
+}
+
+function localizeTimeLabel(time: string, t: TranslationSet) {
+  if (!isIndonesian(t)) {
+    return time;
+  }
+
+  const times: Record<string, string> = {
+    Today: "Hari ini",
+    Yesterday: "Kemarin",
+    "Just now": "Baru saja"
+  };
+
+  return times[time] ?? time;
+}
+
+function localizeMatchSummary(match: MatchRecord, candidate: CandidateProfile, t: TranslationSet) {
+  if (!isIndonesian(t)) {
+    return match.summary;
+  }
+
+  const firstName = candidate.name.split(" ")[0];
+  const firstSkill = candidate.skills[0]?.name ?? candidate.mainSkill;
+  const secondSkill = candidate.skills[1]?.name;
+  const skillText = secondSkill ? `${firstSkill} dan ${secondSkill}` : firstSkill;
+  const goal = candidate.collaborationGoals[0]
+    ? localizeCollaborationGoal(candidate.collaborationGoals[0], t).toLowerCase()
+    : "proyek";
+
+  return [
+    `Anda mencari dukungan ${localizeRoleLabel(candidate.role, t).toLowerCase()}.`,
+    `${firstName} punya pengalaman ${skillText}.`,
+    `Kedua profil menyebut kolaborasi ${goal}.`
+  ];
+}
+
+function localizeProfileSummary(profile: CandidateProfile, t: TranslationSet) {
+  if (!isIndonesian(t)) {
+    return profile.profileSummary;
+  }
+
+  const summaries: Record<string, string> = {
+    "Frontend-focused student building clean web prototypes for campus innovation, competitions, and fast product demos.":
+      "Mahasiswa fokus frontend yang membangun prototipe web rapi untuk inovasi kampus, lomba, dan demo produk cepat.",
+    "Designs research-backed mobile and web flows for student product teams.":
+      "Merancang alur mobile dan web berbasis riset untuk tim produk mahasiswa.",
+    "Builds APIs, auth flows, and deployment-ready backend services for student prototypes.":
+      "Membangun API, alur autentikasi, dan layanan backend siap deploy untuk prototipe mahasiswa.",
+    "Turns prototype ideas into clear validation plans, pitch decks, and competition stories.":
+      "Mengubah ide prototipe menjadi rencana validasi, pitch deck, dan cerita lomba yang jelas.",
+    "Creates data dashboards and simple ML baselines for product validation.":
+      "Membuat dashboard data dan baseline ML sederhana untuk validasi produk.",
+    "Builds sensor prototypes and connects hardware demos to simple web dashboards.":
+      "Membangun prototipe sensor dan menghubungkan demo perangkat keras ke dashboard web sederhana."
+  };
+
+  return summaries[profile.profileSummary] ?? profile.profileSummary;
+}
+
+function localizeExperienceSummary(profile: CandidateProfile, t: TranslationSet) {
+  if (!isIndonesian(t)) {
+    return profile.experienceSummary;
+  }
+
+  const summaries: Record<string, string> = {
+    "Built responsive dashboards, landing pages, and prototype flows for student projects using React and Laravel-ready UI patterns.":
+      "Membangun dashboard responsif, landing page, dan alur prototipe untuk proyek mahasiswa memakai pola UI React yang siap Laravel.",
+    "Led wireframes, prototypes, and usability testing for a campus marketplace concept.":
+      "Memimpin wireframe, prototipe, dan uji kegunaan untuk konsep marketplace kampus.",
+    "Implemented REST APIs and database schemas for organization event systems.":
+      "Mengimplementasikan REST API dan skema database untuk sistem acara organisasi.",
+    "Prepared market research and pitch materials for a campus innovation finalist.":
+      "Menyiapkan riset pasar dan materi pitch untuk finalis inovasi kampus.",
+    "Built survey analytics and dashboard prototypes for research and competition teams.":
+      "Membangun analitik survei dan prototipe dashboard untuk tim riset dan lomba.",
+    "Created smart locker and environment monitoring prototypes for campus assignments.":
+      "Membuat prototipe smart locker dan pemantauan lingkungan untuk tugas kampus."
+  };
+
+  return summaries[profile.experienceSummary] ?? profile.experienceSummary;
+}
+
+function localizeAvailabilityDetail(profile: CandidateProfile, t: TranslationSet) {
+  if (!isIndonesian(t)) {
+    return profile.availabilityDetail;
+  }
+
+  const details: Record<string, string> = {
+    "Open for evening and weekend competition work.": "Terbuka untuk kerja lomba pada malam hari dan akhir pekan.",
+    "Available on weeknights and Saturday morning.": "Tersedia pada malam hari kerja dan Sabtu pagi.",
+    "Can focus on API work during weekends.": "Bisa fokus pada pekerjaan API saat akhir pekan.",
+    "Open for evening planning and pitch practice.": "Tersedia untuk perencanaan malam hari dan latihan pitch.",
+    "Available for small analytics tasks after exams.": "Tersedia untuk tugas analitik kecil setelah ujian.",
+    "Open for lab sessions and weekend demos.": "Terbuka untuk sesi lab dan demo akhir pekan."
+  };
+
+  return details[profile.availabilityDetail] ?? profile.availabilityDetail;
+}
+
+function localizePreferredRole(profile: CandidateProfile, t: TranslationSet) {
+  if (!isIndonesian(t)) {
+    return profile.preferredRole;
+  }
+
+  const roles: Record<string, string> = {
+    "Frontend owner and UI integrator": "Pemilik frontend dan integrator UI",
+    "Design lead and user testing owner": "Pemimpin desain dan penanggung jawab uji pengguna",
+    "API owner and database integrator": "Pemilik API dan integrator database",
+    "Pitch and validation owner": "Penanggung jawab pitch dan validasi",
+    "Analytics and dashboard owner": "Pemilik analitik dan dashboard",
+    "Hardware prototype owner": "Pemilik prototipe perangkat keras"
+  };
+
+  return roles[profile.preferredRole] ?? profile.preferredRole;
+}
+
+function localizeExperienceText(text: string, t: TranslationSet) {
+  if (!isIndonesian(t)) {
+    return text;
+  }
+
+  const texts: Record<string, string> = {
+    "Frontend Developer": "Pengembang Frontend",
+    "Campus Innovation Prototype": "Prototipe Inovasi Kampus",
+    "Created responsive UI screens, reusable components, and a demo flow for a campus collaboration application.":
+      "Membuat layar UI responsif, komponen reusable, dan alur demo untuk aplikasi kolaborasi kampus.",
+    "UI/UX Lead": "Lead UI/UX",
+    "Campus Marketplace Prototype": "Prototipe Marketplace Kampus",
+    "Mapped user flows, produced high-fidelity Figma prototypes, and ran quick usability tests.":
+      "Memetakan alur pengguna, membuat prototipe Figma high-fidelity, dan menjalankan uji kegunaan singkat.",
+    "Backend Developer": "Pengembang Backend",
+    "Event Registration System": "Sistem Pendaftaran Acara",
+    "Created role-based APIs, message queues, and deployment scripts for a student event platform.":
+      "Membuat API berbasis peran, antrean pesan, dan skrip deploy untuk platform acara mahasiswa.",
+    "Business Strategist": "Strategis Bisnis",
+    "Innovation Challenge Finalist": "Finalis Tantangan Inovasi",
+    "Validated customer segments, shaped the revenue model, and prepared the final pitch narrative.":
+      "Memvalidasi segmen pelanggan, membentuk model pendapatan, dan menyiapkan narasi pitch final.",
+    "Data Analyst": "Analis Data",
+    "Student Research Dashboard": "Dashboard Riset Mahasiswa",
+    "Cleaned survey data, visualized insights, and built dashboard screens for decision making.":
+      "Membersihkan data survei, memvisualisasikan insight, dan membangun layar dashboard untuk pengambilan keputusan.",
+    "IoT Prototype Builder": "Pembuat Prototipe IoT",
+    "Smart Locker Assignment": "Tugas Smart Locker",
+    "Connected RFID, sensors, and a dashboard proof of concept for secure locker access.":
+      "Menghubungkan RFID, sensor, dan proof of concept dashboard untuk akses locker yang aman."
+  };
+
+  return texts[text] ?? text;
+}
+
 function findBestSuggestion(suggestion: { mainSkill?: string; skills?: string[]; role?: string }) {
   const normalizedSkills = new Set(
     [suggestion.mainSkill, ...(suggestion.skills ?? [])]
@@ -4919,6 +5817,50 @@ function findBestSuggestion(suggestion: { mainSkill?: string; skills?: string[];
     .sort((left, right) => right.score - left.score);
 
   return ranked[0]?.candidate ?? candidates[0] ?? null;
+}
+
+function findCandidatesForQuery(query: string) {
+  const normalized = query.toLowerCase();
+  const tokens = normalized.split(/[^a-z0-9+#.]+/).filter(Boolean);
+
+  return candidates
+    .map((candidate) => {
+      let score = 0;
+      const role = candidate.role.toLowerCase();
+      const mainSkill = candidate.mainSkill.toLowerCase();
+      const summary = candidate.profileSummary.toLowerCase();
+
+      if (normalized.includes(mainSkill)) {
+        score += 8;
+      }
+      if (normalized.includes(role)) {
+        score += 5;
+      }
+
+      candidate.skills.forEach((skillItem) => {
+        const skillName = skillItem.name.toLowerCase();
+        if (normalized.includes(skillName)) {
+          score += candidate.mainSkill === skillItem.name ? 7 : 4;
+        }
+      });
+
+      candidate.collaborationGoals.forEach((goal) => {
+        if (normalized.includes(goal.toLowerCase())) {
+          score += 2;
+        }
+      });
+
+      tokens.forEach((token) => {
+        if (role.includes(token) || mainSkill.includes(token) || summary.includes(token)) {
+          score += 1;
+        }
+      });
+
+      return { candidate, score };
+    })
+    .filter((item) => item.score > 0)
+    .sort((left, right) => right.score - left.score)
+    .map((item) => item.candidate);
 }
 
 function applyFilters(profiles: CandidateProfile[], filters: FilterValues) {
@@ -4978,65 +5920,65 @@ function ensureSkillSelected(skills: Skill[], skillName: string) {
   return known ? [known, ...skills] : skills;
 }
 
-function validateOnboardingStep(step: number, draft: CandidateProfile) {
+function validateOnboardingStep(step: number, draft: CandidateProfile, t: TranslationSet) {
   const errors: string[] = [];
 
   if (step === 0 && !draft.name.trim()) {
-    errors.push("Full name is required.");
+    errors.push(t.fullNameRequiredValidation);
   }
   if (step === 1) {
     if (!draft.campus.trim()) {
-      errors.push("Campus is required.");
+      errors.push(t.campusRequired);
     }
     if (!draft.program.trim()) {
-      errors.push("Faculty or program is required.");
+      errors.push(t.programRequired);
     }
   }
   if (step === 2) {
     if (!draft.role) {
-      errors.push("Main role is required.");
+      errors.push(t.mainRoleRequired);
     }
     if (!draft.mainSkill) {
-      errors.push("Main skill is required.");
+      errors.push(t.mainSkillRequired);
     }
     if (!draft.collaborationGoals.length) {
-      errors.push("Select at least one collaboration type.");
+      errors.push(t.collaborationTypeRequired);
     }
   }
   if (step === 3 && draft.skills.length < 3) {
-    errors.push("Select at least 3 skills.");
+    errors.push(t.skillRequired);
   }
   if (step === 4) {
     if (draft.profileSummary.length > 180) {
-      errors.push("Profile summary must stay under 180 characters.");
+      errors.push(t.profileSummaryLimit);
     }
   }
   if (step === 5 && draft.experienceSummary.length > 240) {
-    errors.push("Experience summary must stay under 240 characters.");
+    errors.push(t.experienceSummaryLimit);
   }
   if (step === 6) {
     const experience = draft.experiences[0];
     if (!experience?.title.trim()) {
-      errors.push("Experience title is required.");
+      errors.push(t.experienceTitleRequired);
     }
     if (!experience?.organization.trim()) {
-      errors.push("Project or organization is required.");
+      errors.push(t.projectRequired);
     }
     if (!experience?.description.trim()) {
-      errors.push("Experience description is required.");
+      errors.push(t.experienceDescriptionRequired);
     }
   }
   if (step === 7) {
     const badLink = draft.portfolioLinks.find((link) => link.url && !isUrlLike(link.url));
     if (badLink) {
-      errors.push(`${badLink.label || "Portfolio"} URL should start with http or https.`);
+      errors.push(`${badLink.label || "Portfolio"} ${t.portfolioUrlInvalid}`);
     }
   }
   if (step === 8 && !draft.availability) {
-    errors.push("Availability is required.");
+    errors.push(t.availabilityRequired);
   }
   if (step === 9 && !draft.lookingFor.length) {
-    errors.push("Select at least one role you are looking for.");
+    errors.push(t.lookingForRequired);
   }
 
   return errors;
@@ -5098,75 +6040,81 @@ function isUrlLike(value: string) {
 
 
 function TermsPage() {
+  const t = useTranslations();
+  const id = isIndonesian(t);
+
   return (
     <div className="legal-page page-transition">
       <Link to="/" className="legal-back-link">
-        <ArrowLeft size={16} /> Home
+        <ArrowLeft size={16} /> {t.home}
       </Link>
-      <h1>Terms of Service</h1>
-      <p>Last updated: June 2025</p>
+      <h1>{id ? "Syarat dan Ketentuan" : "Terms of Service"}</h1>
+      <p>{id ? "Terakhir diperbarui: Juni 2025" : "Last updated: June 2025"}</p>
 
-      <h2>1. Acceptance of Terms</h2>
-      <p>By accessing or using Mutualizm ("the Platform"), you agree to be bound by these Terms of Service. If you do not agree, please do not use the Platform.</p>
+      <h2>{id ? "1. Penerimaan Syarat" : "1. Acceptance of Terms"}</h2>
+      <p>{id ? "Dengan mengakses atau menggunakan Mutualizm, Anda setuju untuk terikat dengan syarat ini. Jika tidak setuju, mohon jangan gunakan platform." : 'By accessing or using Mutualizm ("the Platform"), you agree to be bound by these Terms of Service. If you do not agree, please do not use the Platform.'}</p>
 
-      <h2>2. Description of Service</h2>
-      <p>Mutualizm is a campus collaboration platform that connects students, developers, designers, and business strategists for project-based teamwork.</p>
+      <h2>{id ? "2. Deskripsi Layanan" : "2. Description of Service"}</h2>
+      <p>{id ? "Mutualizm adalah platform kolaborasi kampus yang menghubungkan mahasiswa, pengembang, desainer, dan strategis bisnis untuk kerja tim berbasis proyek." : "Mutualizm is a campus collaboration platform that connects students, developers, designers, and business strategists for project-based teamwork."}</p>
 
-      <h2>3. User Accounts</h2>
-      <p>You must provide accurate and complete information when creating an account. You are responsible for maintaining the confidentiality of your login credentials.</p>
+      <h2>{id ? "3. Akun Pengguna" : "3. User Accounts"}</h2>
+      <p>{id ? "Anda harus memberikan informasi yang akurat dan lengkap saat membuat akun. Anda bertanggung jawab menjaga kerahasiaan kredensial masuk." : "You must provide accurate and complete information when creating an account. You are responsible for maintaining the confidentiality of your login credentials."}</p>
 
-      <h2>4. Acceptable Use</h2>
+      <h2>{id ? "4. Penggunaan yang Diperbolehkan" : "4. Acceptable Use"}</h2>
       <ul>
-        <li>You agree not to use the Platform for any unlawful or harmful purposes.</li>
-        <li>You will not post misleading, abusive, or offensive content.</li>
-        <li>You will respect the intellectual property of other users.</li>
+        <li>{id ? "Anda setuju tidak menggunakan platform untuk tujuan yang melanggar hukum atau merugikan." : "You agree not to use the Platform for any unlawful or harmful purposes."}</li>
+        <li>{id ? "Anda tidak akan mengunggah konten yang menyesatkan, kasar, atau menyerang." : "You will not post misleading, abusive, or offensive content."}</li>
+        <li>{id ? "Anda akan menghormati kekayaan intelektual pengguna lain." : "You will respect the intellectual property of other users."}</li>
       </ul>
 
-      <h2>5. Intellectual Property</h2>
-      <p>All content you create and share on the Platform remains your property. By posting content, you grant Mutualizm a non-exclusive license to display it within the Platform.</p>
+      <h2>{id ? "5. Kekayaan Intelektual" : "5. Intellectual Property"}</h2>
+      <p>{id ? "Semua konten yang Anda buat dan bagikan tetap menjadi milik Anda. Dengan memposting konten, Anda memberi Mutualizm lisensi non-eksklusif untuk menampilkannya di dalam platform." : "All content you create and share on the Platform remains your property. By posting content, you grant Mutualizm a non-exclusive license to display it within the Platform."}</p>
 
-      <h2>6. Limitation of Liability</h2>
-      <p>Mutualizm is provided "as is" without warranties of any kind. We are not liable for any damages resulting from your use of the Platform.</p>
+      <h2>{id ? "6. Batasan Tanggung Jawab" : "6. Limitation of Liability"}</h2>
+      <p>{id ? "Mutualizm disediakan apa adanya tanpa jaminan apa pun. Kami tidak bertanggung jawab atas kerugian yang timbul dari penggunaan platform." : 'Mutualizm is provided "as is" without warranties of any kind. We are not liable for any damages resulting from your use of the Platform.'}</p>
 
-      <h2>7. Contact</h2>
-      <p>For questions about these Terms, contact us at support@mutualizm.id.</p>
+      <h2>{id ? "7. Kontak" : "7. Contact"}</h2>
+      <p>{id ? "Untuk pertanyaan tentang syarat ini, hubungi support@mutualizm.id." : "For questions about these Terms, contact us at support@mutualizm.id."}</p>
     </div>
   );
 }
 
 function PrivacyPage() {
+  const t = useTranslations();
+  const id = isIndonesian(t);
+
   return (
     <div className="legal-page page-transition">
       <Link to="/" className="legal-back-link">
-        <ArrowLeft size={16} /> Home
+        <ArrowLeft size={16} /> {t.home}
       </Link>
-      <h1>Privacy Policy</h1>
-      <p>Last updated: June 2025</p>
+      <h1>{id ? "Kebijakan Privasi" : "Privacy Policy"}</h1>
+      <p>{id ? "Terakhir diperbarui: Juni 2025" : "Last updated: June 2025"}</p>
 
-      <h2>1. Information We Collect</h2>
-      <p>We collect the information you provide when creating an account, including your name, email, skills, and profile details.</p>
+      <h2>{id ? "1. Informasi yang Kami Kumpulkan" : "1. Information We Collect"}</h2>
+      <p>{id ? "Kami mengumpulkan informasi yang Anda berikan saat membuat akun, termasuk nama, email, keahlian, dan detail profil." : "We collect the information you provide when creating an account, including your name, email, skills, and profile details."}</p>
 
-      <h2>2. How We Use Your Information</h2>
+      <h2>{id ? "2. Cara Kami Menggunakan Informasi" : "2. How We Use Your Information"}</h2>
       <ul>
-        <li>To provide and improve the Platform experience.</li>
-        <li>To match you with relevant collaborators and projects.</li>
-        <li>To send notifications related to your activity.</li>
+        <li>{id ? "Untuk menyediakan dan meningkatkan pengalaman platform." : "To provide and improve the Platform experience."}</li>
+        <li>{id ? "Untuk mencocokkan Anda dengan kolaborator dan proyek yang relevan." : "To match you with relevant collaborators and projects."}</li>
+        <li>{id ? "Untuk mengirim notifikasi terkait aktivitas Anda." : "To send notifications related to your activity."}</li>
       </ul>
 
-      <h2>3. Data Sharing</h2>
-      <p>We do not sell your personal data. Your profile information is visible to other Platform users as part of the collaboration matching process.</p>
+      <h2>{id ? "3. Pembagian Data" : "3. Data Sharing"}</h2>
+      <p>{id ? "Kami tidak menjual data pribadi Anda. Informasi profil Anda terlihat oleh pengguna platform lain sebagai bagian dari proses pencocokan kolaborasi." : "We do not sell your personal data. Your profile information is visible to other Platform users as part of the collaboration matching process."}</p>
 
-      <h2>4. Data Security</h2>
-      <p>We implement industry-standard security measures to protect your data. However, no method of transmission over the Internet is 100% secure.</p>
+      <h2>{id ? "4. Keamanan Data" : "4. Data Security"}</h2>
+      <p>{id ? "Kami menerapkan langkah keamanan standar industri untuk melindungi data Anda. Namun, tidak ada metode transmisi melalui internet yang sepenuhnya aman." : "We implement industry-standard security measures to protect your data. However, no method of transmission over the Internet is 100% secure."}</p>
 
-      <h2>5. Your Rights</h2>
+      <h2>{id ? "5. Hak Anda" : "5. Your Rights"}</h2>
       <ul>
-        <li>You may access, update, or delete your personal data at any time through your profile settings.</li>
-        <li>You may request a copy of your data by contacting us.</li>
+        <li>{id ? "Anda dapat mengakses, memperbarui, atau menghapus data pribadi kapan saja melalui pengaturan profil." : "You may access, update, or delete your personal data at any time through your profile settings."}</li>
+        <li>{id ? "Anda dapat meminta salinan data dengan menghubungi kami." : "You may request a copy of your data by contacting us."}</li>
       </ul>
 
-      <h2>6. Contact</h2>
-      <p>For privacy concerns, contact us at privacy@mutualizm.id.</p>
+      <h2>{id ? "6. Kontak" : "6. Contact"}</h2>
+      <p>{id ? "Untuk pertanyaan privasi, hubungi privacy@mutualizm.id." : "For privacy concerns, contact us at privacy@mutualizm.id."}</p>
     </div>
   );
 }
