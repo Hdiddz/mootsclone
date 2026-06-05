@@ -33,4 +33,19 @@ class MatchController extends Controller
 
         return response()->json($matches);
     }
+
+    public function destroy(Request $request, int $matchId)
+    {
+        $userId = $request->user()->id;
+        $match = UserMatch::findOrFail($matchId);
+
+        abort_unless(
+            $match->user_a_id === $userId || $match->user_b_id === $userId,
+            403, 'Not a participant'
+        );
+
+        $match->delete();
+
+        return response()->noContent();
+    }
 }

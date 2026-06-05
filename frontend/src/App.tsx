@@ -8,15 +8,20 @@ import {
   CheckCircle,
   ChevronDown,
   Clock,
+  Copy,
+  Edit,
   Eye,
   Filter,
+  Flag,
   Heart,
   Home,
   Link as LinkIcon,
   Menu,
   MessageCircle,
+  MoreVertical,
   QrCode,
   RefreshCw,
+  Reply,
   RotateCcw,
   Search,
   Send,
@@ -24,6 +29,7 @@ import {
   SlidersHorizontal,
   Star,
   Trash2,
+  Undo2,
   User,
   Users,
   Wifi,
@@ -116,6 +122,7 @@ type SymbioStore = {
   rewindLast: () => void;
   resetDeck: () => void;
   clearMatches: () => void;
+  removeMatch: (matchId: string) => void;
   removeSaved: (candidateId: string) => void;
   clearFilters: () => void;
   markNotificationRead: (notificationId: string) => void;
@@ -350,6 +357,31 @@ const translations = {
     view: "View",
     unreadCount: "unread",
     clearMatches: "Clear matches",
+    matchActions: "Match actions",
+    removeMatch: "Remove match",
+    reportUser: "Report user",
+    blockUser: "Block user",
+    matchRemovedTitle: "Match removed",
+    matchRemovedBody: "The match and its conversation were removed.",
+    reportQueuedTitle: "Report noted",
+    reportQueuedBody: "This prototype records the action locally for now.",
+    blockQueuedTitle: "Block noted",
+    blockQueuedBody: "This prototype records the action locally for now.",
+    replyMessage: "Reply",
+    deleteMessage: "Delete",
+    undoMessage: "Undo",
+    copyMessage: "Copy",
+    editMessage: "Edit",
+    messageCopiedTitle: "Message copied",
+    messageCopiedBody: "The message text was copied.",
+    messageDeletedTitle: "Message deleted",
+    messageDeletedBody: "The message was removed from this conversation.",
+    messageUpdatedTitle: "Message updated",
+    messageUpdatedBody: "Your edited message was saved.",
+    noMessageToUndo: "No message to undo",
+    noMessageToUndoBody: "Send a message first, then undo it from here.",
+    replyingTo: "Replying to",
+    editingMessage: "Editing message",
     chatPreview: "Chat preview",
     conversationWith: "Conversation with",
     conversationNotFound: "Conversation not found.",
@@ -687,6 +719,31 @@ const translations = {
     view: "Lihat",
     unreadCount: "belum dibaca",
     clearMatches: "Hapus kecocokan",
+    matchActions: "Aksi kecocokan",
+    removeMatch: "Hapus kecocokan",
+    reportUser: "Laporkan pengguna",
+    blockUser: "Blokir pengguna",
+    matchRemovedTitle: "Kecocokan dihapus",
+    matchRemovedBody: "Kecocokan dan percakapannya sudah dihapus.",
+    reportQueuedTitle: "Laporan dicatat",
+    reportQueuedBody: "Prototype ini mencatat aksi secara lokal untuk saat ini.",
+    blockQueuedTitle: "Blokir dicatat",
+    blockQueuedBody: "Prototype ini mencatat aksi secara lokal untuk saat ini.",
+    replyMessage: "Balas",
+    deleteMessage: "Hapus",
+    undoMessage: "Urungkan",
+    copyMessage: "Salin",
+    editMessage: "Ubah",
+    messageCopiedTitle: "Pesan disalin",
+    messageCopiedBody: "Teks pesan sudah disalin.",
+    messageDeletedTitle: "Pesan dihapus",
+    messageDeletedBody: "Pesan sudah dihapus dari percakapan ini.",
+    messageUpdatedTitle: "Pesan diperbarui",
+    messageUpdatedBody: "Pesan yang diubah sudah disimpan.",
+    noMessageToUndo: "Belum ada pesan untuk diurungkan",
+    noMessageToUndoBody: "Kirim pesan dulu, lalu urungkan dari sini.",
+    replyingTo: "Membalas",
+    editingMessage: "Mengubah pesan",
     chatPreview: "Pratinjau obrolan",
     conversationWith: "Obrolan dengan",
     conversationNotFound: "Obrolan tidak ditemukan.",
@@ -975,7 +1032,25 @@ function AuthPage() {
     <div className="auth-shell page-transition">
       <div className="auth-bg-blob-1" />
       <div className="auth-bg-blob-2" />
-      
+
+      <div className="auth-layout">
+        <section className="auth-brand-panel" aria-label="Mutualizm introduction">
+          <Link to="/" className="auth-home-link">
+            <ArrowLeft size={18} aria-hidden="true" />
+            {t.home}
+          </Link>
+          <div>
+            <span className="auth-brand-mark">Mutualizm</span>
+            <h1>{t.landingHeroTitle}</h1>
+            <p>{t.landingHeroBody}</p>
+          </div>
+          <div className="auth-value-list">
+            <span>{t.landingFeatureDiscover}</span>
+            <span>{t.landingFeatureSwipe}</span>
+            <span>{t.aiAssistantIntro}</span>
+          </div>
+        </section>
+
       <div className="auth-container">
         <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--primary)', fontWeight: 600, marginBottom: 16, textDecoration: 'none' }}>
           <span className="material-symbols-outlined" style={{ fontSize: 20 }}>arrow_back</span>
@@ -1130,6 +1205,7 @@ function AuthPage() {
           {t.authLegalPrefix} <br />
           <Link to="/terms">{t.termsOfService}</Link> {t.and} <Link to="/privacy">{t.privacyPolicy}</Link>.
         </div>
+      </div>
       </div>
     </div>
   );
@@ -1393,6 +1469,26 @@ function App() {
     );
   }, [matches, setChats, setMatches, setNotifications]);
 
+  const removeMatch = useCallback(
+    (matchId: string) => {
+      const removedMatch = matches.find((match) => match.id === matchId);
+      setMatches((current) => current.filter((match) => match.id !== matchId));
+      setChats((current) =>
+        Object.fromEntries(Object.entries(current).filter(([currentMatchId]) => currentMatchId !== matchId))
+      );
+      if (removedMatch) {
+        setNotifications((current) =>
+          current.filter((notification) => notification.id !== `notif-match-${removedMatch.candidateId}`)
+        );
+      }
+      addToast(
+        language === "id" ? translations.id.matchRemovedTitle : translations.en.matchRemovedTitle,
+        language === "id" ? translations.id.matchRemovedBody : translations.en.matchRemovedBody
+      );
+    },
+    [addToast, language, matches, setChats, setMatches, setNotifications]
+  );
+
   const removeSaved = useCallback(
     (candidateId: string) => {
       setSavedIds((current) => current.filter((id) => id !== candidateId));
@@ -1474,6 +1570,7 @@ function App() {
       rewindLast,
       resetDeck,
       clearMatches,
+      removeMatch,
       removeSaved,
       clearFilters,
       markNotificationRead,
@@ -1494,6 +1591,7 @@ function App() {
       chats,
       setChats,
       clearMatches,
+      removeMatch,
       clearFilters,
       filters,
       interestedIds,
@@ -3720,9 +3818,10 @@ function ProfilePage() {
 }
 
 function MatchesPage() {
-  const { matches, clearMatches } = useSymbio();
+  const { matches, removeMatch, addToast } = useSymbio();
   const t = useTranslations();
   const [selectedId, setSelectedId] = useState(matches[0]?.id ?? "");
+  const [openMenuId, setOpenMenuId] = useState("");
   const [detailProfile, setDetailProfile] = useState<CandidateProfile | null>(null);
 
   useEffect(() => {
@@ -3750,16 +3849,11 @@ function MatchesPage() {
 
   const selected = matches.find((match) => match.id === selectedId) ?? matches[0];
   const selectedCandidate = getCandidate(selected.candidateId);
+  const showPrototypeActionToast = (title: string, body: string) => addToast(title, body);
 
   return (
     <div className="page-stack beeline-page page-transition">
       <BeelineIntro />
-      <div className="page-inline-actions">
-        <Button variant="secondary" onClick={clearMatches}>
-          <Trash2 size={17} aria-hidden="true" />
-          {t.clearMatches}
-        </Button>
-      </div>
       <div className="matches-grid">
         <section className="match-list" aria-label="Match list">
           {matches.map((match) => {
@@ -3788,25 +3882,68 @@ function MatchesPage() {
                   <em>{localizeMatchMessage(match.latestMessage, t)}</em>
                 </span>
                 {match.unread ? <b>{match.unread}</b> : null}
-                <Link
-                  className="match-chat-button"
-                  to={`/chat/${match.id}`}
-                  onClick={(event) => event.stopPropagation()}
-                  style={{ zIndex: 5 }}
-                >
-                  {t.chat}
-                </Link>
-                <button
-                  type="button"
-                  className="match-profile-button"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    setDetailProfile(candidate);
-                  }}
-                  style={{ zIndex: 5 }}
-                >
-                  {t.profile}
-                </button>
+                <div className="match-quick-actions">
+                  <Link
+                    className="match-chat-button"
+                    to={`/chat/${match.id}`}
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    {t.chat}
+                  </Link>
+                  <button
+                    type="button"
+                    className="match-profile-button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setDetailProfile(candidate);
+                    }}
+                  >
+                    {t.profile}
+                  </button>
+                </div>
+                <div className="match-menu" onClick={(event) => event.stopPropagation()}>
+                  <button
+                    type="button"
+                    className="match-menu-trigger"
+                    aria-label={t.matchActions}
+                    aria-expanded={openMenuId === match.id}
+                    onClick={() => setOpenMenuId((current) => (current === match.id ? "" : match.id))}
+                  >
+                    <MoreVertical size={18} aria-hidden="true" />
+                  </button>
+                  {openMenuId === match.id ? (
+                    <div className="match-menu-panel">
+                      <button type="button" onClick={() => { setDetailProfile(candidate); setOpenMenuId(""); }}>
+                        <Eye size={15} aria-hidden="true" />
+                        {t.viewProfile}
+                      </button>
+                      <button type="button" onClick={() => { removeMatch(match.id); setOpenMenuId(""); }}>
+                        <Trash2 size={15} aria-hidden="true" />
+                        {t.removeMatch}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          showPrototypeActionToast(t.reportQueuedTitle, t.reportQueuedBody);
+                          setOpenMenuId("");
+                        }}
+                      >
+                        <Flag size={15} aria-hidden="true" />
+                        {t.reportUser}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          showPrototypeActionToast(t.blockQueuedTitle, t.blockQueuedBody);
+                          setOpenMenuId("");
+                        }}
+                      >
+                        <X size={15} aria-hidden="true" />
+                        {t.blockUser}
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
               </article>
             );
           })}
@@ -4114,9 +4251,11 @@ function ChatWindow({
   candidate: CandidateProfile;
   embedded?: boolean;
 }) {
-  const { chats, sendMessage } = useSymbio();
+  const { chats, sendMessage, setChats, setMatches, addToast } = useSymbio();
   const t = useTranslations();
   const [message, setMessage] = useState("");
+  const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
+  const [editingId, setEditingId] = useState("");
   const [showProfile, setShowProfile] = useState(false);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
@@ -4138,9 +4277,72 @@ function ChatWindow({
     setShowScrollBtn(scrollHeight - scrollTop - clientHeight > 80);
   };
 
+  const latestOwnMessage = [...messages].reverse().find((chatMessage) => chatMessage.sender === "me");
+
+  const updateMatchPreview = (nextMessages: ChatMessage[]) => {
+    const latestMessage = nextMessages[nextMessages.length - 1];
+    setMatches((current) =>
+      current.map((currentMatch) =>
+        currentMatch.id === match.id
+          ? { ...currentMatch, latestMessage: latestMessage?.text ?? "", unread: 0 }
+          : currentMatch
+      )
+    );
+  };
+
+  const updateMessage = (messageId: string, nextText: string) => {
+    setChats((current) => {
+      const nextMessages = (current[match.id] ?? []).map((chatMessage) =>
+        chatMessage.id === messageId ? { ...chatMessage, text: nextText } : chatMessage
+      );
+      updateMatchPreview(nextMessages);
+      return { ...current, [match.id]: nextMessages };
+    });
+  };
+
+  const deleteMessage = (messageId: string) => {
+    setChats((current) => {
+      const nextMessages = (current[match.id] ?? []).filter((chatMessage) => chatMessage.id !== messageId);
+      updateMatchPreview(nextMessages);
+      return { ...current, [match.id]: nextMessages };
+    });
+    addToast(t.messageDeletedTitle, t.messageDeletedBody);
+  };
+
+  const copyMessage = async (text: string) => {
+    await navigator.clipboard?.writeText(text);
+    addToast(t.messageCopiedTitle, t.messageCopiedBody);
+  };
+
+  const undoLastMessage = () => {
+    if (!latestOwnMessage) {
+      addToast(t.noMessageToUndo, t.noMessageToUndoBody);
+      return;
+    }
+    deleteMessage(latestOwnMessage.id);
+  };
+
   const submit = () => {
-    sendMessage(match.id, message);
+    const cleanText = message.trim();
+    if (!cleanText) {
+      return;
+    }
+
+    if (editingId) {
+      updateMessage(editingId, cleanText);
+      addToast(t.messageUpdatedTitle, t.messageUpdatedBody);
+      setEditingId("");
+      setMessage("");
+      return;
+    }
+
+    const nextMessage = replyTo
+      ? `${t.replyingTo} ${candidate.name.split(" ")[0]}: "${localizeChatMessage(replyTo.text, t)}"\n${cleanText}`
+      : cleanText;
+
+    sendMessage(match.id, nextMessage);
     setMessage("");
+    setReplyTo(null);
   };
 
   return (
@@ -4170,6 +4372,32 @@ function ChatWindow({
             <div className={`message ${chatMessage.sender}`} key={chatMessage.id}>
               <p>{localizeChatMessage(chatMessage.text, t)}</p>
               <span>{localizeTimeLabel(chatMessage.timestamp, t)}</span>
+              <div className="message-actions">
+                <button type="button" title={t.replyMessage} onClick={() => setReplyTo(chatMessage)}>
+                  <Reply size={13} aria-hidden="true" />
+                </button>
+                <button type="button" title={t.copyMessage} onClick={() => copyMessage(chatMessage.text)}>
+                  <Copy size={13} aria-hidden="true" />
+                </button>
+                {chatMessage.sender === "me" ? (
+                  <>
+                    <button
+                      type="button"
+                      title={t.editMessage}
+                      onClick={() => {
+                        setEditingId(chatMessage.id);
+                        setMessage(chatMessage.text);
+                        setReplyTo(null);
+                      }}
+                    >
+                      <Edit size={13} aria-hidden="true" />
+                    </button>
+                    <button type="button" title={t.deleteMessage} onClick={() => deleteMessage(chatMessage.id)}>
+                      <Trash2 size={13} aria-hidden="true" />
+                    </button>
+                  </>
+                ) : null}
+              </div>
             </div>
           ))
         ) : (
@@ -4192,6 +4420,19 @@ function ChatWindow({
       </div>
 
       <div className="chat-input">
+        {replyTo || editingId ? (
+          <div className="chat-compose-context">
+            <span>
+              {editingId ? t.editingMessage : `${t.replyingTo} ${candidate.name.split(" ")[0]}`}
+            </span>
+            <button type="button" onClick={() => { setReplyTo(null); setEditingId(""); setMessage(""); }}>
+              <X size={14} aria-hidden="true" />
+            </button>
+          </div>
+        ) : null}
+        <button type="button" className="chat-undo-button" title={t.undoMessage} onClick={undoLastMessage}>
+          <Undo2 size={17} aria-hidden="true" />
+        </button>
         <input
           value={message}
           onChange={(event) => setMessage(event.target.value)}

@@ -38,10 +38,13 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Matches
     Route::get('/matches', [MatchController::class, 'index']);
+    Route::delete('/matches/{matchId}', [MatchController::class, 'destroy']);
 
     // Chat
     Route::get('/matches/{matchId}/messages', [ChatController::class, 'messages']);
     Route::post('/matches/{matchId}/messages', [ChatController::class, 'send']);
+    Route::put('/matches/{matchId}/messages/{messageId}', [ChatController::class, 'update']);
+    Route::delete('/matches/{matchId}/messages/{messageId}', [ChatController::class, 'destroy']);
 
     // Projects
     Route::get('/projects', [ProjectController::class, 'index']);

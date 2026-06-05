@@ -51,4 +51,41 @@ class ChatController extends Controller
 
         return response()->json($message->load('sender:id,name'), 201);
     }
+
+    public function update(Request $request, int $matchId, int $messageId)
+    {
+        $match = UserMatch::findOrFail($matchId);
+        $userId = $request->user()->id;
+
+        abort_unless(
+            $match->user_a_id === $userId || $match->user_b_id === $userId,
+            403, 'Not a participant'
+        );
+
+        $message = Message::where('match_id', $matchId)->findOrFail($messageId);
+        abort_unless($message->sender_id === $userId, 403, 'Only the sender can edit this message');
+
+        $data = $request->validate(['text' => 'required|string|max:5000']);
+        $message->update(['text' => $data['text']]);
+
+        return response()->json($message->load('sender:id,name'));
+    }
+
+    public function destroy(Request $request, int $matchId, int $messageId)
+    {
+        $match = UserMatch::findOrFail($matchId);
+        $userId = $request->user()->id;
+
+        abort_unless(
+            $match->user_a_id === $userId || $match->user_b_id === $userId,
+            403, 'Not a participant'
+        );
+
+        $message = Message::where('match_id', $matchId)->findOrFail($messageId);
+        abort_unless($message->sender_id === $userId, 403, 'Only the sender can delete this message');
+
+        $message->delete();
+
+        return response()->noContent();
+    }
 }
