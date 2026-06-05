@@ -476,9 +476,16 @@ function AuthPage() {
   const handleSSOLogin = (provider: string) => {
     // Quick login with mock SSO
     const mockEmail = `${provider.toLowerCase()}@telkomuniversity.ac.id`;
-    const success = login(mockEmail, "mockpassword");
-    if (success) {
+
+    const registeredUsers = JSON.parse(window.localStorage.getItem("mutualizm.users") || "[]");
+    const userExists = registeredUsers.some((u: any) => u.email === mockEmail);
+
+    if (userExists) {
+      login(mockEmail, "mockpassword");
       navigate(from, { replace: true });
+    } else {
+      signup(`${provider} User`, mockEmail, "mockpassword");
+      navigate("/onboarding");
     }
   };
 
@@ -699,17 +706,9 @@ function App() {
         (u: any) => u.email.toLowerCase() === cleanEmail && u.password === cleanPassword
       );
 
-      if (cleanEmail === "hadid@telkomuniversity.ac.id" || cleanEmail === "student@telkomuniversity.ac.id" || matchedUser) {
-        const loggedInUser = matchedUser || {
-          name: "Hadid Arkan",
-          email: cleanEmail,
-          role: "Frontend Developer"
-        };
-        setUser(loggedInUser);
-        if (!matchedUser) {
-          setProfile(starterProfile);
-        }
-        addToast("Welcome back!", `Logged in as ${loggedInUser.name}`);
+      if (matchedUser) {
+        setUser(matchedUser);
+        addToast("Welcome back!", `Logged in as ${matchedUser.name}`);
         return true;
       }
       return false;
@@ -3360,36 +3359,17 @@ function NotificationsPage() {
       </div>
 
       {selectedNotification ? createPortal(
-        <div className="overlay" role="presentation" onClick={() => setSelectedNotification(null)}>
-          <div className="modal-sheet" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()} style={{
-            background: 'var(--surface)',
-            padding: '24px',
-            borderRadius: 'var(--radius)',
-            width: 'min(440px, 90vw)',
-            boxShadow: 'var(--shadow)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '12px'
-          }}>
-            <span style={{
-              alignSelf: 'flex-start',
-              fontSize: '0.78rem',
-              fontWeight: 800,
-              textTransform: 'uppercase',
-              letterSpacing: '0.05em',
-              padding: '4px 8px',
-              borderRadius: '4px',
-              background: 'var(--accent-soft)',
-              color: 'var(--on-primary-container)'
-            }}>
+        <div className="overlay notification-detail-overlay" role="presentation" onClick={() => setSelectedNotification(null)}>
+          <div className="modal-sheet notification-detail-modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+            <span className="notification-detail-type">
               {selectedNotification.type}
             </span>
-            <h2 style={{ margin: 0, fontSize: '1.25rem', color: 'var(--ink)' }}>{selectedNotification.title}</h2>
-            <p style={{ color: 'var(--ink)', fontSize: '0.94rem', lineHeight: '1.5', margin: '4px 0' }}>
+            <h2>{selectedNotification.title}</h2>
+            <p>
               {selectedNotification.body}
             </p>
-            <small style={{ color: 'var(--muted)' }}>{selectedNotification.time}</small>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '12px' }}>
+            <small>{selectedNotification.time}</small>
+            <div className="notification-detail-actions">
               <Button variant="primary" onClick={() => setSelectedNotification(null)}>
                 {t.close}
               </Button>
@@ -3535,49 +3515,26 @@ Please assist the user by suggesting messages to send, explaining how this match
 `;
 
     try {
-      // Use OpenRouter first
-      const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      const response = await fetch("/api/ai/suggest", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
-          "Authorization": "Bearer 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"
+          "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          model: "google/gemini-2.5-flash",
-          messages: [
-            { role: "system", content: siteContext },
-            { role: "user", content: promptText }
-          ]
+          prompt: promptText,
+          context: siteContext,
+          candidate
         })
       });
-      
+
       const data = await response.json();
-      const text = data.choices?.[0]?.message?.content || "Sorry, I couldn't generate a response.";
+      if (!response.ok) {
+        throw new Error(data.message || "AI request failed.");
+      }
+      const text = data.message || "Sorry, I couldn't generate a response.";
       setAiResponse(text.trim());
     } catch (err) {
-      try {
-        const directUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=AIzaSyDjZT3eKW0Z9VzNNpXiJ4eUEZEXmS51WOk`;
-        const response = await fetch(directUrl, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            contents: [
-              {
-                parts: [
-                  { text: `${siteContext}\n\nUser request: ${promptText}` }
-                ]
-              }
-            ]
-          })
-        });
-        const data = await response.json();
-        const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "Sorry, I couldn't generate a response.";
-        setAiResponse(text.trim());
-      } catch (directErr) {
-        setAiResponse("Maaf, terjadi kesalahan saat menghubungi server AI.");
-      }
+      setAiResponse("Maaf, terjadi kesalahan saat menghubungi server AI.");
     } finally {
       setAiLoading(false);
     }
@@ -3706,13 +3663,13 @@ Please assist the user by suggesting messages to send, explaining how this match
               <div className="chat-ai-prompts">
                 <p className="chat-ai-intro">How can I help you collaborate with {candidate.name}?</p>
                 <button type="button" onClick={() => runAiCommand("opener")}>
-                  💡 Suggest message opener
+                  Suggest message opener
                 </button>
                 <button type="button" onClick={() => runAiCommand("synergy")}>
-                  📊 Analyze skill synergy
+                  Analyze skill synergy
                 </button>
                 <button type="button" onClick={() => runAiCommand("tips")}>
-                  🔑 Collaboration tips
+                  Collaboration tips
                 </button>
               </div>
             )}
@@ -4553,7 +4510,7 @@ function PhotoUploadField({
       </div>
       <div className="crop-control-grid">
         <label>
-          <span>Horizontal crop</span>
+          <span>Horizontal crop <small>{xNum}%</small></span>
           <input
             type="range"
             min="0"
@@ -4563,7 +4520,7 @@ function PhotoUploadField({
           />
         </label>
         <label>
-          <span>Vertical crop</span>
+          <span>Vertical crop <small>{yNum}%</small></span>
           <input
             type="range"
             min="0"
@@ -4572,16 +4529,19 @@ function PhotoUploadField({
             onChange={(event) => updatePosition(xNum, Number(event.target.value))}
           />
         </label>
+        <button type="button" className="crop-reset-button" onClick={() => updatePosition(50, 42)}>
+          Center crop
+        </button>
       </div>
       {value ? (
-        <div style={{ display: 'flex', gap: 12, marginTop: 12, flexWrap: 'wrap' }}>
-          <div>
+        <div className="photo-crop-preview-grid">
+          <div className="photo-crop-preview">
             <small style={{ display: 'block', color: 'var(--muted)', marginBottom: 4, fontWeight: 700 }}>Horizontal preview</small>
             <div style={{ width: 180, height: 100, borderRadius: 8, overflow: 'hidden', border: '1px solid var(--border)' }}>
               <img src={value} alt="Horizontal preview" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: position }} draggable={false} />
             </div>
           </div>
-          <div>
+          <div className="photo-crop-preview">
             <small style={{ display: 'block', color: 'var(--muted)', marginBottom: 4, fontWeight: 700 }}>Vertical preview</small>
             <div style={{ width: 100, height: 140, borderRadius: 8, overflow: 'hidden', border: '1px solid var(--border)' }}>
               <img src={value} alt="Vertical preview" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: position }} draggable={false} />

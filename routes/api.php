@@ -7,6 +7,7 @@ use App\Http\Controllers\MatchController;
 use App\Http\Controllers\ChatController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\AiAssistantController;
 use Illuminate\Support\Facades\Route;
 
 // Health check
@@ -17,6 +18,7 @@ Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
 Route::post('/reset-password', [AuthController::class, 'resetPassword']);
+Route::post('/ai/suggest', [AiAssistantController::class, 'suggest'])->middleware('throttle:20,1');
 
 // Authenticated routes
 Route::middleware('auth:sanctum')->group(function () {

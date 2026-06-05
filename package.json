@@ -4,7 +4,9 @@
     "type": "module",
     "scripts": {
         "build": "vite build",
-        "dev": "vite"
+        "build:frontend": "npm --prefix frontend run build && node scripts/sync-frontend-dist.mjs",
+        "dev": "vite",
+        "vercel-build": "npm --prefix frontend install && npm run build:frontend"
     },
     "devDependencies": {
         "@tailwindcss/vite": "^4.0.0",

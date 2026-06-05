@@ -22,6 +22,24 @@ return [
         'key' => env('RESEND_API_KEY'),
     ],
 
+    'openrouter' => [
+        'key' => env('OPENROUTER_API_KEY'),
+        'model' => env('OPENROUTER_MODEL', 'google/gemini-2.5-flash'),
+    ],
+
+    'gemini' => [
+        'key' => env('GEMINI_API_KEY'),
+        'model' => env('GEMINI_MODEL', 'gemini-2.5-flash'),
+    ],
+
+    'supabase' => [
+        'url' => env('SUPABASE_URL'),
+        'publishable_key' => env('SUPABASE_PUBLISHABLE_KEY'),
+        'secret_key' => env('SUPABASE_SECRET_KEY'),
+        'anon_key' => env('SUPABASE_ANON_KEY'),
+        'service_role_key' => env('SUPABASE_SERVICE_ROLE_KEY'),
+    ],
+
     'ses' => [
         'key' => env('AWS_ACCESS_KEY_ID'),
         'secret' => env('AWS_SECRET_ACCESS_KEY'),

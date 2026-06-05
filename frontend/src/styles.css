@@ -52,6 +52,7 @@ body {
   margin: 0;
   color: var(--ink);
   background: var(--bg);
+  overflow-x: hidden;
 }
 
 a {
@@ -2882,6 +2883,7 @@ img.avatar {
   }
 
   .toast-stack {
+    top: auto;
     right: 28px;
     bottom: 28px;
   }
@@ -5453,6 +5455,228 @@ img.avatar {
 
 @media (max-width: 767px) {
   .chat-ai-panel {
+    width: 100%;
+  }
+}
+
+/* Final interaction fixes */
+.top-bar {
+  z-index: 140;
+}
+
+.top-actions,
+.top-actions .icon-link,
+.top-icon-button {
+  position: relative;
+  z-index: 2;
+  pointer-events: auto;
+}
+
+.chat-bubble {
+  right: max(18px, env(safe-area-inset-right));
+  bottom: max(84px, calc(env(safe-area-inset-bottom) + 24px));
+  z-index: 150;
+  pointer-events: auto;
+}
+
+.chat-bubble.open {
+  width: min(360px, calc(100vw - 32px));
+}
+
+.chat-bubble-panel {
+  max-height: min(360px, calc(100dvh - 156px));
+  overflow-y: auto;
+}
+
+.chat-bubble-button {
+  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.22);
+}
+
+@media (min-width: 768px) {
+  .chat-bubble {
+    bottom: 24px;
+  }
+}
+
+.match-row {
+  padding-bottom: 62px;
+}
+
+.match-row > span {
+  padding-bottom: 0;
+}
+
+.match-chat-button,
+.match-profile-button {
+  bottom: 12px;
+  min-width: 74px;
+  min-height: 34px;
+  text-align: center;
+}
+
+.match-chat-button {
+  left: 12px;
+}
+
+.match-profile-button {
+  right: 12px;
+}
+
+.notification-detail-overlay {
+  align-items: flex-start;
+  justify-content: center;
+  overflow-y: auto;
+  padding: clamp(14px, 5dvh, 48px) 16px 16px;
+}
+
+.notification-detail-modal {
+  display: grid;
+  width: min(360px, calc(100vw - 32px));
+  min-height: 0;
+  max-height: calc(100dvh - 32px);
+  gap: 10px;
+  overflow-y: auto;
+  border-radius: 10px;
+  padding: 16px;
+  background: var(--surface);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.18);
+}
+
+.notification-detail-modal h2,
+.notification-detail-modal p {
+  margin: 0;
+}
+
+.notification-detail-modal h2 {
+  color: var(--ink);
+  font-size: 1.04rem;
+  line-height: 1.25;
+}
+
+.notification-detail-modal p {
+  color: var(--ink);
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+
+.notification-detail-modal small {
+  color: var(--muted);
+}
+
+.notification-detail-type {
+  justify-self: start;
+  border-radius: 999px;
+  padding: 4px 8px;
+  color: var(--on-primary-container);
+  background: var(--accent-soft);
+  font-size: 0.68rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.notification-detail-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+.toast-stack {
+  top: 64px;
+  right: 12px;
+  width: min(240px, calc(100vw - 24px));
+  gap: 6px;
+}
+
+.toast {
+  border-radius: 8px;
+  padding: 6px 8px;
+  font-size: 0.73rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.toast p {
+  line-height: 1.25;
+}
+
+.chat-input {
+  grid-template-columns: auto minmax(0, 1fr) auto !important;
+  align-items: center;
+}
+
+.ai-toggle-btn {
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+  padding: 0 !important;
+}
+
+.chat-input .button-primary {
+  min-width: 48px;
+}
+
+.crop-control-grid {
+  align-items: end;
+}
+
+.crop-control-grid span {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.crop-control-grid span small {
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 800;
+}
+
+.crop-reset-button {
+  min-height: 40px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0 12px;
+  color: var(--ink);
+  background: var(--surface);
+  font-weight: 800;
+}
+
+.photo-crop-preview-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.photo-crop-preview {
+  min-width: 0;
+}
+
+@media (max-width: 767px) {
+  .chat-bubble {
+    right: 16px;
+    bottom: max(92px, calc(env(safe-area-inset-bottom) + 84px));
+  }
+
+  .chat-bubble.open {
+    left: 16px;
+    width: auto;
+  }
+
+  .notification-card {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .notification-card .notification-type {
+    order: -1;
+  }
+
+  .notification-card .button {
+    justify-self: start;
+  }
+
+  .crop-reset-button {
     width: 100%;
   }
 }
