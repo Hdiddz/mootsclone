@@ -7597,3 +7597,33 @@ body {
   background: rgba(59, 130, 246, 0.85) !important; /* Blue */
 }
 
+/* Auth Page Theme Toggle styling */
+.auth-theme-toggle {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 100;
+}
+
+.mobile-auth-header-row {
+  display: none !important;
+}
+
+@media (max-width: 980px) {
+  .auth-theme-toggle {
+    display: none !important;
+  }
+  
+  .mobile-auth-header-row {
+    display: flex !important;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    margin-bottom: 16px;
+  }
+  
+  .mobile-auth-header-row .mobile-only-home {
+    display: flex !important;
+    margin-bottom: 0 !important;
+  }
+}

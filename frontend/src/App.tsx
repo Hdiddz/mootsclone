@@ -1073,7 +1073,7 @@ function AuthPage() {
       <div className="auth-bg-blob-1" />
       <div className="auth-bg-blob-2" />
 
-      <div style={{ position: "fixed", top: "16px", right: "16px", zIndex: 100 }}>
+      <div className="auth-theme-toggle">
         <Button
           variant="secondary"
           onClick={() => setTheme((prev) => (prev === "light" ? "dark" : "light"))}
@@ -1103,10 +1103,20 @@ function AuthPage() {
         </section>
 
       <div className="auth-container">
-        <Link to="/" className="mobile-only-home" style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--primary)', fontWeight: 600, marginBottom: 16, textDecoration: 'none' }}>
-          <span className="material-symbols-outlined" style={{ fontSize: 20 }}>arrow_back</span>
-          {t.home}
-        </Link>
+        <div className="mobile-auth-header-row">
+          <Link to="/" className="mobile-only-home" style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--primary)', fontWeight: 600, textDecoration: 'none' }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 20 }}>arrow_back</span>
+            {t.home}
+          </Link>
+          <Button
+            variant="secondary"
+            onClick={() => setTheme((prev) => (prev === "light" ? "dark" : "light"))}
+            aria-label={theme === "light" ? "Switch to dark mode" : "Switch to light mode"}
+            style={{ width: "40px", height: "40px", borderRadius: "50%", padding: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
+          >
+            {theme === "light" ? <Moon size={18} /> : <Sun size={18} />}
+          </Button>
+        </div>
         <div className="auth-header">
           <div className="auth-logo-wrap">
             <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>hub</span>
@@ -2272,29 +2282,30 @@ function LandingPage() {
             </div>
           )}
         </nav>
-        <button
-          type="button"
-          className="landing-menu-button"
-          aria-label="Open landing menu"
-          onClick={() => setLandingMenuOpen((current) => !current)}
-        >
-          {landingMenuOpen ? <X size={20} aria-hidden="true" /> : <Menu size={20} aria-hidden="true" />}
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <Button
+            variant="ghost"
+            onClick={() => setTheme((prev) => (prev === "light" ? "dark" : "light"))}
+            aria-label={theme === "light" ? "Switch to dark mode" : "Switch to light mode"}
+            style={{ width: "36px", height: "36px", borderRadius: "50%", padding: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
+            className="mobile-only"
+          >
+            {theme === "light" ? <Moon size={18} /> : <Sun size={18} />}
+          </Button>
+          <button
+            type="button"
+            className="landing-menu-button"
+            aria-label="Open landing menu"
+            onClick={() => setLandingMenuOpen((current) => !current)}
+          >
+            {landingMenuOpen ? <X size={20} aria-hidden="true" /> : <Menu size={20} aria-hidden="true" />}
+          </button>
+        </div>
       </header>
       {landingMenuOpen ? (
         <div className="landing-mobile-menu">
           <a href="#how" onClick={(e) => { e.preventDefault(); scrollToSection("how"); }}>{t.landingHow}</a>
           <a href="#features" onClick={(e) => { e.preventDefault(); scrollToSection("features"); }}>{t.landingFeatures}</a>
-
-          <button
-            type="button"
-            className="button button-secondary"
-            onClick={() => setTheme((prev) => (prev === "light" ? "dark" : "light"))}
-            style={{ width: "100%", justifyContent: "center", gap: "8px", minHeight: "40px", borderRadius: "10px", margin: "8px 0", fontSize: "0.85rem" }}
-          >
-            {theme === "light" ? <Moon size={16} /> : <Sun size={16} />}
-            {theme === "light" ? "Dark Mode" : "Light Mode"}
-          </button>
 
           {isAuthenticated ? (
             <Link to="/discover">{t.landingOpenApp}</Link>
@@ -3977,9 +3988,6 @@ function OnboardingPage() {
         <Link to="/" className="top-logo" style={{ position: "static", transform: "none" }}>
           Mutualizm <span>✦</span>
         </Link>
-        <Link to="/discover" className="text-link">
-          {t.skipToDemo}
-        </Link>
       </header>
 
       <main className="onboarding-grid">
@@ -4091,7 +4099,7 @@ function OnboardingStep({
 
     return (
       <div className="field-grid">
-        <div className="field-group" style={{ display: 'flex', flexDirection: 'column', gap: '8px', gridColumn: 'span 2' }}>
+        <div className="field-group" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           <label className="field-label uppercase">{t.mainRole}</label>
           <div className="role-card-grid">
             {[
