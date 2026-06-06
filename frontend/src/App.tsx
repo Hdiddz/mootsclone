@@ -61,7 +61,7 @@ import {
   type SetStateAction
 } from "react";
 import { createPortal } from "react-dom";
-import { supabase } from "./lib/supabase";
+import { supabase, supabaseUrl, supabaseAnonKey } from "./lib/supabase";
 import {
   Link,
   NavLink,
@@ -1320,6 +1320,39 @@ function App() {
   const [user, setUser] = useState<{ id: string; name: string; email: string; role?: string } | null>(null);
   const isAuthenticated = Boolean(user);
 
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const setStatus = async (isOnline: boolean) => {
+      await supabase.from("profiles").update({ online: isOnline }).eq("id", user.id);
+    };
+
+    setStatus(true);
+
+    const handleUnload = () => {
+      if (supabaseUrl && supabaseAnonKey) {
+        const url = `${supabaseUrl}/rest/v1/profiles?id=eq.${user.id}`;
+        fetch(url, {
+          method: "PATCH",
+          headers: {
+            "apikey": supabaseAnonKey,
+            "Authorization": `Bearer ${supabaseAnonKey}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ online: false }),
+          keepalive: true
+        });
+      }
+    };
+
+    window.addEventListener("beforeunload", handleUnload);
+
+    return () => {
+      setStatus(false);
+      window.removeEventListener("beforeunload", handleUnload);
+    };
+  }, [user?.id]);
+
   const loadUserProfile = useCallback(async (userId: string) => {
     const { data, error } = await supabase
       .from("profiles")
@@ -1730,6 +1763,9 @@ function App() {
 
   const logout = useCallback(async () => {
     try {
+      if (user?.id) {
+        await supabase.from("profiles").update({ online: false }).eq("id", user.id);
+      }
       await supabase.auth.signOut();
       setUser(null);
       setProfileState(starterProfile);
@@ -1746,7 +1782,7 @@ function App() {
     } catch (err: any) {
       console.error("Logout error:", err);
     }
-  }, [addToast, language]);
+  }, [addToast, language, user]);
 
   const actOnCandidate = useCallback(
     async (candidate: CandidateProfile, action: SwipeAction, createdMatch = false) => {
@@ -2202,12 +2238,59 @@ function App() {
           }
         }
       )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "profiles"
+        },
+        (payload) => {
+          const updated = payload.new;
+          const existing = candidateLookup.get(updated.id);
+          if (existing) {
+            const nextProfile = {
+              ...existing,
+              name: updated.name || existing.name,
+              avatarUrl: updated.avatar_url || existing.avatarUrl,
+              online: updated.online ?? existing.online,
+              campus: updated.campus || existing.campus,
+              program: updated.program || existing.program,
+              role: updated.role || existing.role,
+              mainSkill: updated.main_skill || existing.mainSkill,
+              availability: updated.availability || existing.availability,
+              availabilityDetail: updated.availability_detail || existing.availabilityDetail
+            };
+            candidateLookup.set(updated.id, nextProfile);
+          }
+
+          if (user && updated.id === user.id) {
+            setProfileState((current) => {
+              if (!current) return current;
+              return {
+                ...current,
+                online: updated.online ?? current.online
+              };
+            });
+          }
+
+          setDbCandidates((current) =>
+            current.map((c) =>
+              c.id === updated.id
+                ? { ...c, online: updated.online ?? c.online }
+                : c
+            )
+          );
+
+          setMatches((current) => [...current]);
+        }
+      )
       .subscribe();
 
     return () => {
       supabase.removeChannel(realtimeChannel);
     };
-  }, [addToast, language, profile?.skills, setChats, setMatches, setNotifications, user?.id]);
+  }, [addToast, language, profile?.skills, setChats, setMatches, setNotifications, user, setDbCandidates]);
 
   const value = useMemo<SymbioStore>(
     () => ({
@@ -2788,14 +2871,18 @@ function AppShell() {
         {!isChatRoute ? <BottomNav unreadCount={unreadCount} /> : null}
       </main>
 
-      <AiAssistantBubble
-        isOpen={activeFloatingPanel === "ai"}
-        onToggle={(open) => setActiveFloatingPanel(open ? "ai" : null)}
-      />
-      <FollowChatBubble
-        isOpen={activeFloatingPanel === "chat"}
-        onToggle={(open) => setActiveFloatingPanel(open ? "chat" : null)}
-      />
+      {!isChatRoute && (
+        <>
+          <AiAssistantBubble
+            isOpen={activeFloatingPanel === "ai"}
+            onToggle={(open) => setActiveFloatingPanel(open ? "ai" : null)}
+          />
+          <FollowChatBubble
+            isOpen={activeFloatingPanel === "chat"}
+            onToggle={(open) => setActiveFloatingPanel(open ? "chat" : null)}
+          />
+        </>
+      )}
 
       {settingsOpen ? <SettingsDrawer onClose={() => setSettingsOpen(false)} onLogoutRequest={() => setLogoutOpen(true)} /> : null}
       {logoutOpen ? <LogoutConfirmModal onClose={() => setLogoutOpen(false)} /> : null}
@@ -6131,15 +6218,15 @@ function PhotoUploadField({
   let tRendered = 0;
 
   if (imgAspectRatio > rFrame) {
-    hRendered = frameH;
-    wRendered = frameH * imgAspectRatio;
-    lRendered = -(wRendered - frameW) / 2;
-    tRendered = 0;
-  } else {
     wRendered = frameW;
     hRendered = frameW / imgAspectRatio;
     lRendered = 0;
-    tRendered = -(hRendered - frameH) / 2;
+    tRendered = (frameH - hRendered) / 2;
+  } else {
+    hRendered = frameH;
+    wRendered = frameH * imgAspectRatio;
+    lRendered = (frameW - wRendered) / 2;
+    tRendered = 0;
   }
 
   const getPanBounds = (currentScale: number) => {
@@ -6393,7 +6480,7 @@ function PhotoUploadField({
         )}
       </div>
 
-      {isCroppingModalOpen && tempPhotoUrl && (
+      {isCroppingModalOpen && tempPhotoUrl && createPortal(
         <div className="crop-modal-overlay">
           <div className="crop-modal-content">
             <h3>{t.language === "id" ? "Sesuaikan Crop Foto" : "Adjust Photo Crop"}</h3>
@@ -6515,7 +6602,8 @@ function PhotoUploadField({
               </Button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

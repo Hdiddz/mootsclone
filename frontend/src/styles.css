@@ -6752,7 +6752,7 @@ img.avatar {
   display: grid;
   grid-template-rows: auto auto 1fr auto;
   width: min(380px, calc(100vw - 32px));
-  max-height: min(620px, calc(100dvh - 160px));
+  height: min(620px, calc(100dvh - 160px));
   gap: 14px;
   overflow: hidden;
   border: 1px solid var(--border);
