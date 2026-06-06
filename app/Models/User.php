@@ -30,6 +30,7 @@ class User extends Authenticatable
     public function sentMessages() { return $this->hasMany(Message::class, 'sender_id'); }
     public function projects() { return $this->hasMany(Project::class, 'creator_id'); }
     public function appNotifications() { return $this->hasMany(AppNotification::class)->orderByDesc('created_at'); }
+    public function aiConversations() { return $this->hasMany(AiConversation::class)->orderBy('created_at'); }
 
     public function matches()
     {

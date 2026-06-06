@@ -6,6 +6,9 @@ import {
   Briefcase,
   Check,
   CheckCircle,
+  AlertCircle,
+  AlertTriangle,
+  Info,
   ChevronDown,
   Clock,
   Copy,
@@ -35,7 +38,9 @@ import {
   Wifi,
   X,
   LogOut,
-  Sparkles
+  Sparkles,
+  Moon,
+  Sun
 } from "lucide-react";
 import {
   createContext,
@@ -52,6 +57,8 @@ import {
   type SetStateAction
 } from "react";
 import { createPortal } from "react-dom";
+import Echo from "laravel-echo";
+import Pusher from "pusher-js";
 import {
   Link,
   NavLink,
@@ -98,6 +105,7 @@ type ToastMessage = {
   id: string;
   title: string;
   body: string;
+  type?: "success" | "error" | "warning" | "info";
 };
 
 type SymbioStore = {
@@ -128,14 +136,16 @@ type SymbioStore = {
   markNotificationRead: (notificationId: string) => void;
   markAllNotificationsRead: () => void;
   sendMessage: (matchId: string, text: string) => void;
-  addToast: (title: string, body: string) => void;
-  user: { name: string; email: string; role?: string } | null;
+  addToast: (title: string, body: string, type?: "success" | "error" | "warning" | "info") => void;
+  user: { id?: number; name: string; email: string; role?: string } | null;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => boolean;
-  signup: (name: string, email: string, password: string) => void;
+  login: (email: string, password: string) => Promise<boolean>;
+  signup: (name: string, email: string, password: string) => Promise<void>;
   logout: () => void;
   language: "en" | "id";
   setLanguage: (lang: "en" | "id") => void;
+  theme: "light" | "dark";
+  setTheme: Dispatch<SetStateAction<"light" | "dark">>;
 };
 
 const defaultFilters: FilterValues = {
@@ -904,14 +914,14 @@ const translations = {
 
 type TranslationSet = typeof translations.en;
 
-function useTranslations() {
+export function useTranslations() {
   const { language } = useSymbio();
   return translations[language];
 }
 
 const SymbioContext = createContext<SymbioStore | null>(null);
 
-function useSymbio() {
+export function useSymbio() {
   const context = useContext(SymbioContext);
   if (!context) {
     throw new Error("Symbio context is missing.");
@@ -955,8 +965,39 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
+function isBackendId(value: string) {
+  return /^\d+$/.test(String(value));
+}
+
+function createRealtimeClient(token: string) {
+  const key = import.meta.env.VITE_REVERB_APP_KEY;
+  const host = import.meta.env.VITE_REVERB_HOST;
+
+  if (!key || !host) {
+    return null;
+  }
+
+  (window as any).Pusher = Pusher;
+
+  return new Echo({
+    broadcaster: "reverb",
+    key,
+    wsHost: host,
+    wsPort: Number(import.meta.env.VITE_REVERB_PORT || 80),
+    wssPort: Number(import.meta.env.VITE_REVERB_PORT || 443),
+    forceTLS: (import.meta.env.VITE_REVERB_SCHEME || "https") === "https",
+    enabledTransports: ["ws", "wss"],
+    authEndpoint: "/broadcasting/auth",
+    auth: {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    }
+  });
+}
+
 function AuthPage() {
-  const { login, signup, isAuthenticated, addToast } = useSymbio();
+  const { login, signup, isAuthenticated, addToast, theme, setTheme } = useSymbio();
   const t = useTranslations();
   const navigate = useNavigate();
   const location = useLocation();
@@ -969,6 +1010,7 @@ function AuthPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const from = (location.state as any)?.from?.pathname || "/discover";
 
@@ -982,20 +1024,23 @@ function AuthPage() {
     setMode(location.pathname === "/signup" ? "signup" : "login");
   }, [location.pathname]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setLoading(true);
 
     if (mode === "login") {
-      const success = login(loginEmail, password);
+      const success = await login(loginEmail, password);
       if (success) {
         navigate(from, { replace: true });
       } else {
         setError(t.invalidLogin);
+        setLoading(false);
       }
     } else {
       if (!fullName.trim()) {
         setError(t.fullNameRequired);
+        setLoading(false);
         return;
       }
       if (!emailPrefix.trim()) {
@@ -1008,30 +1053,39 @@ function AuthPage() {
       }
       const fullEmail = `${emailPrefix.trim()}@telkomuniversity.ac.id`;
       signup(fullName, fullEmail, password);
+      await signup(fullName, fullEmail, password);
       navigate("/onboarding");
     }
+    setLoading(false);
   };
 
   const handleSSOLogin = (provider: string) => {
-    // Quick login with mock SSO
-    const mockEmail = `${provider.toLowerCase()}@telkomuniversity.ac.id`;
-
-    const registeredUsers = JSON.parse(window.localStorage.getItem("mutualizm.users") || "[]");
-    const userExists = registeredUsers.some((u: any) => u.email === mockEmail);
-
-    if (userExists) {
-      login(mockEmail, "mockpassword");
-      navigate(from, { replace: true });
-    } else {
-      signup(`${provider} User`, mockEmail, "mockpassword");
-      navigate("/onboarding");
-    }
+    setLoading(true);
+    setTimeout(() => {
+      setLoading(false);
+      addToast(
+        t.language === "id" ? "SSO Belum Terhubung" : "SSO Not Connected",
+        t.language === "id" ? `Fitur login menggunakan ${provider} sedang dalam pengembangan.` : `Login using ${provider} is currently under development.`,
+        "info"
+      );
+    }, 600);
   };
 
   return (
     <div className="auth-shell page-transition">
       <div className="auth-bg-blob-1" />
       <div className="auth-bg-blob-2" />
+
+      <div style={{ position: "fixed", top: "16px", right: "16px", zIndex: 100 }}>
+        <Button
+          variant="secondary"
+          onClick={() => setTheme((prev) => (prev === "light" ? "dark" : "light"))}
+          aria-label={theme === "light" ? "Switch to dark mode" : "Switch to light mode"}
+          style={{ width: "40px", height: "40px", borderRadius: "50%", padding: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
+        >
+          {theme === "light" ? <Moon size={18} /> : <Sun size={18} />}
+        </Button>
+      </div>
 
       <div className="auth-layout">
         <section className="auth-brand-panel" aria-label="Mutualizm introduction">
@@ -1052,7 +1106,7 @@ function AuthPage() {
         </section>
 
       <div className="auth-container">
-        <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--primary)', fontWeight: 600, marginBottom: 16, textDecoration: 'none' }}>
+        <Link to="/" className="mobile-only-home" style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--primary)', fontWeight: 600, marginBottom: 16, textDecoration: 'none' }}>
           <span className="material-symbols-outlined" style={{ fontSize: 20 }}>arrow_back</span>
           {t.home}
         </Link>
@@ -1157,8 +1211,8 @@ function AuthPage() {
             ) : null}
           </div>
 
-          <button type="submit" className="auth-btn-primary">
-            {mode === "login" ? t.signIn : t.createAccount}
+          <button type="submit" className="auth-btn-primary" disabled={loading}>
+            {loading ? "..." : (mode === "login" ? t.signIn : t.createAccount)}
           </button>
         </form>
 
@@ -1211,6 +1265,8 @@ function AuthPage() {
   );
 }
 
+import MatchesPage from "./pages/MatchesPage";
+
 function App() {
   const [profile, setProfile] = useLocalStorageState("mutualizm.profile", starterProfile);
   const [filters, setFilters] = useLocalStorageState("mutualizm.filters", defaultFilters);
@@ -1238,106 +1294,126 @@ function App() {
   );
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [language, setLanguage] = useLocalStorageState<"en" | "id">("mutualizm.language", "en");
-  const addToast = useCallback((title: string, body: string) => {
-    const id = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-    setToasts((current) => [...current, { id, title, body }]);
-    window.setTimeout(() => {
+  const [theme, setTheme] = useLocalStorageState<"light" | "dark">("mutualizm.theme", "light");
+
+  useEffect(() => {
+    if (theme === "dark") {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+  }, [theme]);
+
+  const addToast = useCallback((title: string, body: string, type?: "success" | "error" | "warning" | "info") => {
+    const id = `toast-${Date.now()}`;
+    setToasts((current) => [...current, { id, title, body, type }]);
+    setTimeout(() => {
       setToasts((current) => current.filter((toast) => toast.id !== id));
     }, 3800);
   }, []);
 
-  const [user, setUser] = useLocalStorageState<{ name: string; email: string; role?: string } | null>(
-    "mutualizm.user",
-    null
-  );
-  const isAuthenticated = user !== null;
+  const [user, setUser] = useLocalStorageState<{ id?: number; name: string; email: string; role?: string } | null>("mutualizm.user", null);
+  const [token, setToken] = useLocalStorageState<string | null>("mutualizm.token", null);
+  const isAuthenticated = Boolean(user && token);
 
   const login = useCallback(
-    (email: string, password: string) => {
-      const cleanEmail = email.trim().toLowerCase();
-      const cleanPassword = password.trim();
+    async (email: string, password: string) => {
+      try {
+        const response = await fetch("/api/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password })
+        });
+        const data = await response.json();
 
-      const registeredUsers = JSON.parse(
-        window.localStorage.getItem("mutualizm.users") || "[]"
-      );
-      const matchedUser = registeredUsers.find(
-        (u: any) => u.email.toLowerCase() === cleanEmail && u.password === cleanPassword
-      );
-
-      if (matchedUser) {
-        setUser(matchedUser);
-        addToast(language === "id" ? "Selamat datang kembali!" : "Welcome back!", language === "id" ? `Masuk sebagai ${matchedUser.name}` : `Logged in as ${matchedUser.name}`);
-        return true;
+        if (response.ok && data.token) {
+          setToken(data.token);
+          setUser(data.user);
+          addToast(
+            language === "id" ? "Selamat datang kembali!" : "Welcome back!",
+            language === "id" ? `Masuk sebagai ${data.user.name}` : `Logged in as ${data.user.name}`,
+            "success"
+          );
+          return true;
+        } else {
+          addToast(
+            language === "id" ? "Login Gagal" : "Login Failed",
+            data.message || (language === "id" ? "Email atau password salah." : "Invalid email or password."),
+            "error"
+          );
+          return false;
+        }
+      } catch (err) {
+        addToast(
+          language === "id" ? "Kesalahan Jaringan" : "Network Error",
+          language === "id" ? "Gagal terhubung ke server." : "Failed to connect to server.",
+          "error"
+        );
+        return false;
       }
-      return false;
     },
-    [addToast, language, setUser]
+    [addToast, language, setUser, setToken]
   );
 
   const signup = useCallback(
-    (name: string, email: string, password: string) => {
-      const cleanEmail = email.trim().toLowerCase();
-      const cleanPassword = password.trim();
-      const cleanName = name.trim();
+    async (name: string, email: string, password: string) => {
+      try {
+        const response = await fetch("/api/register", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, email, password, password_confirmation: password })
+        });
+        const data = await response.json();
 
-      const registeredUsers = JSON.parse(
-        window.localStorage.getItem("mutualizm.users") || "[]"
-      );
-
-      if (registeredUsers.some((u: any) => u.email.toLowerCase() === cleanEmail)) {
-        addToast(language === "id" ? "Gagal" : "Error", language === "id" ? "Akun dengan email ini sudah ada." : "An account with this email already exists.");
-        return;
+        if (response.ok && data.token) {
+          setToken(data.token);
+          setUser(data.user);
+          addToast(
+            language === "id" ? "Akun dibuat!" : "Account created!",
+            language === "id" ? "Lengkapi profil onboarding Anda." : "Please complete your onboarding profile.",
+            "success"
+          );
+        } else {
+          addToast(
+            language === "id" ? "Pendaftaran Gagal" : "Signup Failed",
+            data.message || (language === "id" ? "Gagal membuat akun." : "Failed to create account."),
+            "error"
+          );
+        }
+      } catch (err) {
+        addToast(
+          language === "id" ? "Kesalahan Jaringan" : "Network Error",
+          language === "id" ? "Gagal terhubung ke server." : "Failed to connect to server.",
+          "error"
+        );
       }
-
-      const newUser = {
-        name: cleanName,
-        email: cleanEmail,
-        password: cleanPassword,
-        role: ""
-      };
-
-      registeredUsers.push(newUser);
-      window.localStorage.setItem("mutualizm.users", JSON.stringify(registeredUsers));
-      setUser(newUser);
-
-      const newProfile: CandidateProfile = {
-        ...starterProfile,
-        id: "me",
-        name: cleanName,
-        campus: "Telkom University",
-        program: "",
-        role: "",
-        mainSkill: "",
-        skills: [],
-        profileSummary: "",
-        experienceSummary: "",
-        experiences: [],
-        lookingFor: [],
-        availability: "available",
-        availabilityDetail: "",
-        collaborationGoals: [],
-        portfolioLinks: [
-          { label: "GitHub", url: "" },
-          { label: "Figma", url: "" },
-          { label: "Portfolio", url: "" }
-        ],
-        preferredRole: "",
-        suggestedMessage: "",
-        avatarPosition: "center 42%",
-        statusLabel: "",
-        mutualInterest: false
-      };
-
-      setProfile(newProfile);
-      addToast(language === "id" ? "Akun dibuat!" : "Account created!", language === "id" ? "Lengkapi profil onboarding Anda." : "Please complete your onboarding profile.");
     },
-    [addToast, language, setProfile, setUser]
+    [addToast, language, setUser, setToken]
   );
 
-  const logout = useCallback(() => {
-    setUser(null);
-    addToast(language === "id" ? "Keluar" : "Logged out", language === "id" ? "Anda sudah keluar dari sesi." : "You have been logged out of your session.");
-  }, [addToast, language, setUser]);
+  const logout = useCallback(async () => {
+    try {
+      if (token) {
+        await fetch("/api/logout", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${token}`,
+            "Content-Type": "application/json"
+          }
+        });
+      }
+    } catch (err) {
+      // Ignore network errors on logout
+    } finally {
+      setUser(null);
+      setToken(null);
+      addToast(
+        language === "id" ? "Keluar" : "Logged out",
+        language === "id" ? "Anda sudah keluar dari sesi." : "You have been logged out of your session.",
+        "info"
+      );
+    }
+  }, [addToast, language, setUser, setToken, token]);
 
   const actOnCandidate = useCallback(
     (candidate: CandidateProfile, action: SwipeAction, createdMatch = false) => {
@@ -1518,7 +1594,7 @@ function App() {
   }, [setNotifications]);
 
   const sendMessage = useCallback(
-    (matchId: string, text: string) => {
+    async (matchId: string, text: string) => {
       const cleanText = text.trim();
       if (!cleanText) {
         return;
@@ -1547,9 +1623,110 @@ function App() {
           match.id === matchId ? { ...match, latestMessage: cleanText, unread: 0 } : match
         )
       );
+
+      if (token && isBackendId(matchId)) {
+        try {
+          const response = await fetch(`/api/matches/${matchId}/messages`, {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${token}`,
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ text: cleanText })
+          });
+
+          if (!response.ok) {
+            throw new Error("Failed to persist message");
+          }
+        } catch {
+          addToast(
+            language === "id" ? "Pesan belum tersimpan" : "Message not persisted",
+            language === "id"
+              ? "Pesan tampil di UI, tetapi API backend belum berhasil menyimpannya."
+              : "The message is visible locally, but the backend API did not persist it.",
+            "warning"
+          );
+        }
+      }
     },
-    [setChats, setMatches]
+    [addToast, language, setChats, setMatches, token]
   );
+
+  useEffect(() => {
+    if (!token) {
+      return;
+    }
+
+    const echo = createRealtimeClient(token);
+    if (!echo) {
+      return;
+    }
+
+    const backendMatches = matches.filter((match) => isBackendId(match.id));
+
+    backendMatches.forEach((match) => {
+      echo.private(`chat.${match.id}`).listen("MessageSent", (event: any) => {
+        if (event.sender_id && user?.id && Number(event.sender_id) === Number(user.id)) {
+          return;
+        }
+
+        const nextMessage: ChatMessage = {
+          id: String(event.id ?? `reverb-${Date.now()}`),
+          sender: "them",
+          text: String(event.text ?? ""),
+          timestamp: event.created_at
+            ? new Date(event.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+            : "Just now"
+        };
+
+        setChats((current) => {
+          const currentMessages = current[match.id] ?? [];
+          if (currentMessages.some((messageItem) => messageItem.id === nextMessage.id)) {
+            return current;
+          }
+
+          return {
+            ...current,
+            [match.id]: [...currentMessages, nextMessage]
+          };
+        });
+
+        setMatches((current) =>
+          current.map((currentMatch) =>
+            currentMatch.id === match.id
+              ? {
+                  ...currentMatch,
+                  latestMessage: nextMessage.text,
+                  unread: currentMatch.unread + 1
+                }
+              : currentMatch
+          )
+        );
+      });
+    });
+
+    if (user?.id) {
+      echo.private(`user.${user.id}`).listen("NewMatch", () => {
+        addToast(
+          language === "id" ? "Kecocokan baru" : "New match",
+          language === "id"
+            ? "Ada kecocokan baru dari backend real-time."
+            : "A new realtime backend match is available.",
+          "success"
+        );
+      });
+    }
+
+    return () => {
+      backendMatches.forEach((match) => {
+        echo.leave(`chat.${match.id}`);
+      });
+      if (user?.id) {
+        echo.leave(`user.${user.id}`);
+      }
+      echo.disconnect();
+    };
+  }, [addToast, language, matches, setChats, setMatches, token, user?.id]);
 
   const value = useMemo<SymbioStore>(
     () => ({
@@ -1583,7 +1760,9 @@ function App() {
       signup,
       logout,
       language,
-      setLanguage
+      setLanguage,
+      theme,
+      setTheme
     }),
     [
       actOnCandidate,
@@ -1616,7 +1795,9 @@ function App() {
       signup,
       logout,
       language,
-      setLanguage
+      setLanguage,
+      theme,
+      setTheme
     ]
   );
 
@@ -1659,7 +1840,7 @@ function App() {
 }
 
 function LandingPage() {
-  const { isAuthenticated } = useSymbio();
+  const { isAuthenticated, theme, setTheme } = useSymbio();
   const t = useTranslations();
   const [landingMenuOpen, setLandingMenuOpen] = useState(false);
   const scrollToSection = (sectionId: string) => {
@@ -1680,6 +1861,16 @@ function LandingPage() {
         <nav className="landing-links" aria-label="Landing navigation" style={{ fontWeight: "600" }}>
           <a href="#how" onClick={(e) => { e.preventDefault(); scrollToSection("how"); }}>{t.landingHow}</a>
           <a href="#features" onClick={(e) => { e.preventDefault(); scrollToSection("features"); }}>{t.landingFeatures}</a>
+
+          <Button
+            variant="ghost"
+            onClick={() => setTheme((prev) => (prev === "light" ? "dark" : "light"))}
+            aria-label={theme === "light" ? "Switch to dark mode" : "Switch to light mode"}
+            style={{ width: "36px", height: "36px", borderRadius: "50%", padding: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
+          >
+            {theme === "light" ? <Moon size={18} /> : <Sun size={18} />}
+          </Button>
+
           {isAuthenticated ? (
             <Link to="/discover" className="button button-primary" style={{ minHeight: "38px", padding: "0 16px", borderRadius: "20px", fontSize: "0.85rem" }}>{t.landingOpenApp}</Link>
           ) : (
@@ -1702,6 +1893,17 @@ function LandingPage() {
         <div className="landing-mobile-menu">
           <a href="#how" onClick={(e) => { e.preventDefault(); scrollToSection("how"); }}>{t.landingHow}</a>
           <a href="#features" onClick={(e) => { e.preventDefault(); scrollToSection("features"); }}>{t.landingFeatures}</a>
+
+          <button
+            type="button"
+            className="button button-secondary"
+            onClick={() => setTheme((prev) => (prev === "light" ? "dark" : "light"))}
+            style={{ width: "100%", justifyContent: "center", gap: "8px", minHeight: "40px", borderRadius: "10px", margin: "8px 0", fontSize: "0.85rem" }}
+          >
+            {theme === "light" ? <Moon size={16} /> : <Sun size={16} />}
+            {theme === "light" ? "Dark Mode" : "Light Mode"}
+          </button>
+
           {isAuthenticated ? (
             <Link to="/discover">{t.landingOpenApp}</Link>
           ) : (
@@ -1847,13 +2049,6 @@ function HeroCardCarousel() {
   const total = heroCarouselCards.length;
   const reducedMotion = usePrefersReducedMotion();
 
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setHeroIndex((prev) => (prev + 1) % total);
-    }, 4000);
-    return () => clearInterval(timer);
-  }, [total]);
-
   const moveCard = useCallback(
     (direction: "next" | "prev") => {
       if (motion) {
@@ -1880,12 +2075,21 @@ function HeroCardCarousel() {
     [motion, reducedMotion, total]
   );
 
+  const moveCardRef = useRef<(direction: "next" | "prev") => void>(() => {});
+  moveCardRef.current = moveCard;
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      moveCardRef.current("next");
+    }, 4000);
+    return () => clearInterval(timer);
+  }, []);
+
   const handlePointerDown: PointerEventHandler<HTMLDivElement> = (e) => {
     if (motion) {
       return;
     }
     pointerStart.current = { x: e.clientX, y: e.clientY };
-    e.currentTarget.setPointerCapture(e.pointerId);
   };
 
   const handlePointerMove: PointerEventHandler<HTMLDivElement> = (e) => {
@@ -1908,20 +2112,20 @@ function HeroCardCarousel() {
   };
 
   const handleWheel = (event: React.WheelEvent<HTMLDivElement>) => {
-    const horizontalSwipe = Math.abs(event.deltaX) > 32;
-    const verticalSwipe = Math.abs(event.deltaY) > 54;
-    if ((!horizontalSwipe && !verticalSwipe) || wheelLocked.current) {
+    const horizontalSwipe = Math.abs(event.deltaX) > 20;
+    if (!horizontalSwipe || wheelLocked.current) {
       return;
     }
 
     wheelLocked.current = true;
-    moveCard(event.deltaX > 0 || event.deltaY > 0 ? "next" : "prev");
+    moveCard(event.deltaX > 0 ? "next" : "prev");
     window.setTimeout(() => {
       wheelLocked.current = false;
     }, 520);
   };
 
   const card = heroCarouselCards[heroIndex];
+  const nextCard = heroCarouselCards[(heroIndex + 1) % total];
   const cardStyle = {
     transform: `translateX(${dragX}px) rotate(${Math.max(-8, Math.min(8, dragX / 24))}deg)`
   } as CSSProperties;
@@ -1939,9 +2143,36 @@ function HeroCardCarousel() {
         onPointerCancel={handlePointerUp}
         onWheel={handleWheel}
       >
+        {/* Next Card underneath */}
         <div
-          className={`hero-carousel-card ${motion === 'next' ? 'carousel-slide-left' : ''} ${motion === 'prev' ? 'carousel-slide-right' : ''}`}
-          style={cardStyle}
+          className="hero-carousel-card next-preview-card"
+          style={{ zIndex: 1, transform: 'scale(0.96)', opacity: 0.9 }}
+        >
+          <img src={nextCard.avatarUrl} alt={nextCard.name} draggable={false} />
+          <div className="hero-card-overlay">
+            <div className="hero-card-topline">
+              <div>
+                <h3>{nextCard.name}</h3>
+                <p>{nextCard.role}</p>
+              </div>
+              <div className="hero-status-pill">
+                <span />
+                Available
+              </div>
+            </div>
+            <small>{nextCard.summary}</small>
+            <div className="hero-card-chips">
+              {nextCard.skills.map((skill) => (
+                <span key={skill}>{skill}</span>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Top Active Card */}
+        <div
+          className="hero-carousel-card active-preview-card"
+          style={{ ...cardStyle, zIndex: 2 }}
         >
           <img src={card.avatarUrl} alt={card.name} draggable={false} />
           <div className="hero-card-overlay">
@@ -1981,7 +2212,7 @@ function HeroCardCarousel() {
 }
 
 function AppShell() {
-  const { profile, notifications } = useSymbio();
+  const { profile, notifications, theme, setTheme } = useSymbio();
   const location = useLocation();
   const showFilters = location.pathname === "/discover";
   const isChatRoute = location.pathname.startsWith("/chat/");
@@ -1991,6 +2222,7 @@ function AppShell() {
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [logoutOpen, setLogoutOpen] = useState(false);
+  const [activeFloatingPanel, setActiveFloatingPanel] = useState<"ai" | "chat" | null>(null);
 
   const handleMenuClick = () => {
     if (window.matchMedia("(min-width: 768px)").matches) {
@@ -2004,16 +2236,25 @@ function AppShell() {
 
   return (
     <div className={`app-shell ${sidebarCollapsed ? "sidebar-collapsed" : ""}`}>
-      <TopBar unreadCount={unreadCount} onMenuClick={handleMenuClick} />
+      <TopBar
+        unreadCount={unreadCount}
+        onMenuClick={handleMenuClick}
+        theme={theme}
+        onToggleTheme={() => setTheme((prev) => (prev === "light" ? "dark" : "light"))}
+      />
 
       {mobileDrawerOpen ? (
         <div className="mobile-drawer-overlay" onClick={() => setMobileDrawerOpen(false)}>
           <div className="mobile-drawer-content" onClick={(e) => e.stopPropagation()}>
             <div className="mobile-drawer-header">
-              <span className="brand-mark">
-                <span className="brand-icon">S</span>
-                <span>Mutualizm</span>
-              </span>
+              <Link
+                to="/discover"
+                className="top-logo"
+                onClick={() => setMobileDrawerOpen(false)}
+                aria-label="Mutualizm discover"
+              >
+                Mutualizm <span>✦</span>
+              </Link>
               <button className="close-btn" aria-label="Close menu" onClick={() => setMobileDrawerOpen(false)}>
                 <X size={20} />
               </button>
@@ -2060,8 +2301,14 @@ function AppShell() {
         {!isChatRoute ? <BottomNav unreadCount={unreadCount} /> : null}
       </main>
 
-      <AiAssistantBubble />
-      {!isChatRoute ? <FollowChatBubble /> : null}
+      <AiAssistantBubble
+        isOpen={activeFloatingPanel === "ai"}
+        onToggle={(open) => setActiveFloatingPanel(open ? "ai" : null)}
+      />
+      <FollowChatBubble
+        isOpen={activeFloatingPanel === "chat"}
+        onToggle={(open) => setActiveFloatingPanel(open ? "chat" : null)}
+      />
 
       {settingsOpen ? <SettingsDrawer onClose={() => setSettingsOpen(false)} onLogoutRequest={() => setLogoutOpen(true)} /> : null}
       {logoutOpen ? <LogoutConfirmModal onClose={() => setLogoutOpen(false)} /> : null}
@@ -2069,7 +2316,17 @@ function AppShell() {
   );
 }
 
-function TopBar({ unreadCount, onMenuClick }: { unreadCount: number; onMenuClick?: () => void }) {
+function TopBar({
+  unreadCount,
+  onMenuClick,
+  theme,
+  onToggleTheme
+}: {
+  unreadCount: number;
+  onMenuClick?: () => void;
+  theme: "light" | "dark";
+  onToggleTheme: () => void;
+}) {
   return (
     <header className="top-bar">
       <button className="top-icon-button" aria-label="Open menu" onClick={onMenuClick}>
@@ -2078,7 +2335,16 @@ function TopBar({ unreadCount, onMenuClick }: { unreadCount: number; onMenuClick
       <Link to="/discover" className="top-logo" aria-label="Mutualizm discover">
         Mutualizm <span>✦</span>
       </Link>
-      <div className="top-actions">
+      <div className="top-actions" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <button
+          type="button"
+          className="icon-link theme-toggle-btn"
+          aria-label={theme === "light" ? "Switch to dark mode" : "Switch to light mode"}
+          onClick={onToggleTheme}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+        >
+          {theme === "light" ? <Moon size={20} /> : <Sun size={20} />}
+        </button>
         <Link to="/notifications" className="icon-link" aria-label="Open notifications">
           <Bell size={20} aria-hidden="true" />
           {unreadCount > 0 ? <span className="count-badge">{unreadCount}</span> : null}
@@ -2485,10 +2751,9 @@ function ProfileQrModal({ profile, onClose }: { profile: CandidateProfile; onClo
   );
 }
 
-function FollowChatBubble() {
+function FollowChatBubble({ isOpen, onToggle }: { isOpen: boolean; onToggle: (open: boolean) => void }) {
   const { matches } = useSymbio();
   const t = useTranslations();
-  const [open, setOpen] = useState(false);
   const chatItems = matches
     .map((match) => ({ match, candidate: getCandidate(match.candidateId) }))
     .filter((item): item is { match: MatchRecord; candidate: CandidateProfile } => Boolean(item.candidate))
@@ -2497,16 +2762,16 @@ function FollowChatBubble() {
   const totalUnread = matches.reduce((sum, m) => sum + m.unread, 0);
 
   return (
-    <div className={`chat-bubble ${open ? "open" : ""}`}>
-      {open ? (
+    <div className={`chat-bubble ${isOpen ? "open" : ""}`}>
+      {isOpen ? (
         <section className="chat-bubble-panel" aria-label="Followed user chat list">
           <div className="rail-heading">
             <h2>{t.chatFollowed}</h2>
-            <button className="text-link" onClick={() => setOpen(false)}>{t.closePanel}</button>
+            <button className="text-link" onClick={() => onToggle(false)}>{t.closePanel}</button>
           </div>
           <div className="compact-list">
             {chatItems.length ? chatItems.map(({ match, candidate }) => (
-              <Link className="compact-row" to={`/chat/${match.id}`} key={match.id} onClick={() => setOpen(false)}>
+              <Link className="compact-row" to={`/chat/${match.id}`} key={match.id} onClick={() => onToggle(false)}>
                 <Avatar profile={candidate} size="xs" />
                 <span>
                   <strong>{candidate.name}</strong>
@@ -2520,7 +2785,7 @@ function FollowChatBubble() {
           </div>
         </section>
       ) : null}
-      <button className="chat-bubble-button" type="button" aria-label="Open followed user chat" onClick={() => setOpen((current) => !current)}>
+      <button className="chat-bubble-button" type="button" aria-label="Open followed user chat" onClick={() => onToggle(!isOpen)}>
         <MessageCircle size={24} aria-hidden="true" />
         {totalUnread > 0 ? <span className="chat-bubble-badge">{totalUnread}</span> : null}
       </button>
@@ -2528,14 +2793,50 @@ function FollowChatBubble() {
   );
 }
 
-function AiAssistantBubble() {
+function AiAssistantBubble({ isOpen, onToggle }: { isOpen: boolean; onToggle: (open: boolean) => void }) {
   const { language } = useSymbio();
   const t = useTranslations();
-  const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
-  const [response, setResponse] = useState("");
+  const [history, setHistory] = useState<{role: string, message: string}[]>([]);
   const [results, setResults] = useState<CandidateProfile[]>([]);
+
+  const renderMessage = (text: string) => {
+    const parts = text.split(/(\*\*.*?\*\*|\*.*?\*)/g);
+    return parts.map((part, i) => {
+      if (part.startsWith('**') && part.endsWith('**')) {
+        return <strong key={i}>{part.slice(2, -2)}</strong>;
+      }
+      if (part.startsWith('*') && part.endsWith('*')) {
+        return <strong key={i}>{part.slice(1, -1)}</strong>;
+      }
+      return <span key={i}>{part}</span>;
+    });
+  };
+
+  const clearHistory = () => {
+    setHistory([]);
+    setResults([]);
+    fetch("/api/ai/history", {
+      method: "DELETE",
+      headers: { "Authorization": `Bearer ${window.localStorage.getItem("mutualizm.token")}` }
+    }).catch(() => {});
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      fetch("/api/ai/history", {
+        headers: { "Authorization": `Bearer ${window.localStorage.getItem("mutualizm.token")}` }
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.conversations) {
+          setHistory(data.conversations);
+        }
+      })
+      .catch(() => {});
+    }
+  }, [isOpen]);
 
   const presets = [
     { label: t.aiFindDesign, prompt: "I need a UI/UX designer who can help with Figma, wireframes, and user testing." },
@@ -2549,10 +2850,10 @@ function AiAssistantBubble() {
       return;
     }
 
-    setOpen(true);
-    setQuery(prompt);
+    onToggle(true);
+    setQuery("");
     setLoading(true);
-    setResponse("");
+    setHistory(prev => [...prev, { role: "user", message: prompt }]);
     setResults(findCandidatesForQuery(prompt).slice(0, 3));
 
     const siteContext = `
@@ -2564,9 +2865,13 @@ ${candidates.map((candidate) => `- ${candidate.name}: ${candidate.role}, main sk
 `;
 
     try {
+      const authToken = window.localStorage.getItem("mutualizm.token");
       const request = await fetch("/api/ai/suggest", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(authToken ? { "Authorization": `Bearer ${authToken}` } : {})
+        },
         body: JSON.stringify({
           prompt,
           context: siteContext
@@ -2576,17 +2881,17 @@ ${candidates.map((candidate) => `- ${candidate.name}: ${candidate.role}, main sk
       if (!request.ok) {
         throw new Error(data.message || "AI request failed.");
       }
-      setResponse(data.message || "");
+      setHistory(prev => [...prev, { role: "assistant", message: data.message || "" }]);
     } catch {
-      setResponse(t.aiError);
+      setHistory(prev => [...prev, { role: "assistant", message: t.aiError }]);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className={`ai-assistant-bubble ${open ? "open" : ""}`}>
-      {open ? (
+    <div className={`ai-assistant-bubble ${isOpen ? "open" : ""}`}>
+      {isOpen ? (
         <section className="ai-assistant-panel" aria-label={t.aiAssistantTitle}>
           <header>
             <div>
@@ -2596,9 +2901,14 @@ ${candidates.map((candidate) => `- ${candidate.name}: ${candidate.role}, main sk
               </h2>
               <p>{t.aiAssistantIntro}</p>
             </div>
-            <button type="button" aria-label={t.close} onClick={() => setOpen(false)}>
-              <X size={18} aria-hidden="true" />
-            </button>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button type="button" aria-label="Clear chat history" onClick={clearHistory}>
+                <Trash2 size={18} aria-hidden="true" />
+              </button>
+              <button type="button" aria-label={t.close} onClick={() => onToggle(false)}>
+                <X size={18} aria-hidden="true" />
+              </button>
+            </div>
           </header>
 
           <div className="ai-assistant-presets">
@@ -2610,31 +2920,38 @@ ${candidates.map((candidate) => `- ${candidate.name}: ${candidate.role}, main sk
           </div>
 
           <div className="ai-assistant-response">
-            {loading ? (
-              <div className="ai-loading-state">
-                <span className="spinner" />
-                <p>{t.aiThinking}</p>
-              </div>
-            ) : response ? (
-              <p>{response}</p>
-            ) : null}
-
-            <div className="ai-result-list">
-              <strong>{t.aiMatches}</strong>
-              {results.length ? (
-                results.map((candidate) => (
-                  <article className="ai-result-card" key={candidate.id}>
-                    <Avatar profile={candidate} size="xs" />
-                    <span>
-                      <b>{candidate.name}</b>
-                      <small>{localizeRoleLabel(candidate.role, t)} · {candidate.mainSkill}</small>
-                    </span>
-                  </article>
-                ))
-              ) : (
-                <small className="muted-text">{t.aiNoMatches}</small>
-              )}
+            <div className="ai-chat-history">
+              {history.map((msg, i) => (
+                <div key={i} className={`ai-chat-bubble ${msg.role === "user" ? "user" : "assistant"}`}>
+                  {renderMessage(msg.message)}
+                </div>
+              ))}
+              {loading ? (
+                <div className="ai-loading-state" style={{ alignSelf: "flex-start" }}>
+                  <span className="spinner" />
+                  <p>{t.aiThinking}</p>
+                </div>
+              ) : null}
             </div>
+
+            {history.length > 0 ? (
+              <div className="ai-result-list">
+                <strong>{t.aiMatches}</strong>
+                {results.length ? (
+                  results.map((candidate) => (
+                    <article className="ai-result-card" key={candidate.id}>
+                      <Avatar profile={candidate} size="xs" />
+                      <span>
+                        <b>{candidate.name}</b>
+                        <small>{localizeRoleLabel(candidate.role, t)} · {candidate.mainSkill}</small>
+                      </span>
+                    </article>
+                  ))
+                ) : (
+                  <small className="muted-text">{t.aiNoMatches}</small>
+                )}
+              </div>
+            ) : null}
           </div>
 
           <form
@@ -2660,7 +2977,7 @@ ${candidates.map((candidate) => `- ${candidate.name}: ${candidate.role}, main sk
         className="ai-assistant-button"
         type="button"
         aria-label={t.aiAssistantTitle}
-        onClick={() => setOpen((current) => !current)}
+        onClick={() => onToggle(!isOpen)}
       >
         <Sparkles size={23} aria-hidden="true" />
       </button>
@@ -2900,7 +3217,14 @@ function DiscoverPage() {
     const vertical = Math.abs(drag.y);
 
     if (horizontal > 90 && horizontal > vertical) {
-      handleAction(drag.x > 0 ? "interest" : "pass");
+      if (drag.x > 0) {
+        handleAction("interest");
+      } else {
+        rewindLast();
+        setRewindAnim(true);
+        window.setTimeout(() => setRewindAnim(false), 450);
+        setDrag({ x: 0, y: 0, active: false });
+      }
       return;
     }
 
@@ -2910,7 +3234,7 @@ function DiscoverPage() {
     }
 
     setDrag({ x: 0, y: 0, active: false });
-  }, [drag.x, drag.y, handleAction]);
+  }, [drag.x, drag.y, handleAction, rewindLast]);
 
   const animateAction = useCallback(
     (action: SwipeAction) => {
@@ -3065,9 +3389,7 @@ function DiscoverPage() {
         )}
       </div>
 
-      <p className="shortcut-note">
-        Desktop shortcuts: Left rewind, Right next, Up save, R rewind, Enter details, Esc close.
-      </p>
+      {/* Shortcut note removed */}
 
       {detailProfile ? (
         <CandidateDetailSheet profile={detailProfile} onClose={() => setDetailProfile(null)} />
@@ -3635,12 +3957,12 @@ function ProfilePage() {
             gap: '16px'
           }}>
             <h2 style={{ margin: 0, fontSize: '1.25rem', color: 'var(--ink)' }}>{t.settingsTitle}</h2>
-            
+
             <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               <label style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--muted)' }}>{t.name}</label>
-              <input 
-                type="text" 
-                defaultValue={profile.name} 
+              <input
+                type="text"
+                defaultValue={profile.name}
                 id="settings-name-input"
                 className="input-field"
                 style={{
@@ -3655,9 +3977,9 @@ function ProfilePage() {
 
             <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               <label style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--muted)' }}>{t.photoUrl}</label>
-              <input 
-                type="text" 
-                defaultValue={profile.avatarUrl ?? ""} 
+              <input
+                type="text"
+                defaultValue={profile.avatarUrl ?? ""}
                 id="settings-avatar-input"
                 className="input-field"
                 style={{
@@ -3672,8 +3994,8 @@ function ProfilePage() {
 
             <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               <label style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--muted)' }}>{t.language}</label>
-              <select 
-                defaultValue={language} 
+              <select
+                defaultValue={language}
                 id="settings-language-input"
                 style={{
                   padding: '10px 12px',
@@ -3690,9 +4012,9 @@ function ProfilePage() {
 
             <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               <label style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--muted)' }}>{t.campus}</label>
-              <input 
-                type="text" 
-                defaultValue={profile.campus} 
+              <input
+                type="text"
+                defaultValue={profile.campus}
                 id="settings-campus-input"
                 className="input-field"
                 style={{
@@ -3707,9 +4029,9 @@ function ProfilePage() {
 
             <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               <label style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--muted)' }}>{t.program}</label>
-              <input 
-                type="text" 
-                defaultValue={profile.program} 
+              <input
+                type="text"
+                defaultValue={profile.program}
                 id="settings-program-input"
                 className="input-field"
                 style={{
@@ -3724,9 +4046,9 @@ function ProfilePage() {
 
             <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               <label style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--muted)' }}>{t.preferredRole}</label>
-              <input 
-                type="text" 
-                defaultValue={profile.role} 
+              <input
+                type="text"
+                defaultValue={profile.role}
                 id="settings-role-input"
                 className="input-field"
                 style={{
@@ -3741,9 +4063,9 @@ function ProfilePage() {
 
             <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               <label style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--muted)' }}>{t.mainSkill}</label>
-              <input 
-                type="text" 
-                defaultValue={profile.mainSkill} 
+              <input
+                type="text"
+                defaultValue={profile.mainSkill}
                 id="settings-skill-input"
                 className="input-field"
                 style={{
@@ -3758,8 +4080,8 @@ function ProfilePage() {
 
             <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               <label style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--muted)' }}>{t.bio}</label>
-              <textarea 
-                defaultValue={profile.profileSummary} 
+              <textarea
+                defaultValue={profile.profileSummary}
                 id="settings-bio-input"
                 rows={3}
                 style={{
@@ -3817,146 +4139,9 @@ function ProfilePage() {
   );
 }
 
-function MatchesPage() {
-  const { matches, removeMatch, addToast } = useSymbio();
-  const t = useTranslations();
-  const [selectedId, setSelectedId] = useState(matches[0]?.id ?? "");
-  const [openMenuId, setOpenMenuId] = useState("");
-  const [detailProfile, setDetailProfile] = useState<CandidateProfile | null>(null);
 
-  useEffect(() => {
-    if (!matches.some((match) => match.id === selectedId)) {
-      setSelectedId(matches[0]?.id ?? "");
-    }
-  }, [matches, selectedId]);
 
-  if (!matches.length) {
-    return (
-      <div className="page-stack">
-        <BeelineIntro />
-        <EmptyState
-          title={t.noMatchesYet}
-          body={t.noMatchesBody}
-          action={
-            <Link className="button button-primary" to="/discover">
-              {t.discoverProfiles}
-            </Link>
-          }
-        />
-      </div>
-    );
-  }
-
-  const selected = matches.find((match) => match.id === selectedId) ?? matches[0];
-  const selectedCandidate = getCandidate(selected.candidateId);
-  const showPrototypeActionToast = (title: string, body: string) => addToast(title, body);
-
-  return (
-    <div className="page-stack beeline-page page-transition">
-      <BeelineIntro />
-      <div className="matches-grid">
-        <section className="match-list" aria-label="Match list">
-          {matches.map((match) => {
-            const candidate = getCandidate(match.candidateId);
-            if (!candidate) {
-              return null;
-            }
-
-            return (
-              <article
-                className={`match-row ${match.id === selected.id ? "selected" : ""}`}
-                key={match.id}
-                onClick={() => setSelectedId(match.id)}
-                tabIndex={0}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" || event.key === " ") {
-                    setSelectedId(match.id);
-                  }
-                }}
-                style={candidate.avatarUrl ? { backgroundImage: `linear-gradient(180deg, rgba(0,0,0,0.05), rgba(0,0,0,0.78)), url(${candidate.avatarUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
-              >
-                <Avatar profile={candidate} size="sm" />
-                <span>
-                  <strong>{candidate.name}</strong>
-                  <small>{localizeRoleLabel(candidate.role, t)} · {candidate.mainSkill}</small>
-                  <em>{localizeMatchMessage(match.latestMessage, t)}</em>
-                </span>
-                {match.unread ? <b>{match.unread}</b> : null}
-                <div className="match-quick-actions">
-                  <Link
-                    className="match-chat-button"
-                    to={`/chat/${match.id}`}
-                    onClick={(event) => event.stopPropagation()}
-                  >
-                    {t.chat}
-                  </Link>
-                  <button
-                    type="button"
-                    className="match-profile-button"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      setDetailProfile(candidate);
-                    }}
-                  >
-                    {t.profile}
-                  </button>
-                </div>
-                <div className="match-menu" onClick={(event) => event.stopPropagation()}>
-                  <button
-                    type="button"
-                    className="match-menu-trigger"
-                    aria-label={t.matchActions}
-                    aria-expanded={openMenuId === match.id}
-                    onClick={() => setOpenMenuId((current) => (current === match.id ? "" : match.id))}
-                  >
-                    <MoreVertical size={18} aria-hidden="true" />
-                  </button>
-                  {openMenuId === match.id ? (
-                    <div className="match-menu-panel">
-                      <button type="button" onClick={() => { setDetailProfile(candidate); setOpenMenuId(""); }}>
-                        <Eye size={15} aria-hidden="true" />
-                        {t.viewProfile}
-                      </button>
-                      <button type="button" onClick={() => { removeMatch(match.id); setOpenMenuId(""); }}>
-                        <Trash2 size={15} aria-hidden="true" />
-                        {t.removeMatch}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          showPrototypeActionToast(t.reportQueuedTitle, t.reportQueuedBody);
-                          setOpenMenuId("");
-                        }}
-                      >
-                        <Flag size={15} aria-hidden="true" />
-                        {t.reportUser}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          showPrototypeActionToast(t.blockQueuedTitle, t.blockQueuedBody);
-                          setOpenMenuId("");
-                        }}
-                      >
-                        <X size={15} aria-hidden="true" />
-                        {t.blockUser}
-                      </button>
-                    </div>
-                  ) : null}
-                </div>
-              </article>
-            );
-          })}
-        </section>
-      </div>
-      {detailProfile ? (
-        <CandidateDetailSheet profile={detailProfile} onClose={() => setDetailProfile(null)} />
-      ) : null}
-    </div>
-  );
-}
-
-function BeelineIntro() {
+export function BeelineIntro() {
   const t = useTranslations();
   return (
     <section className="beeline-intro">
@@ -4329,7 +4514,11 @@ function ChatWindow({
     }
 
     if (editingId) {
-      updateMessage(editingId, cleanText);
+      const originalMessage = messages.find((m) => m.id === editingId);
+      const replyPrefixMatch = originalMessage?.text.match(/^(?:Replying to|Membalas) [^:]+: "[\s\S]+?"\n/);
+      const prefix = replyPrefixMatch ? replyPrefixMatch[0] : "";
+
+      updateMessage(editingId, prefix + cleanText);
       addToast(t.messageUpdatedTitle, t.messageUpdatedBody);
       setEditingId("");
       setMessage("");
@@ -4337,7 +4526,7 @@ function ChatWindow({
     }
 
     const nextMessage = replyTo
-      ? `${t.replyingTo} ${candidate.name.split(" ")[0]}: "${localizeChatMessage(replyTo.text, t)}"\n${cleanText}`
+      ? `${t.replyingTo} ${candidate.name.split(" ")[0]}: "${stripReplyContext(localizeChatMessage(replyTo.text, t))}"\n${cleanText}`
       : cleanText;
 
     sendMessage(match.id, nextMessage);
@@ -4356,22 +4545,31 @@ function ChatWindow({
             {candidate.online ? t.onlineNow : t.offline} · {candidate.mainSkill}
           </p>
         </div>
-        <button className="button button-secondary" onClick={() => setShowProfile(true)}>{t.viewProfile}</button>
+        <button className="button button-secondary" style={{ marginLeft: 'auto' }} onClick={() => setShowProfile(true)}>{t.viewProfile}</button>
       </header>
-
-      <div className="match-reason">
-        <strong>{t.whyMatchWorks}</strong>
-        {localizeMatchSummary(match, candidate, t).map((item) => (
-          <p key={item}>{item}</p>
-        ))}
-      </div>
 
       <div className="message-list" aria-label="Chat messages" ref={listRef} onScroll={handleScroll} style={{ position: 'relative' }}>
         {messages.length ? (
           messages.map((chatMessage) => (
             <div className={`message ${chatMessage.sender}`} key={chatMessage.id}>
-              <p>{localizeChatMessage(chatMessage.text, t)}</p>
-              <span>{localizeTimeLabel(chatMessage.timestamp, t)}</span>
+              {(() => {
+                const localized = localizeChatMessage(chatMessage.text, t);
+                const match = localized.match(/^(Replying to|Membalas) ([^:]+): "([\s\S]+?)"\n([\s\S]+)$/);
+                if (match) {
+                  const [_, prefix, senderName, parentText, ownText] = match;
+                  return (
+                    <p>
+                      <span className="message-reply-preview" style={{ display: 'block' }}>
+                        <strong>{senderName}</strong>
+                        <span className="clamp-2" style={{ display: 'block' }}>{parentText}</span>
+                      </span>
+                      <span className="message-text" style={{ display: 'block', marginTop: '4px' }}>{ownText}</span>
+                    </p>
+                  );
+                }
+                return <p>{localized}</p>;
+              })()}
+              <span className="message-time">{localizeTimeLabel(chatMessage.timestamp, t)}</span>
               <div className="message-actions">
                 <button type="button" title={t.replyMessage} onClick={() => setReplyTo(chatMessage)}>
                   <Reply size={13} aria-hidden="true" />
@@ -4386,7 +4584,7 @@ function ChatWindow({
                       title={t.editMessage}
                       onClick={() => {
                         setEditingId(chatMessage.id);
-                        setMessage(chatMessage.text);
+                        setMessage(stripReplyContext(chatMessage.text));
                         setReplyTo(null);
                       }}
                     >
@@ -4406,12 +4604,6 @@ function ChatWindow({
             body={t.typeMessage}
           />
         )}
-        <div className="typing-indicator" aria-label={`${candidate.name} ${t.isTyping}`}>
-          <span />
-          <span />
-          <span />
-          {candidate.name.split(" ")[0]} {t.isTyping}
-        </div>
         {showScrollBtn ? (
           <button type="button" className="scroll-to-bottom-btn" onClick={scrollToBottom} aria-label="Scroll to bottom">
             <ChevronDown size={18} />
@@ -4430,9 +4622,6 @@ function ChatWindow({
             </button>
           </div>
         ) : null}
-        <button type="button" className="chat-undo-button" title={t.undoMessage} onClick={undoLastMessage}>
-          <Undo2 size={17} aria-hidden="true" />
-        </button>
         <input
           value={message}
           onChange={(event) => setMessage(event.target.value)}
@@ -4535,7 +4724,7 @@ function CandidateCard({
       aria-label={`${profile.name}, ${localizeRoleLabel(profile.role, t)}, ${t.mainSkillLabel} ${profile.mainSkill}`}
     >
       {actionHint ? <div className={`action-hint ${actionHint.toLowerCase()}`}>{localizedActionHint}</div> : null}
-      
+
       {/* Card Header Image Area */}
       <div className="card-cover">
         <img
@@ -4674,7 +4863,7 @@ function CandidateCard({
   );
 }
 
-function CandidateDetailSheet({
+export function CandidateDetailSheet({
   profile,
   onClose
 }: {
@@ -5061,7 +5250,7 @@ function PageHeader({
   );
 }
 
-function EmptyState({
+export function EmptyState({
   title,
   body,
   action
@@ -5111,7 +5300,7 @@ function getSkillCategory(name: string): string {
   const normalized = name.toLowerCase().trim();
   const found = allSkills.find((s) => s.name.toLowerCase().trim() === normalized);
   if (found) return found.category;
-  
+
   if (["react", "node.js", "typescript", "python", "mysql", "laravel", "javascript", "html", "css", "docker", "git", "api"].some(k => normalized.includes(k))) {
     return "Development";
   }
@@ -5147,7 +5336,7 @@ function AvailabilityBadge({
   return <span className={`availability availability-${availability}`}>{localizeStatusLabel(label, t) || fallback}</span>;
 }
 
-function Avatar({ profile, size }: { profile: CandidateProfile; size: "xs" | "sm" | "md" | "lg" }) {
+export function Avatar({ profile, size }: { profile: CandidateProfile; size: "xs" | "sm" | "md" | "lg" }) {
   if (profile.avatarUrl) {
     return (
       <img
@@ -5626,12 +5815,24 @@ function ToastStack() {
 
   return (
     <div className="toast-stack" aria-live="polite" aria-atomic="true">
-      {toasts.map((toast) => (
-        <div className="toast" key={toast.id}>
-          <strong>{toast.title}</strong>
-          <p>{toast.body}</p>
-        </div>
-      ))}
+      {toasts.map((toast) => {
+        let icon = <Info size={16} />;
+        if (toast.type === "success") icon = <CheckCircle size={16} />;
+        if (toast.type === "error") icon = <AlertCircle size={16} />;
+        if (toast.type === "warning") icon = <AlertTriangle size={16} />;
+
+        return (
+          <div className="toast" key={toast.id}>
+            <div className={`toast-icon ${toast.type || "info"}`}>
+              {icon}
+            </div>
+            <div className="toast-content">
+              <strong>{toast.title}</strong>
+              <p>{toast.body}</p>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -5740,8 +5941,8 @@ function localizeProject(project: typeof mockProjects[number], t: TranslationSet
   return { ...project, ...(known[project.id] ?? {}) };
 }
 
-function localizeRoleLabel(role: string, t: TranslationSet) {
-  if (!isIndonesian(t)) {
+export function localizeRoleLabel(role: string, t: Record<string, string>): string {
+  if (!isIndonesian(t as unknown as TranslationSet)) {
     return role;
   }
 
@@ -5820,7 +6021,7 @@ function localizeSkillLevel(level: string, t: TranslationSet) {
 
 function localizeOptionLabel(value: string, t: TranslationSet) {
   if (roleOptions.includes(value)) {
-    return localizeRoleLabel(value, t);
+    return localizeRoleLabel(value, t as unknown as Record<string, string>);
   }
   if (collaborationGoalOptions.includes(value)) {
     return localizeCollaborationGoal(value, t);
@@ -5854,11 +6055,14 @@ function localizeActionHint(actionHint: string | undefined, t: TranslationSet) {
   if (actionHint === "Pass") {
     return t.passProfile;
   }
+  if (actionHint === "Rewind") {
+    return isIndonesian(t) ? "Kembali" : "Rewind";
+  }
   return actionHint;
 }
 
-function localizeMatchMessage(message: string, t: TranslationSet) {
-  if (!isIndonesian(t)) {
+export function localizeMatchMessage(message: string, t: Record<string, string>): string {
+  if (!isIndonesian(t as unknown as TranslationSet)) {
     return message;
   }
 
@@ -5885,7 +6089,7 @@ function localizeMatchMessage(message: string, t: TranslationSet) {
 }
 
 function localizeChatMessage(message: string, t: TranslationSet) {
-  return localizeMatchMessage(message, t);
+  return localizeMatchMessage(message, t as unknown as Record<string, string>);
 }
 
 function localizeTimeLabel(time: string, t: TranslationSet) {
@@ -5916,7 +6120,7 @@ function localizeMatchSummary(match: MatchRecord, candidate: CandidateProfile, t
     : "proyek";
 
   return [
-    `Anda mencari dukungan ${localizeRoleLabel(candidate.role, t).toLowerCase()}.`,
+    `Anda mencari dukungan ${localizeRoleLabel(candidate.role, t as unknown as Record<string, string>).toLowerCase()}.`,
     `${firstName} punya pengalaman ${skillText}.`,
     `Kedua profil menyebut kolaborasi ${goal}.`
   ];
@@ -6239,8 +6443,8 @@ function validateProfile(profile: CandidateProfile) {
   return errors;
 }
 
-function getCandidate(candidateId: string) {
-  return candidateLookup.get(candidateId);
+export function getCandidate(id: string): CandidateProfile | undefined {
+  return candidateLookup.get(id);
 }
 
 function getInitials(name: string) {
@@ -6265,9 +6469,14 @@ function getActionHint(x: number, y: number) {
     return "Interested";
   }
   if (horizontal > vertical && x < -50) {
-    return "Pass";
+    return "Rewind";
   }
   return "";
+}
+
+function stripReplyContext(text: string): string {
+  const match = text.match(/^(?:Replying to|Membalas) [^:]+: "[\s\S]+?"\n([\s\S]+)$/);
+  return match ? match[1] : text;
 }
 
 function isUrlLike(value: string) {

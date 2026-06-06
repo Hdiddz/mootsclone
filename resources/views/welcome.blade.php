@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="Mutualizm is a frontend-only campus collaboration matchmaking prototype for Telkom University students."
+      content="Mutualizm helps Telkom University students discover collaborators, chat in real time, and get AI-assisted skill matching suggestions."
     />
     <title>Mutualizm | Skill-based campus collaboration</title>
     <!-- Google Fonts: Montserrat -->

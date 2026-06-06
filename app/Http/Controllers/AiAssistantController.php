@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AiConversation;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
@@ -19,41 +20,128 @@ class AiAssistantController extends Controller
 
         $prompt = trim($data['prompt']);
         $context = $this->buildContext($data['candidate'] ?? [], $data['context'] ?? '');
+        $provider = 'local';
+        $reply = null;
+        $apiError = null;
+
+        // Fetch recent chat history for the user to provide memory/context
+        $history = [];
+        if ($user = $request->user()) {
+            $history = AiConversation::where('user_id', $user->id)
+                ->orderBy('created_at', 'desc')
+                ->limit(12)
+                ->get()
+                ->reverse()
+                ->map(fn ($msg) => [
+                    'role' => $msg->role,
+                    'content' => $msg->message,
+                ])
+                ->toArray();
+        }
 
         if ($openRouterKey = config('services.openrouter.key')) {
             try {
-                return response()->json([
-                    'message' => $this->askOpenRouter($openRouterKey, $context, $prompt),
-                    'provider' => 'openrouter',
-                ]);
+                $reply = $this->askOpenRouter($openRouterKey, $context, $prompt, $history);
+                $provider = 'openrouter';
             } catch (RequestException $exception) {
-                Log::warning('OpenRouter AI request failed.', ['status' => $exception->response?->status()]);
+                $status = $exception->response?->status();
+                $body = $exception->response?->body();
+                $apiError = "OpenRouter API Error [{$status}]: " . ($exception->response?->json('error.message') ?? $body ?? $exception->getMessage());
+                Log::warning('OpenRouter AI request failed.', ['status' => $status, 'body' => $body]);
             } catch (\Throwable $exception) {
+                $apiError = "OpenRouter Error: " . $exception->getMessage();
                 Log::warning('OpenRouter AI request failed.', ['error' => $exception->getMessage()]);
             }
         }
 
-        if ($geminiKey = config('services.gemini.key')) {
+        if ($reply === null && ($geminiKey = config('services.gemini.key'))) {
             try {
-                return response()->json([
-                    'message' => $this->askGemini($geminiKey, $context, $prompt),
-                    'provider' => 'gemini',
-                ]);
+                $reply = $this->askGemini($geminiKey, $context, $prompt, $history);
+                $provider = 'gemini';
             } catch (RequestException $exception) {
-                Log::warning('Gemini AI request failed.', ['status' => $exception->response?->status()]);
+                $status = $exception->response?->status();
+                $apiError = "Gemini API Error [{$status}]: " . ($exception->response?->json('error.message') ?? $exception->getMessage());
+                Log::warning('Gemini AI request failed.', ['status' => $status]);
             } catch (\Throwable $exception) {
+                $apiError = "Gemini Error: " . $exception->getMessage();
                 Log::warning('Gemini AI request failed.', ['error' => $exception->getMessage()]);
             }
         }
 
+        if ($reply === null) {
+            if ($apiError !== null) {
+                Log::warning('AI provider fallback used.', ['error' => $apiError]);
+                $reply = $this->fallbackSuggestion($prompt);
+                $provider = 'local';
+            } else {
+                $reply = $this->fallbackSuggestion($prompt);
+                $provider = 'local';
+            }
+        }
+
+        // Save conversation history if user is authenticated
+        if ($user = $request->user()) {
+            AiConversation::create([
+                'user_id' => $user->id,
+                'role' => 'user',
+                'message' => $prompt,
+            ]);
+            AiConversation::create([
+                'user_id' => $user->id,
+                'role' => 'assistant',
+                'message' => $reply,
+            ]);
+        }
+
         return response()->json([
-            'message' => $this->fallbackSuggestion($prompt),
-            'provider' => 'local',
+            'message' => $reply,
+            'provider' => $provider,
         ]);
     }
 
-    private function askOpenRouter(string $key, string $context, string $prompt): string
+    /**
+     * Retrieve AI chat history for the authenticated user.
+     */
+    public function chatHistory(Request $request)
     {
+        $user = $request->user();
+
+        $conversations = AiConversation::where('user_id', $user->id)
+            ->orderBy('created_at', 'asc')
+            ->get(['id', 'role', 'message', 'created_at']);
+
+        return response()->json([
+            'conversations' => $conversations,
+        ]);
+    }
+
+    /**
+     * Clear AI chat history for the authenticated user.
+     */
+    public function clearHistory(Request $request)
+    {
+        $user = $request->user();
+        AiConversation::where('user_id', $user->id)->delete();
+
+        return response()->json([
+            'message' => 'Chat history cleared.',
+        ]);
+    }
+
+    private function askOpenRouter(string $key, string $context, string $prompt, array $history = []): string
+    {
+        $messages = [];
+        $messages[] = ['role' => 'system', 'content' => $context];
+
+        foreach ($history as $msg) {
+            $messages[] = [
+                'role' => $msg['role'] === 'assistant' ? 'assistant' : 'user',
+                'content' => $msg['content']
+            ];
+        }
+
+        $messages[] = ['role' => 'user', 'content' => $prompt];
+
         $response = Http::timeout(30)
             ->acceptJson()
             ->withHeaders([
@@ -64,10 +152,7 @@ class AiAssistantController extends Controller
             ])
             ->post('https://openrouter.ai/api/v1/chat/completions', [
                 'model' => config('services.openrouter.model', 'google/gemini-2.5-flash'),
-                'messages' => [
-                    ['role' => 'system', 'content' => $context],
-                    ['role' => 'user', 'content' => $prompt],
-                ],
+                'messages' => $messages,
                 'temperature' => 0.55,
                 'max_tokens' => 260,
             ])
@@ -77,20 +162,36 @@ class AiAssistantController extends Controller
         return trim($response['choices'][0]['message']['content'] ?? 'I could not generate a suggestion right now.');
     }
 
-    private function askGemini(string $key, string $context, string $prompt): string
+    private function askGemini(string $key, string $context, string $prompt, array $history = []): string
     {
         $model = config('services.gemini.model', 'gemini-2.5-flash');
+
+        $contents = [];
+        foreach ($history as $msg) {
+            $contents[] = [
+                'role' => $msg['role'] === 'assistant' ? 'model' : 'user',
+                'parts' => [
+                    ['text' => $msg['content']]
+                ]
+            ];
+        }
+        $contents[] = [
+            'role' => 'user',
+            'parts' => [
+                ['text' => $prompt]
+            ]
+        ];
+
         $response = Http::timeout(30)
             ->acceptJson()
             ->withQueryParameters(['key' => $key])
             ->post("https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent", [
-                'contents' => [
-                    [
-                        'parts' => [
-                            ['text' => $context."\n\nUser request: ".$prompt],
-                        ],
-                    ],
+                'systemInstruction' => [
+                    'parts' => [
+                        ['text' => $context]
+                    ]
                 ],
+                'contents' => $contents,
                 'generationConfig' => [
                     'temperature' => 0.55,
                     'maxOutputTokens' => 260,

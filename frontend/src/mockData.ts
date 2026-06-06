@@ -243,7 +243,7 @@ export const candidates: CandidateProfile[] = [
     statusLabel: "Pitch ready",
     accent: "#f59e0b",
     online: false,
-    mutualInterest: false
+    mutualInterest: true
   },
   {
     id: "dimas-wicaksono",
@@ -282,7 +282,7 @@ export const candidates: CandidateProfile[] = [
     statusLabel: "Limited slots",
     accent: "#10b981",
     online: false,
-    mutualInterest: false
+    mutualInterest: true
   },
   {
     id: "satria-nugraha",
@@ -321,7 +321,7 @@ export const candidates: CandidateProfile[] = [
     statusLabel: "Lab ready",
     accent: "#8b5cf6",
     online: true,
-    mutualInterest: false
+    mutualInterest: true
   }
 ];
 

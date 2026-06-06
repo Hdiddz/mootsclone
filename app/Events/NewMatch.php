@@ -4,10 +4,10 @@ namespace App\Events;
 
 use App\Models\UserMatch;
 use Illuminate\Broadcasting\PrivateChannel;
-use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
+use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Queue\SerializesModels;
 
-class NewMatch implements ShouldBroadcast
+class NewMatch implements ShouldBroadcastNow
 {
     use SerializesModels;
 
