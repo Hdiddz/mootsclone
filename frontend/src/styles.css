@@ -6906,6 +6906,14 @@ img.avatar {
   border-radius: 12px;
   padding: 10px;
   background: var(--surface);
+  cursor: pointer;
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+}
+
+.ai-result-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.06);
+  border-color: var(--primary);
 }
 
 .ai-result-card span,
@@ -7649,7 +7657,7 @@ body {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 16px;
-  padding: 24px;
+  padding: 16px 20px;
   width: min(400px, calc(100vw - 32px));
   max-height: calc(100dvh - 32px);
   overflow: hidden;
@@ -7660,7 +7668,7 @@ body {
 }
 
 .crop-modal-content h3 {
-  margin: 0 0 16px;
+  margin: 0 0 10px;
   font-size: 1.15rem;
   font-weight: 800;
   text-align: center;
@@ -7670,7 +7678,7 @@ body {
 .crop-modal-actions {
   display: flex;
   gap: 12px;
-  margin-top: 20px;
+  margin-top: 10px;
 }
 
 @keyframes modalFadeIn {

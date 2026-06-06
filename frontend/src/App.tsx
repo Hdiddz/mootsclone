@@ -42,7 +42,9 @@ import {
   Moon,
   Sun,
   Upload,
-  Crop
+  Crop,
+  ZoomIn,
+  ZoomOut
 } from "lucide-react";
 import {
   createContext,
@@ -3284,6 +3286,7 @@ function AiAssistantBubble({ isOpen, onToggle }: { isOpen: boolean; onToggle: (o
   const [loading, setLoading] = useState(false);
   const [history, setHistory] = useState<{role: string, message: string}[]>([]);
   const [results, setResults] = useState<CandidateProfile[]>([]);
+  const [detailProfile, setDetailProfile] = useState<CandidateProfile | null>(null);
 
   const renderMessage = (text: string) => {
     const parts = text.split(/(\*\*.*?\*\*|\*.*?\*)/g);
@@ -3342,12 +3345,17 @@ function AiAssistantBubble({ isOpen, onToggle }: { isOpen: boolean; onToggle: (o
     setHistory(prev => [...prev, { role: "user", message: prompt }]);
     setResults(findCandidatesForQuery(prompt).slice(0, 3));
 
+    const allProfiles = candidateLookup.size > 0 ? Array.from(candidateLookup.values()) : candidates;
     const siteContext = `
 You are Mutualizm AI, a website assistant for Mutualizm.
 Your job is not to interrupt chats. Help the user search for collaborators by skill, role, program, availability, and project goal.
 Reply in ${language === "id" ? "Indonesian" : "English"}.
 Available demo candidates:
-${candidates.map((candidate) => `- ${candidate.name}: ${candidate.role}, main skill ${candidate.mainSkill}, skills ${candidate.skills.map((skillItem) => skillItem.name).join(", ")}, goals ${candidate.collaborationGoals.join(", ")}, availability ${candidate.availabilityDetail}`).join("\n")}
+${allProfiles.map((candidate) => {
+  const skillsStr = (candidate.skills || []).map((skillItem: any) => typeof skillItem === 'string' ? skillItem : (skillItem?.name || "")).filter(Boolean).join(", ");
+  const goalsStr = (candidate.collaborationGoals || []).map((g: any) => typeof g === 'string' ? g : (g?.name || "")).filter(Boolean).join(", ");
+  return `- ${candidate.name}: ${candidate.role}, main skill ${candidate.mainSkill}, skills ${skillsStr}, goals ${goalsStr}, availability ${candidate.availabilityDetail || candidate.availability || ""}`;
+}).join("\n")}
 `;
 
     try {
@@ -3433,7 +3441,11 @@ ${candidates.map((candidate) => `- ${candidate.name}: ${candidate.role}, main sk
                 <strong>{t.aiMatches}</strong>
                 {results.length ? (
                   results.map((candidate) => (
-                    <article className="ai-result-card" key={candidate.id}>
+                    <article 
+                      className="ai-result-card" 
+                      key={candidate.id}
+                      onClick={() => setDetailProfile(candidate)}
+                    >
                       <Avatar profile={candidate} size="xs" />
                       <span>
                         <b>{candidate.name}</b>
@@ -3475,6 +3487,10 @@ ${candidates.map((candidate) => `- ${candidate.name}: ${candidate.role}, main sk
       >
         <Sparkles size={23} aria-hidden="true" />
       </button>
+
+      {detailProfile ? (
+        <CandidateDetailSheet profile={detailProfile} onClose={() => setDetailProfile(null)} />
+      ) : null}
     </div>
   );
 }
@@ -3673,8 +3689,8 @@ function DiscoverPage() {
 
   // Auto-refresh the deck when the user runs out of cards
   useEffect(() => {
-    const hasNonMatchSwipes = passedIds.length > 0 || savedIds.length > 0 || interestedIds.some(id => !matches.some(m => m.candidateId === id));
-    if (dbCandidates.length === 0 && hasNonMatchSwipes && !showSwiped) {
+    const hasSwipes = passedIds.length > 0 || savedIds.length > 0 || interestedIds.length > 0;
+    if (dbCandidates.length === 0 && hasSwipes && !showSwiped) {
       if (isRefreshingRef.current) return;
       isRefreshingRef.current = true;
 
@@ -3692,7 +3708,7 @@ function DiscoverPage() {
     } else {
       isRefreshingRef.current = false;
     }
-  }, [dbCandidates.length, passedIds.length, interestedIds.length, savedIds.length, matches, showSwiped, resetDeck, addToast, language]);
+  }, [dbCandidates.length, passedIds.length, interestedIds.length, savedIds.length, showSwiped, resetDeck, addToast, language]);
 
   const getSwipeStatus = (candidateId: string) => {
     if (interestedIds.includes(candidateId)) return "interest";
@@ -4859,10 +4875,29 @@ function SavedPage() {
   );
 }
 
+function findCandidateFromNotification(notification: NotificationItem) {
+  const allProfiles = candidateLookup.size > 0 ? Array.from(candidateLookup.values()) : candidates;
+  const sortedProfiles = [...allProfiles].sort((a, b) => b.name.length - a.name.length);
+  
+  const titleLower = (notification.title || "").toLowerCase();
+  const bodyLower = (notification.body || "").toLowerCase();
+  
+  const found = sortedProfiles.find((profile) => {
+    const nameLower = profile.name.toLowerCase();
+    const firstName = nameLower.split(" ")[0];
+    return titleLower.includes(nameLower) || 
+           bodyLower.includes(nameLower) ||
+           (firstName.length > 2 && (titleLower.includes(firstName) || bodyLower.includes(firstName)));
+  });
+  
+  return found || null;
+}
+
 function NotificationsPage() {
-  const { notifications, markNotificationRead, markAllNotificationsRead } = useSymbio();
+  const { notifications, markNotificationRead, markAllNotificationsRead, language } = useSymbio();
   const unreadCount = notifications.filter((notification) => !notification.read).length;
   const [selectedNotification, setSelectedNotification] = useState<NotificationItem | null>(null);
+  const [detailProfile, setDetailProfile] = useState<CandidateProfile | null>(null);
   const t = useTranslations();
 
   return (
@@ -4923,13 +4958,33 @@ function NotificationsPage() {
             </p>
             <small>{localizeNotification(selectedNotification, t).time}</small>
             <div className="notification-detail-actions">
-              <Button variant="primary" onClick={() => setSelectedNotification(null)}>
+              {selectedNotification.type === "match" && (
+                (() => {
+                  const candidate = findCandidateFromNotification(selectedNotification);
+                  return candidate ? (
+                    <Button 
+                      variant="primary" 
+                      onClick={() => {
+                        setDetailProfile(candidate);
+                        setSelectedNotification(null);
+                      }}
+                    >
+                      {language === "id" ? "Lihat Profil" : "View Profile"}
+                    </Button>
+                  ) : null;
+                })()
+              )}
+              <Button variant="secondary" onClick={() => setSelectedNotification(null)}>
                 {t.close}
               </Button>
             </div>
           </div>
         </div>,
         document.body
+      ) : null}
+
+      {detailProfile ? (
+        <CandidateDetailSheet profile={detailProfile} onClose={() => setDetailProfile(null)} />
       ) : null}
     </div>
   );
@@ -5997,7 +6052,7 @@ function PhotoUploadField({
   const [panX, setPanX] = useState(0);
   const [panY, setPanY] = useState(0);
   const [imgAspectRatio, setImgAspectRatio] = useState(1.0);
-  const [frameDimensions, setFrameDimensions] = useState({ width: 300, height: 375 });
+  const [frameDimensions, setFrameDimensions] = useState({ width: 200, height: 250 });
 
   const containerRef = useRef<HTMLDivElement>(null);
   const dragStart = useRef({ x: 0, y: 0, panX: 0, panY: 0, active: false });
@@ -6124,20 +6179,37 @@ function PhotoUploadField({
     document.addEventListener("mouseup", handleMouseUp);
   };
 
-  const handleWheel = (e: React.WheelEvent) => {
-    e.preventDefault();
-    const zoomIntensity = 0.08;
-    const delta = e.deltaY < 0 ? 1 : -1;
-    const nextScale = Math.max(1.0, Math.min(3.0, scale + delta * zoomIntensity));
-    
-    const { maxPanX, maxPanY } = getPanBounds(nextScale);
-    const clampedX = Math.max(-maxPanX, Math.min(maxPanX, panX));
-    const clampedY = Math.max(-maxPanY, Math.min(maxPanY, panY));
+  useEffect(() => {
+    const element = containerRef.current;
+    if (!element) return;
 
-    setScale(nextScale);
-    setPanX(clampedX);
-    setPanY(clampedY);
-  };
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const zoomIntensity = 0.08;
+      const delta = e.deltaY < 0 ? 1 : -1;
+      
+      setScale((prevScale) => {
+        const nextScale = Math.max(1.0, Math.min(3.0, prevScale + delta * zoomIntensity));
+        
+        setPanX((prevX) => {
+          const wScaled = wRendered * nextScale;
+          const maxPanX = Math.max(0, (wScaled - frameW) / 2);
+          return Math.max(-maxPanX, Math.min(maxPanX, prevX));
+        });
+        
+        setPanY((prevY) => {
+          const hScaled = hRendered * nextScale;
+          const maxPanY = Math.max(0, (hScaled - frameH) / 2);
+          return Math.max(-maxPanY, Math.min(maxPanY, prevY));
+        });
+        
+        return nextScale;
+      });
+    };
+
+    element.addEventListener("wheel", onWheel, { passive: false });
+    return () => element.removeEventListener("wheel", onWheel);
+  }, [wRendered, hRendered, frameW, frameH]);
 
   const handleTouchStart = (e: React.TouchEvent) => {
     e.preventDefault();
@@ -6321,11 +6393,11 @@ function PhotoUploadField({
               className="photo-preview-frame"
               ref={containerRef}
               style={{
-                width: "240px",
-                height: "300px",
+                width: "200px",
+                height: "250px",
                 maxWidth: "100%",
                 maxHeight: "none",
-                margin: "10px auto 20px",
+                margin: "5px auto 10px",
                 position: "relative",
                 overflow: "hidden",
                 cursor: "move",
@@ -6334,7 +6406,6 @@ function PhotoUploadField({
               }}
               onMouseDown={handleMouseDown}
               onTouchStart={handleTouchStart}
-              onWheel={handleWheel}
             >
               <img
                 src={tempPhotoUrl}
@@ -6356,15 +6427,41 @@ function PhotoUploadField({
               />
             </div>
 
-            <div style={{ textAlign: "center", marginBottom: "15px" }}>
-              <small style={{ color: "var(--muted)", fontSize: "0.8rem" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", margin: "10px auto 12px", width: "200px", maxWidth: "100%" }}>
+              <ZoomOut size={16} style={{ color: "var(--muted)" }} />
+              <input
+                type="range"
+                min="1.0"
+                max="3.0"
+                step="0.05"
+                value={scale}
+                onChange={(e) => {
+                  const nextScale = parseFloat(e.target.value);
+                  const { maxPanX, maxPanY } = getPanBounds(nextScale);
+                  setScale(nextScale);
+                  setPanX((prevX) => Math.max(-maxPanX, Math.min(maxPanX, prevX)));
+                  setPanY((prevY) => Math.max(-maxPanY, Math.min(maxPanY, prevY)));
+                }}
+                style={{
+                  flex: 1,
+                  accentColor: "var(--primary)",
+                  cursor: "pointer",
+                  height: "4px",
+                  borderRadius: "2px"
+                }}
+              />
+              <ZoomIn size={16} style={{ color: "var(--muted)" }} />
+            </div>
+
+            <div style={{ textAlign: "center", marginBottom: "10px" }}>
+              <small style={{ color: "var(--muted)", fontSize: "0.78rem" }}>
                 {t.language === "id" 
-                  ? "Geser foto untuk menyesuaikan posisi. Gunakan scroll mouse (desktop) atau pinch gesture (mobile) untuk zoom." 
-                  : "Drag photo to pan. Use mouse scroll (desktop) or pinch gestures (mobile) to zoom."}
+                  ? "Geser foto untuk memindahkan. Gunakan slider, scroll mouse, atau pinch untuk zoom." 
+                  : "Drag photo to pan. Use slider, mouse scroll, or pinch gesture to zoom."}
               </small>
             </div>
 
-            <div style={{ display: "flex", justifyContent: "center", marginBottom: "15px" }}>
+            <div style={{ display: "flex", justifyContent: "center", marginBottom: "10px" }}>
               <button
                 type="button"
                 onClick={() => {
@@ -6373,14 +6470,14 @@ function PhotoUploadField({
                   setPanY(0);
                 }}
                 style={{
-                  padding: "6px 12px",
+                  padding: "5px 12px",
                   borderRadius: "20px",
                   border: "1px solid var(--border)",
                   background: "var(--surface-container-low)",
                   color: "var(--ink)",
                   fontWeight: 700,
                   cursor: "pointer",
-                  fontSize: "0.8rem"
+                  fontSize: "0.78rem"
                 }}
               >
                 {t.language === "id" ? "Reset Posisi" : "Reset Position"}
