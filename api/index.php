@@ -1,5 +1,9 @@
 <?php
 
+use Illuminate\Contracts\Console\Kernel as ConsoleKernel;
+use Illuminate\Foundation\Application;
+use Illuminate\Http\Request;
+
 $defaults = [
     'LOG_CHANNEL' => 'stderr',
     'LOG_LEVEL' => 'error',
@@ -28,12 +32,79 @@ function mutualizmUseLaravelPath(string $path): void
     $_SERVER['PHP_SELF'] = '/index.php';
 }
 
+function mutualizmSetEnv(string $key, string $value): void
+{
+    putenv("{$key}={$value}");
+    $_ENV[$key] = $value;
+    $_SERVER[$key] = $value;
+}
+
+function mutualizmHasEnv(string $key): bool
+{
+    $value = getenv($key);
+
+    return $value !== false && trim((string) $value) !== '';
+}
+
+function mutualizmPrepareServerlessDatabase(Application $app): void
+{
+    if (getenv('MUTUALIZM_SERVERLESS_SQLITE') !== '1') {
+        return;
+    }
+
+    $database = (string) getenv('DB_DATABASE');
+    $directory = dirname($database);
+
+    if (! is_dir($directory)) {
+        mkdir($directory, 0755, true);
+    }
+
+    $freshDatabase = ! file_exists($database);
+    if ($freshDatabase) {
+        touch($database);
+    }
+
+    $lock = fopen('/tmp/mutualizm-database.lock', 'c');
+    if ($lock === false) {
+        return;
+    }
+
+    try {
+        flock($lock, LOCK_EX);
+
+        $migratedFlag = '/tmp/mutualizm-database-ready.flag';
+        if ($freshDatabase || ! file_exists($migratedFlag)) {
+            $kernel = $app->make(ConsoleKernel::class);
+            $kernel->call('migrate', [
+                '--force' => true,
+                '--no-interaction' => true,
+            ]);
+
+            if ($freshDatabase) {
+                $kernel->call('db:seed', [
+                    '--force' => true,
+                    '--no-interaction' => true,
+                ]);
+            }
+
+            file_put_contents($migratedFlag, (string) time());
+        }
+    } finally {
+        flock($lock, LOCK_UN);
+        fclose($lock);
+    }
+}
+
 foreach ($defaults as $key => $value) {
     if (getenv($key) === false) {
-        putenv("{$key}={$value}");
-        $_ENV[$key] = $value;
-        $_SERVER[$key] = $value;
+        mutualizmSetEnv($key, $value);
     }
+}
+
+if (! mutualizmHasEnv('DATABASE_URL') && ! mutualizmHasEnv('DB_URL') && ! mutualizmHasEnv('DB_HOST')) {
+    mutualizmSetEnv('DB_CONNECTION', 'sqlite');
+    mutualizmSetEnv('DB_DATABASE', '/tmp/mutualizm.sqlite');
+    mutualizmSetEnv('MUTUALIZM_SERVERLESS_SQLITE', '1');
 }
 
 if (isset($_GET['__laravel_path'])) {
@@ -75,9 +146,7 @@ if ($appKey === false || trim((string) $appKey) === '') {
 
     $fallbackKey = 'base64:'.base64_encode(hash('sha256', 'mutualizm:'.$seed, true));
 
-    putenv("APP_KEY={$fallbackKey}");
-    $_ENV['APP_KEY'] = $fallbackKey;
-    $_SERVER['APP_KEY'] = $fallbackKey;
+    mutualizmSetEnv('APP_KEY', $fallbackKey);
 }
 
 foreach ([
@@ -92,4 +161,17 @@ foreach ([
     }
 }
 
-require __DIR__.'/../public/index.php';
+define('LARAVEL_START', microtime(true));
+
+if (file_exists($maintenance = __DIR__.'/../storage/framework/maintenance.php')) {
+    require $maintenance;
+}
+
+require __DIR__.'/../vendor/autoload.php';
+
+/** @var Application $app */
+$app = require_once __DIR__.'/../bootstrap/app.php';
+
+mutualizmPrepareServerlessDatabase($app);
+
+$app->handleRequest(Request::capture());
