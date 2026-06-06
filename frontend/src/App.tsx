@@ -147,6 +147,7 @@ type SymbioStore = {
   setTheme: Dispatch<SetStateAction<"light" | "dark">>;
   dbCandidates: CandidateProfile[];
   setDbCandidates: Dispatch<SetStateAction<CandidateProfile[]>>;
+  fetchDiscoverAndMatches: (userId: string) => Promise<any>;
 };
 
 const defaultFilters: FilterValues = {
@@ -2166,7 +2167,8 @@ function App() {
       theme,
       setTheme,
       dbCandidates,
-      setDbCandidates
+      setDbCandidates,
+      fetchDiscoverAndMatches
     }),
     [
       actOnCandidate,
@@ -2203,7 +2205,8 @@ function App() {
       theme,
       setTheme,
       dbCandidates,
-      setDbCandidates
+      setDbCandidates,
+      fetchDiscoverAndMatches
     ]
   );
 
@@ -3894,7 +3897,7 @@ function SwipeActionButtons({
 }
 
 function OnboardingPage() {
-  const { profile, setProfile, addToast } = useSymbio();
+  const { profile, setProfile, addToast, user, fetchDiscoverAndMatches } = useSymbio();
   const t = useTranslations();
   const navigate = useNavigate();
   const [draft, setDraft] = useState<CandidateProfile>(() => ({
@@ -3937,6 +3940,9 @@ function OnboardingPage() {
       setSaving(true);
       try {
         await setProfile({ ...draft, id: "me", mutualInterest: false });
+        if (user?.id) {
+          await fetchDiscoverAndMatches(user.id);
+        }
         addToast(t.profileReadyTitle, t.profileReadyBody);
         window.sessionStorage.setItem(
           "mutualizm.signupSuggestion",
@@ -6677,18 +6683,25 @@ function findBestSuggestion(suggestion: { mainSkill?: string; skills?: string[];
       .filter(Boolean)
       .map((skill) => String(skill).toLowerCase())
   );
-  const role = suggestion.role?.toLowerCase() ?? "";
+  const role = suggestion?.role?.toLowerCase() ?? "";
 
   const allProfiles = candidateLookup.size > 0 ? Array.from(candidateLookup.values()) : candidates;
 
   const ranked = allProfiles
     .map((candidate) => {
-      const skillScore = candidate.skills.reduce(
-        (score, skillItem) => score + (normalizedSkills.has(skillItem.name.toLowerCase()) ? 3 : 0),
+      if (!candidate) return { candidate, score: 0 };
+      const skillsArray = Array.isArray(candidate.skills) ? candidate.skills : [];
+      const skillScore = skillsArray.reduce(
+        (score, skillItem) => {
+          const name = skillItem?.name ? String(skillItem.name).toLowerCase() : "";
+          return score + (normalizedSkills.has(name) ? 3 : 0);
+        },
         0
       );
-      const mainSkillScore = normalizedSkills.has(candidate.mainSkill.toLowerCase()) ? 5 : 0;
-      const roleScore = role && candidate.role.toLowerCase().includes(role) ? 2 : 0;
+      const mainSkillStr = candidate.mainSkill ? String(candidate.mainSkill).toLowerCase() : "";
+      const mainSkillScore = normalizedSkills.has(mainSkillStr) ? 5 : 0;
+      const roleStr = candidate.role ? String(candidate.role).toLowerCase() : "";
+      const roleScore = role && roleStr.includes(role) ? 2 : 0;
       return { candidate, score: skillScore + mainSkillScore + roleScore };
     })
     .sort((left, right) => right.score - left.score);
@@ -6704,33 +6717,36 @@ function findCandidatesForQuery(query: string) {
 
   return allProfiles
     .map((candidate) => {
+      if (!candidate) return { candidate, score: 0 };
       let score = 0;
-      const role = candidate.role.toLowerCase();
-      const mainSkill = candidate.mainSkill.toLowerCase();
-      const summary = candidate.profileSummary.toLowerCase();
+      const role = candidate.role ? String(candidate.role).toLowerCase() : "";
+      const mainSkill = candidate.mainSkill ? String(candidate.mainSkill).toLowerCase() : "";
+      const summary = candidate.profileSummary ? String(candidate.profileSummary).toLowerCase() : "";
 
-      if (normalized.includes(mainSkill)) {
+      if (mainSkill && normalized.includes(mainSkill)) {
         score += 8;
       }
-      if (normalized.includes(role)) {
+      if (role && normalized.includes(role)) {
         score += 5;
       }
 
-      candidate.skills.forEach((skillItem) => {
-        const skillName = skillItem.name.toLowerCase();
-        if (normalized.includes(skillName)) {
-          score += candidate.mainSkill === skillItem.name ? 7 : 4;
+      const skillsArray = Array.isArray(candidate.skills) ? candidate.skills : [];
+      skillsArray.forEach((skillItem) => {
+        const skillName = skillItem?.name ? String(skillItem.name).toLowerCase() : "";
+        if (skillName && normalized.includes(skillName)) {
+          score += candidate.mainSkill === skillItem?.name ? 7 : 4;
         }
       });
 
-      candidate.collaborationGoals.forEach((goal) => {
-        if (normalized.includes(goal.toLowerCase())) {
+      const collaborationGoals = Array.isArray(candidate.collaborationGoals) ? candidate.collaborationGoals : [];
+      collaborationGoals.forEach((goal) => {
+        if (goal && normalized.includes(String(goal).toLowerCase())) {
           score += 2;
         }
       });
 
       tokens.forEach((token) => {
-        if (role.includes(token) || mainSkill.includes(token) || summary.includes(token)) {
+        if ((role && role.includes(token)) || (mainSkill && mainSkill.includes(token)) || (summary && summary.includes(token))) {
           score += 1;
         }
       });
@@ -6743,21 +6759,26 @@ function findCandidatesForQuery(query: string) {
 }
 
 function applyFilters(profiles: CandidateProfile[], filters: FilterValues) {
-  return profiles.filter((profile) => {
+  const safeProfiles = Array.isArray(profiles) ? profiles : [];
+  return safeProfiles.filter((profile) => {
+    if (!profile) return false;
+    const skills = Array.isArray(profile.skills) ? profile.skills : [];
+    const collaborationGoals = Array.isArray(profile.collaborationGoals) ? profile.collaborationGoals : [];
+
     const matchesCategory =
       !filters.skillCategory ||
-      profile.skills.some((skillItem) => skillItem.category === filters.skillCategory);
+      skills.some((skillItem) => skillItem && skillItem.category === filters.skillCategory);
     const matchesSkill =
       !filters.specificSkill ||
       profile.mainSkill === filters.specificSkill ||
-      profile.skills.some((skillItem) => skillItem.name === filters.specificSkill);
+      skills.some((skillItem) => skillItem && skillItem.name === filters.specificSkill);
     const matchesRole = !filters.role || profile.role === filters.role;
     const matchesAvailability = !filters.availability || profile.availability === filters.availability;
     const matchesGoal =
-      !filters.collaborationGoal || profile.collaborationGoals.includes(filters.collaborationGoal);
+      !filters.collaborationGoal || collaborationGoals.includes(filters.collaborationGoal);
     const matchesProgram = !filters.program || profile.program === filters.program;
     const matchesLevel =
-      !filters.level || profile.skills.some((skillItem) => skillItem.level === filters.level);
+      !filters.level || skills.some((skillItem) => skillItem && skillItem.level === filters.level);
 
     return (
       matchesCategory &&
