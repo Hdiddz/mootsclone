@@ -1034,16 +1034,30 @@ function AuthPage() {
     setLoading(false);
   };
 
-  const handleSSOLogin = (provider: string) => {
-    setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      addToast(
-        t.language === "id" ? "SSO Belum Terhubung" : "SSO Not Connected",
-        t.language === "id" ? `Fitur login menggunakan ${provider} sedang dalam pengembangan.` : `Login using ${provider} is currently under development.`,
-        "info"
-      );
-    }, 600);
+  const handleSSOLogin = async (provider: string) => {
+    if (provider.toLowerCase() === "google") {
+      setLoading(true);
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: window.location.origin
+        }
+      });
+      if (error) {
+        addToast("OAuth Error", error.message, "error");
+        setLoading(false);
+      }
+    } else {
+      setLoading(true);
+      setTimeout(() => {
+        setLoading(false);
+        addToast(
+          t.language === "id" ? "SSO Belum Terhubung" : "SSO Not Connected",
+          t.language === "id" ? `Fitur login menggunakan ${provider} sedang dalam pengembangan.` : `Login using ${provider} is currently under development.`,
+          "info"
+        );
+      }, 600);
+    }
   };
 
   return (
