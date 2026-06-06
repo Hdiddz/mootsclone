@@ -1281,7 +1281,7 @@ function App() {
   const [user, setUser] = useState<{ id: string; name: string; email: string; role?: string } | null>(null);
   const isAuthenticated = Boolean(user);
 
-  const loadUserProfile = async (userId: string) => {
+  const loadUserProfile = useCallback(async (userId: string) => {
     const { data, error } = await supabase
       .from("profiles")
       .select("*")
@@ -1311,15 +1311,16 @@ function App() {
         avatarUrl: data.avatar_url || undefined,
         avatarPosition: data.avatar_position || undefined,
         statusLabel: data.status_label || undefined,
-        online: data.online || false
+        online: data.online || false,
+        mutualInterest: data.mutual_interest !== false
       };
       setProfileState(formattedProfile);
       return formattedProfile;
     }
     return null;
-  };
+  }, []);
 
-  const fetchAllProfiles = async () => {
+  const fetchAllProfiles = useCallback(async () => {
     const { data, error } = await supabase
       .from("profiles")
       .select("*");
@@ -1347,21 +1348,22 @@ function App() {
         avatarUrl: row.avatar_url || undefined,
         avatarPosition: row.avatar_position || undefined,
         statusLabel: row.status_label || undefined,
-        online: row.online || false
+        online: row.online || false,
+        mutualInterest: row.mutual_interest !== false
       }));
 
       allLoaded.forEach((c) => candidateLookup.set(c.id, c));
       return allLoaded;
     }
     return [];
-  };
+  }, []);
 
-  const fetchDiscoverAndMatches = async (userId: string) => {
+  const fetchDiscoverAndMatches = useCallback(async (userId: string) => {
     const allProfiles = await fetchAllProfiles();
 
     const { data: swipesData } = await supabase
       .from("swipes")
-      .select("swiped_id")
+      .select("swiped_id, action")
       .eq("swiper_id", userId);
 
     const swipedIds = swipesData?.map((s: any) => s.swiped_id) || [];
@@ -1369,6 +1371,14 @@ function App() {
 
     const loadedCandidates = allProfiles.filter((p) => !swipedIds.includes(p.id));
     setDbCandidates(loadedCandidates);
+
+    const passed = swipesData?.filter((s: any) => s.action === "pass").map((s: any) => s.swiped_id) || [];
+    const interested = swipesData?.filter((s: any) => s.action === "interest").map((s: any) => s.swiped_id) || [];
+    const saved = swipesData?.filter((s: any) => s.action === "save").map((s: any) => s.swiped_id) || [];
+
+    setPassedIds(passed);
+    setInterestedIds(interested);
+    setSavedIds(saved);
 
     const { data: matchesData } = await supabase
       .from("matches")
@@ -1451,7 +1461,7 @@ function App() {
         }))
       );
     }
-  };
+  }, [profile?.skills, setPassedIds, setInterestedIds, setSavedIds, setDbCandidates, setMatches, setChats, setNotifications, fetchAllProfiles]);
 
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
@@ -1515,44 +1525,49 @@ function App() {
 
   const setProfile = useCallback(
     async (updater: SetStateAction<CandidateProfile>) => {
-      setProfileState((current) => {
-        const next = typeof updater === "function" ? updater(current) : updater;
-        const targetUserId = user?.id || next.id;
-        
-        if (targetUserId && targetUserId !== "me") {
-          supabase
-            .from("profiles")
-            .update({
-              name: next.name,
-              campus: next.campus,
-              program: next.program,
-              role: next.role,
-              main_skill: next.mainSkill,
-              skills: next.skills,
-              profile_summary: next.profileSummary,
-              experience_summary: next.experienceSummary,
-              experiences: next.experiences,
-              looking_for: next.lookingFor,
-              availability: next.availability,
-              availability_detail: next.availabilityDetail,
-              collaboration_goals: next.collaborationGoals,
-              portfolio_links: next.portfolioLinks,
-              preferred_role: next.preferredRole,
-              suggested_message: next.suggestedMessage,
-              accent: next.accent,
-              avatar_url: next.avatarUrl,
-              avatar_position: next.avatarPosition,
-              status_label: next.statusLabel,
-              online: next.online
-            })
-            .eq("id", targetUserId)
-            .then(({ error }) => {
-              if (error) {
-                console.error("Error updating profile in Supabase:", error);
-              }
-            });
-        }
-        return { ...next, id: targetUserId };
+      return new Promise<void>((resolve) => {
+        setProfileState((current) => {
+          const next = typeof updater === "function" ? updater(current) : updater;
+          const targetUserId = user?.id || next.id;
+          
+          if (targetUserId && targetUserId !== "me") {
+            supabase
+              .from("profiles")
+              .update({
+                name: next.name,
+                campus: next.campus,
+                program: next.program,
+                role: next.role,
+                main_skill: next.mainSkill,
+                skills: next.skills,
+                profile_summary: next.profileSummary,
+                experience_summary: next.experienceSummary,
+                experiences: next.experiences,
+                looking_for: next.lookingFor,
+                availability: next.availability,
+                availability_detail: next.availabilityDetail,
+                collaboration_goals: next.collaborationGoals,
+                portfolio_links: next.portfolioLinks,
+                preferred_role: next.preferredRole,
+                suggested_message: next.suggestedMessage,
+                accent: next.accent,
+                avatar_url: next.avatarUrl,
+                avatar_position: next.avatarPosition,
+                status_label: next.statusLabel,
+                online: next.online
+              })
+              .eq("id", targetUserId)
+              .then(({ error }) => {
+                if (error) {
+                  console.error("Error updating profile in Supabase:", error);
+                }
+                resolve();
+              });
+          } else {
+            resolve();
+          }
+          return { ...next, id: targetUserId };
+        });
       });
     },
     [user?.id]
@@ -1714,6 +1729,17 @@ function App() {
 
       if (user?.id) {
         try {
+          if (action === "interest" && candidate.mutualInterest) {
+            // First, insert a matching swipe from the candidate to the user to trigger the mutual match trigger in postgres!
+            await supabase
+              .from("swipes")
+              .upsert({
+                swiper_id: candidate.id,
+                swiped_id: user.id,
+                action: "interest"
+              });
+          }
+
           const { error } = await supabase
             .from("swipes")
             .upsert({
@@ -1722,12 +1748,15 @@ function App() {
               action: action
             });
           if (error) throw error;
+
+          // Refresh state from database
+          await fetchDiscoverAndMatches(user.id);
         } catch (err) {
           console.error("Error saving swipe:", err);
         }
       }
     },
-    [user?.id, setPassedIds, setSavedIds, setInterestedIds, setPreviousActions]
+    [user?.id, setPassedIds, setSavedIds, setInterestedIds, setPreviousActions, fetchDiscoverAndMatches]
   );
 
   const rewindLast = useCallback(async () => {
@@ -1783,7 +1812,7 @@ function App() {
     } catch (err) {
       console.error("Error resetting deck:", err);
     }
-  }, [user?.id, setPassedIds, setInterestedIds, setSavedIds, setPreviousActions]);
+  }, [user?.id, setPassedIds, setInterestedIds, setSavedIds, setPreviousActions, fetchDiscoverAndMatches]);
 
   const clearMatches = useCallback(async () => {
     if (!user?.id) return;
@@ -1840,11 +1869,12 @@ function App() {
           .eq("swiped_id", candidateId)
           .eq("action", "save");
         if (error) throw error;
+        await fetchDiscoverAndMatches(user.id);
       } catch (err) {
         console.error("Error removing saved candidate:", err);
       }
     },
-    [user?.id, setSavedIds]
+    [user?.id, setSavedIds, fetchDiscoverAndMatches]
   );
 
   const clearFilters = useCallback(() => {
@@ -3558,14 +3588,18 @@ function DiscoverPage() {
 
       let createsMatch = false;
       if (action === "interest") {
-        const { data } = await supabase
-          .from("swipes")
-          .select("id")
-          .eq("swiper_id", current.id)
-          .eq("swiped_id", user.id)
-          .eq("action", "interest");
-        
-        createsMatch = !!(data && data.length > 0);
+        if (current.mutualInterest) {
+          createsMatch = true;
+        } else {
+          const { data } = await supabase
+            .from("swipes")
+            .select("id")
+            .eq("swiper_id", current.id)
+            .eq("swiped_id", user.id)
+            .eq("action", "interest");
+          
+          createsMatch = !!(data && data.length > 0);
+        }
       }
 
       actOnCandidate(current, action, createsMatch);
@@ -3767,18 +3801,14 @@ function DiscoverPage() {
             }
             body={
               filteredProfiles.length === 0
-                ? (language === "id" ? "Coba hapus filter atau pilih kategori keahlian yang lebih luas." : "Try clearing a filter or selecting a broader skill category.")
+                ? (language === "id" ? "Coba muat ulang deck untuk melihat kembali semua kartu." : "Try reloading the deck to see all candidate cards again.")
                 : (language === "id" ? "Anda telah menelusuri semua kartu. Ulangi kembali untuk menampilkan semua pengguna." : "You have gone through all candidate cards. Refresh to see them again.")
             }
             action={
-              filteredProfiles.length === 0 ? (
-                <ClearFiltersButton />
-              ) : (
-                <Button variant="primary" onClick={resetDeck}>
-                  <RefreshCw size={18} />
-                  {language === "id" ? "Ulangi Deck" : "Refresh Deck"}
-                </Button>
-              )
+              <Button variant="primary" onClick={resetDeck}>
+                <RefreshCw size={18} />
+                {language === "id" ? "Ulangi Deck" : "Refresh Deck"}
+              </Button>
             }
           />
         )}
@@ -3894,7 +3924,9 @@ function OnboardingPage() {
   ];
   const errors = validateOnboardingStep(step, draft, t);
 
-  const goNext = () => {
+  const [saving, setSaving] = useState(false);
+
+  const goNext = async () => {
     if (errors.length) {
       setTouched(true);
       return;
@@ -3902,17 +3934,24 @@ function OnboardingPage() {
 
     setTouched(false);
     if (step === steps.length - 1) {
-      setProfile({ ...draft, id: "me", mutualInterest: false });
-      addToast(t.profileReadyTitle, t.profileReadyBody);
-      window.sessionStorage.setItem(
-        "mutualizm.signupSuggestion",
-        JSON.stringify({
-          mainSkill: draft.mainSkill,
-          skills: draft.skills.map((skill) => skill.name),
-          role: draft.role
-        })
-      );
-      navigate("/discover");
+      setSaving(true);
+      try {
+        await setProfile({ ...draft, id: "me", mutualInterest: false });
+        addToast(t.profileReadyTitle, t.profileReadyBody);
+        window.sessionStorage.setItem(
+          "mutualizm.signupSuggestion",
+          JSON.stringify({
+            mainSkill: draft.mainSkill,
+            skills: (draft.skills || []).map((skill) => skill.name),
+            role: draft.role
+          })
+        );
+        navigate("/discover");
+      } catch (err) {
+        console.error("Error saving profile during onboarding:", err);
+      } finally {
+        setSaving(false);
+      }
       return;
     }
     setStep((current) => current + 1);
@@ -3949,13 +3988,13 @@ function OnboardingPage() {
               </div>
             ) : null}
             <div className="form-actions">
-              <Button variant="secondary" onClick={goBack} disabled={step === 0}>
+              <Button variant="secondary" onClick={goBack} disabled={step === 0 || saving}>
                 <ArrowLeft size={18} aria-hidden="true" />
                 {t.back}
               </Button>
-              <Button variant="primary" onClick={goNext}>
-                {step === steps.length - 1 ? t.enterDiscover : t.continue}
-                <ArrowRight size={18} aria-hidden="true" />
+              <Button variant="primary" onClick={goNext} disabled={saving}>
+                {saving ? "..." : (step === steps.length - 1 ? t.enterDiscover : t.continue)}
+                {!saving && <ArrowRight size={18} aria-hidden="true" />}
               </Button>
             </div>
           </div>
@@ -4136,7 +4175,7 @@ function OnboardingStep({
         onChange={(value) => update({ profileSummary: value })}
         minRows={5}
         maxLength={180}
-        hint={`${draft.profileSummary.length}/180 ${t.profileSummaryHint}.`}
+        hint={`${(draft.profileSummary || "").length}/180 ${t.profileSummaryHint}.`}
         placeholder={t.profileSummaryPlaceholder}
       />
     );
@@ -4150,7 +4189,7 @@ function OnboardingStep({
         onChange={(value) => update({ experienceSummary: value })}
         minRows={5}
         maxLength={240}
-        hint={`${draft.experienceSummary.length}/240 ${t.experienceSummaryHint}`}
+        hint={`${(draft.experienceSummary || "").length}/240 ${t.experienceSummaryHint}`}
         placeholder={t.experienceSummaryPlaceholder}
       />
     );
@@ -6763,14 +6802,14 @@ function ensureSkillSelected(skills: Skill[], skillName: string) {
 function validateOnboardingStep(step: number, draft: CandidateProfile, t: TranslationSet) {
   const errors: string[] = [];
 
-  if (step === 0 && !draft.name.trim()) {
+  if (step === 0 && !(draft.name || "").trim()) {
     errors.push(t.fullNameRequiredValidation);
   }
   if (step === 1) {
-    if (!draft.campus.trim()) {
+    if (!(draft.campus || "").trim()) {
       errors.push(t.campusRequired);
     }
-    if (!draft.program.trim()) {
+    if (!(draft.program || "").trim()) {
       errors.push(t.programRequired);
     }
   }
@@ -6781,35 +6820,35 @@ function validateOnboardingStep(step: number, draft: CandidateProfile, t: Transl
     if (!draft.mainSkill) {
       errors.push(t.mainSkillRequired);
     }
-    if (!draft.collaborationGoals.length) {
+    if (!(draft.collaborationGoals || []).length) {
       errors.push(t.collaborationTypeRequired);
     }
   }
-  if (step === 3 && draft.skills.length < 3) {
+  if (step === 3 && (draft.skills || []).length < 3) {
     errors.push(t.skillRequired);
   }
   if (step === 4) {
-    if (draft.profileSummary.length > 180) {
+    if ((draft.profileSummary || "").length > 180) {
       errors.push(t.profileSummaryLimit);
     }
   }
-  if (step === 5 && draft.experienceSummary.length > 240) {
+  if (step === 5 && (draft.experienceSummary || "").length > 240) {
     errors.push(t.experienceSummaryLimit);
   }
   if (step === 6) {
-    const experience = draft.experiences[0];
-    if (!experience?.title.trim()) {
+    const experience = (draft.experiences || [])[0];
+    if (!(experience?.title || "").trim()) {
       errors.push(t.experienceTitleRequired);
     }
-    if (!experience?.organization.trim()) {
+    if (!(experience?.organization || "").trim()) {
       errors.push(t.projectRequired);
     }
-    if (!experience?.description.trim()) {
+    if (!(experience?.description || "").trim()) {
       errors.push(t.experienceDescriptionRequired);
     }
   }
   if (step === 7) {
-    const badLink = draft.portfolioLinks.find((link) => link.url && !isUrlLike(link.url));
+    const badLink = (draft.portfolioLinks || []).find((link) => link.url && !isUrlLike(link.url));
     if (badLink) {
       errors.push(`${badLink.label || "Portfolio"} ${t.portfolioUrlInvalid}`);
     }
@@ -6817,7 +6856,7 @@ function validateOnboardingStep(step: number, draft: CandidateProfile, t: Transl
   if (step === 8 && !draft.availability) {
     errors.push(t.availabilityRequired);
   }
-  if (step === 9 && !draft.lookingFor.length) {
+  if (step === 9 && !(draft.lookingFor || []).length) {
     errors.push(t.lookingForRequired);
   }
 
