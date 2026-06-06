@@ -19,6 +19,9 @@ Route::post('/login', [AuthController::class, 'login']);
 Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
 Route::post('/reset-password', [AuthController::class, 'resetPassword']);
 
+// AI Assistant (public, throttled)
+Route::post('/ai/suggest', [AiAssistantController::class, 'suggest'])->middleware('throttle:20,1');
+
 // Authenticated routes
 Route::middleware('auth:sanctum')->group(function () {
     // Auth
@@ -57,7 +60,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/notifications/read-all', [NotificationController::class, 'markAllRead']);
 
     // AI Assistant
-    Route::post('/ai/suggest', [AiAssistantController::class, 'suggest'])->middleware('throttle:20,1');
     Route::get('/ai/history', [AiAssistantController::class, 'chatHistory']);
     Route::delete('/ai/history', [AiAssistantController::class, 'clearHistory']);
 });

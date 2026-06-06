@@ -16,6 +16,7 @@ class AiAssistantController extends Controller
             'prompt' => ['required', 'string', 'max:1400'],
             'candidate' => ['nullable', 'array'],
             'context' => ['nullable', 'string', 'max:5000'],
+            'history' => ['nullable', 'array'],
         ]);
 
         $prompt = trim($data['prompt']);
@@ -24,19 +25,18 @@ class AiAssistantController extends Controller
         $reply = null;
         $apiError = null;
 
-        // Fetch recent chat history for the user to provide memory/context
+        // Use chat history passed from the frontend for stateless memory/context
         $history = [];
-        if ($user = $request->user()) {
-            $history = AiConversation::where('user_id', $user->id)
-                ->orderBy('created_at', 'desc')
-                ->limit(12)
-                ->get()
-                ->reverse()
-                ->map(fn ($msg) => [
-                    'role' => $msg->role,
-                    'content' => $msg->message,
-                ])
-                ->toArray();
+        if (isset($data['history']) && is_array($data['history'])) {
+            // Map the history array to the format expected by the API clients: ['role' => role, 'content' => message]
+            foreach ($data['history'] as $msg) {
+                if (isset($msg['role']) && (isset($msg['message']) || isset($msg['content']))) {
+                    $history[] = [
+                        'role' => $msg['role'],
+                        'content' => $msg['content'] ?? $msg['message'],
+                    ];
+                }
+            }
         }
 
         // Prioritize Gemini since the user requested it specifically for Vercel deployment
@@ -78,20 +78,6 @@ class AiAssistantController extends Controller
                 $reply = $this->fallbackSuggestion($prompt);
                 $provider = 'local';
             }
-        }
-
-        // Save conversation history if user is authenticated
-        if ($user = $request->user()) {
-            AiConversation::create([
-                'user_id' => $user->id,
-                'role' => 'user',
-                'message' => $prompt,
-            ]);
-            AiConversation::create([
-                'user_id' => $user->id,
-                'role' => 'assistant',
-                'message' => $reply,
-            ]);
         }
 
         return response()->json([

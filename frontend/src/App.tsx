@@ -3230,27 +3230,26 @@ function AiAssistantBubble({ isOpen, onToggle }: { isOpen: boolean; onToggle: (o
     });
   };
 
-  const clearHistory = () => {
+  const clearHistory = async () => {
     setHistory([]);
     setResults([]);
-    fetch("/api/ai/history", {
-      method: "DELETE",
-      headers: { "Authorization": `Bearer ${window.localStorage.getItem("mutualizm.token")}` }
-    }).catch(() => {});
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      await supabase.from("ai_conversations").delete().eq("user_id", user.id);
+    }
   };
 
   useEffect(() => {
     if (isOpen) {
-      fetch("/api/ai/history", {
-        headers: { "Authorization": `Bearer ${window.localStorage.getItem("mutualizm.token")}` }
-      })
-      .then(res => res.json())
-      .then(data => {
-        if (data.conversations) {
-          setHistory(data.conversations);
-        }
-      })
-      .catch(() => {});
+      supabase
+        .from("ai_conversations")
+        .select("role, message")
+        .order("created_at", { ascending: true })
+        .then(({ data, error }) => {
+          if (data && !error) {
+            setHistory(data);
+          }
+        });
     }
   }, [isOpen]);
 
@@ -3269,6 +3268,9 @@ function AiAssistantBubble({ isOpen, onToggle }: { isOpen: boolean; onToggle: (o
     onToggle(true);
     setQuery("");
     setLoading(true);
+
+    const currentHistory = [...history];
+
     setHistory(prev => [...prev, { role: "user", message: prompt }]);
     setResults(findCandidatesForQuery(prompt).slice(0, 3));
 
@@ -3281,23 +3283,31 @@ ${candidates.map((candidate) => `- ${candidate.name}: ${candidate.role}, main sk
 `;
 
     try {
-      const authToken = window.localStorage.getItem("mutualizm.token");
       const request = await fetch("/api/ai/suggest", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
-          ...(authToken ? { "Authorization": `Bearer ${authToken}` } : {})
+          "Content-Type": "application/json"
         },
         body: JSON.stringify({
           prompt,
-          context: siteContext
+          context: siteContext,
+          history: currentHistory
         })
       });
       const data = await request.json();
       if (!request.ok) {
         throw new Error(data.message || "AI request failed.");
       }
-      setHistory(prev => [...prev, { role: "assistant", message: data.message || "" }]);
+      const aiReply = data.message || "";
+      setHistory(prev => [...prev, { role: "assistant", message: aiReply }]);
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await supabase.from("ai_conversations").insert([
+          { user_id: user.id, role: "user", message: prompt },
+          { user_id: user.id, role: "assistant", message: aiReply }
+        ]);
+      }
     } catch {
       setHistory(prev => [...prev, { role: "assistant", message: t.aiError }]);
     } finally {
@@ -3560,7 +3570,8 @@ function DiscoverPage() {
     dbCandidates,
     user,
     language,
-    showSwiped
+    showSwiped,
+    addToast
   } = useSymbio();
   const t = useTranslations();
   const [detailProfile, setDetailProfile] = useState<CandidateProfile | null>(null);
@@ -3590,6 +3601,23 @@ function DiscoverPage() {
   );
   const current = deck[0] ?? null;
   const next = deck[1] ?? null;
+
+  // Auto-refresh the deck when the user runs out of cards
+  useEffect(() => {
+    if (filteredProfiles.length > 0 && deck.length === 0 && !showSwiped) {
+      addToast(
+        language === "id" ? "Semua kartu sudah habis" : "Deck complete",
+        language === "id"
+          ? "Semua kartu sudah habis. Memuat ulang deck secara otomatis..."
+          : "No more candidates. Auto-refreshing the deck...",
+        "info"
+      );
+      const timer = setTimeout(() => {
+        resetDeck();
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [deck.length, filteredProfiles.length, showSwiped, resetDeck, addToast, language]);
 
   const getSwipeStatus = (candidateId: string) => {
     if (interestedIds.includes(candidateId)) return "interest";
