@@ -23,6 +23,17 @@ foreach ($defaults as $key => $value) {
     }
 }
 
+$appKey = getenv('APP_KEY');
+if ($appKey === false || trim((string) $appKey) === '') {
+    http_response_code(503);
+    header('Content-Type: application/json');
+    echo json_encode([
+        'status' => 'error',
+        'message' => 'APP_KEY is missing in the Vercel environment.',
+    ]);
+    return;
+}
+
 foreach ([
     '/tmp/storage/framework/cache/data',
     '/tmp/storage/framework/sessions',
