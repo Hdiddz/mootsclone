@@ -6324,6 +6324,7 @@ function PhotoUploadField({
               <img
                 src={tempPhotoUrl}
                 alt="Temp preview"
+                className="crop-img"
                 style={{
                   position: "absolute",
                   left: `${lRendered}px`,
