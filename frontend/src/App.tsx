@@ -1836,9 +1836,51 @@ function App() {
     }
   }, [user?.id, previousActions, setPassedIds, setSavedIds, setInterestedIds, setPreviousActions, addToast]);
 
-  const resetDeck = useCallback(() => {
-    setShowSwiped(true);
-  }, []);
+  const resetDeck = useCallback(async () => {
+    if (!user?.id) return;
+    
+    try {
+      // Find user IDs of active matches to preserve them
+      const { data: matchesData } = await supabase
+        .from("matches")
+        .select("user_a_id, user_b_id")
+        .or(`user_a_id.eq.${user.id},user_b_id.eq.${user.id}`);
+        
+      const matchedUserIds = matchesData?.map(m => m.user_a_id === user.id ? m.user_b_id : m.user_a_id) || [];
+      
+      // Delete swipes made by user that are NOT matches
+      let query = supabase
+        .from("swipes")
+        .delete()
+        .eq("swiper_id", user.id);
+        
+      if (matchedUserIds.length > 0) {
+        query = query.not("swiped_id", "in", `(${matchedUserIds.join(",")})`);
+      }
+      
+      const { error } = await query;
+      if (error) throw error;
+      
+      // Local state refresh
+      setPreviousActions([]);
+      await fetchDiscoverAndMatches(user.id);
+      
+      addToast(
+        language === "id" ? "Deck Diperbarui" : "Deck Refreshed",
+        language === "id"
+          ? "Deck telah berhasil diperbarui dan siap digunakan kembali."
+          : "Deck has been successfully refreshed.",
+        "success"
+      );
+    } catch (err) {
+      console.error("Error resetting deck:", err);
+      addToast(
+        language === "id" ? "Gagal memperbarui deck" : "Failed to refresh deck",
+        language === "id" ? "Silakan coba lagi beberapa saat lagi." : "Please try again later.",
+        "error"
+      );
+    }
+  }, [user?.id, fetchDiscoverAndMatches, addToast, language]);
 
   const clearMatches = useCallback(async () => {
     if (!user?.id) return;
@@ -3604,7 +3646,8 @@ function DiscoverPage() {
 
   // Auto-refresh the deck when the user runs out of cards
   useEffect(() => {
-    if (filteredProfiles.length > 0 && deck.length === 0 && !showSwiped) {
+    const hasSwipes = passedIds.length > 0 || interestedIds.length > 0 || savedIds.length > 0;
+    if (dbCandidates.length === 0 && hasSwipes && !showSwiped) {
       addToast(
         language === "id" ? "Semua kartu sudah habis" : "Deck complete",
         language === "id"
@@ -3617,7 +3660,7 @@ function DiscoverPage() {
       }, 1500);
       return () => clearTimeout(timer);
     }
-  }, [deck.length, filteredProfiles.length, showSwiped, resetDeck, addToast, language]);
+  }, [dbCandidates.length, passedIds.length, interestedIds.length, savedIds.length, showSwiped, resetDeck, addToast, language]);
 
   const getSwipeStatus = (candidateId: string) => {
     if (interestedIds.includes(candidateId)) return "interest";
