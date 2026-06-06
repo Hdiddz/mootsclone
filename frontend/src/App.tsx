@@ -6294,11 +6294,16 @@ function PhotoUploadField({
             className="button button-secondary"
             style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}
             onClick={() => {
-              setTempPhotoUrl(value);
-              setScale(1.0);
-              setPanX(0);
-              setPanY(0);
-              setIsCroppingModalOpen(true);
+              const img = new Image();
+              img.src = value;
+              img.onload = () => {
+                setImgAspectRatio(img.width / img.height);
+                setTempPhotoUrl(value);
+                setScale(1.0);
+                setPanX(0);
+                setPanY(0);
+                setIsCroppingModalOpen(true);
+              };
             }}
           >
             <Crop size={18} />
@@ -6316,6 +6321,10 @@ function PhotoUploadField({
               className="photo-preview-frame"
               ref={containerRef}
               style={{
+                width: "240px",
+                height: "300px",
+                maxWidth: "100%",
+                maxHeight: "none",
                 margin: "10px auto 20px",
                 position: "relative",
                 overflow: "hidden",
