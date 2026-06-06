@@ -3669,11 +3669,15 @@ function DiscoverPage() {
   );
   const current = deck[0] ?? null;
   const next = deck[1] ?? null;
+  const isRefreshingRef = useRef(false);
 
   // Auto-refresh the deck when the user runs out of cards
   useEffect(() => {
     const hasNonMatchSwipes = passedIds.length > 0 || savedIds.length > 0 || interestedIds.some(id => !matches.some(m => m.candidateId === id));
     if (dbCandidates.length === 0 && hasNonMatchSwipes && !showSwiped) {
+      if (isRefreshingRef.current) return;
+      isRefreshingRef.current = true;
+
       addToast(
         language === "id" ? "Semua kartu sudah habis" : "Deck complete",
         language === "id"
@@ -3685,6 +3689,8 @@ function DiscoverPage() {
         resetDeck();
       }, 1500);
       return () => clearTimeout(timer);
+    } else {
+      isRefreshingRef.current = false;
     }
   }, [dbCandidates.length, passedIds.length, interestedIds.length, savedIds.length, matches, showSwiped, resetDeck, addToast, language]);
 
