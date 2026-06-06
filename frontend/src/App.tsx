@@ -2282,7 +2282,7 @@ function LandingPage() {
             </div>
           )}
         </nav>
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+        <div className="mobile-only" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
           <Button
             variant="ghost"
             onClick={() => setTheme((prev) => (prev === "light" ? "dark" : "light"))}
@@ -3987,6 +3987,10 @@ function OnboardingPage() {
       <header className="onboarding-top">
         <Link to="/" className="top-logo" style={{ position: "static", transform: "none" }}>
           Mutualizm <span>✦</span>
+        </Link>
+        <Link to="/" className="text-link" style={{ display: 'flex', alignItems: 'center', gap: '6px', textDecoration: 'none', fontWeight: 600 }}>
+          <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>logout</span>
+          {t.language === "id" ? "Batal & Keluar" : "Cancel & Exit"}
         </Link>
       </header>
 
