@@ -816,7 +816,7 @@ const translations = {
     suggestedOpener: "Pembuka yang disarankan"
     ,
     skipToDemo: "Lewati ke demo",
-    stepOf: "Langkah",
+    stepOf: "Tahap",
     of: "dari",
     profileReadyTitle: "Profil siap",
     profileReadyBody: "Profil demo Anda sudah disimpan.",
@@ -1040,7 +1040,7 @@ function AuthPage() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: window.location.origin
+          redirectTo: `${window.location.origin}/discover`
         }
       });
       if (error) {
@@ -1468,6 +1468,11 @@ function App() {
           if (window.location.pathname !== "/onboarding") {
             navigate("/onboarding", { replace: true });
           }
+        } else {
+          const path = window.location.pathname;
+          if (path === "/" || path === "/login" || path === "/signup") {
+            navigate("/discover", { replace: true });
+          }
         }
       } else {
         setUser(null);
@@ -1488,6 +1493,11 @@ function App() {
         if (!p || !p.mainSkill || !p.campus) {
           if (window.location.pathname !== "/onboarding") {
             navigate("/onboarding", { replace: true });
+          }
+        } else {
+          const path = window.location.pathname;
+          if (path === "/" || path === "/login" || path === "/signup") {
+            navigate("/discover", { replace: true });
           }
         }
       } else {
@@ -2863,23 +2873,30 @@ function SettingsDrawer({
     setDraft((current) => ({ ...current, [key]: value }));
   };
 
-  const deleteAccount = () => {
+  const deleteAccount = async () => {
     const confirmed = window.confirm(t.deleteAccountConfirm);
     if (!confirmed) {
       return;
     }
 
-    const registeredUsers = JSON.parse(window.localStorage.getItem("mutualizm.users") || "[]") as Array<{ email: string }>;
-    window.localStorage.setItem(
-      "mutualizm.users",
-      JSON.stringify(registeredUsers.filter((account) => account.email !== user?.email))
-    );
-    ["mutualizm.profile", "mutualizm.filters", "mutualizm.passed", "mutualizm.interested", "mutualizm.saved", "mutualizm.previous"].forEach((key) =>
-      window.localStorage.removeItem(key)
-    );
-    logout();
-    onClose();
-    navigate("/login");
+    try {
+      const { error } = await supabase.rpc('delete_user');
+      if (error) throw error;
+
+      ["mutualizm.profile", "mutualizm.filters", "mutualizm.passed", "mutualizm.interested", "mutualizm.saved", "mutualizm.previous"].forEach((key) =>
+        window.localStorage.removeItem(key)
+      );
+      await logout();
+      onClose();
+      navigate("/login");
+    } catch (err: any) {
+      console.error("Error deleting user account:", err);
+      addToast(
+        language === "id" ? "Gagal menghapus akun" : "Failed to delete account",
+        err.message || "An error occurred while deleting your account.",
+        "error"
+      );
+    }
   };
 
   return createPortal(
@@ -3505,7 +3522,8 @@ function DiscoverPage() {
     rewindLast,
     resetDeck,
     dbCandidates,
-    user
+    user,
+    language
   } = useSymbio();
   const t = useTranslations();
   const [detailProfile, setDetailProfile] = useState<CandidateProfile | null>(null);
@@ -3742,11 +3760,15 @@ function DiscoverPage() {
           />
         ) : (
           <EmptyState
-            title={filteredProfiles.length === 0 ? "No candidates match these filters" : "Deck complete"}
+            title={
+              filteredProfiles.length === 0
+                ? (language === "id" ? "Tidak ada profil yang cocok" : "No candidates match these filters")
+                : (language === "id" ? "Semua kartu sudah habis" : "Deck complete")
+            }
             body={
               filteredProfiles.length === 0
-                ? "Try clearing a filter or selecting a broader skill category."
-                : "You have gone through the current mock deck. Reset it to run the demo again."
+                ? (language === "id" ? "Coba hapus filter atau pilih kategori keahlian yang lebih luas." : "Try clearing a filter or selecting a broader skill category.")
+                : (language === "id" ? "Anda telah menelusuri semua kartu. Ulangi kembali untuk menampilkan semua pengguna." : "You have gone through all candidate cards. Refresh to see them again.")
             }
             action={
               filteredProfiles.length === 0 ? (
@@ -3754,7 +3776,7 @@ function DiscoverPage() {
               ) : (
                 <Button variant="primary" onClick={resetDeck}>
                   <RefreshCw size={18} />
-                  {t.resetDemo}
+                  {language === "id" ? "Ulangi Deck" : "Refresh Deck"}
                 </Button>
               )
             }
@@ -3904,9 +3926,8 @@ function OnboardingPage() {
   return (
     <div className="onboarding-shell page-transition">
       <header className="onboarding-top">
-        <Link to="/" className="brand-mark">
-          <span className="brand-icon">S</span>
-          <span>Mutualizm</span>
+        <Link to="/" className="top-logo" style={{ position: "static", transform: "none" }}>
+          Mutualizm <span>✦</span>
         </Link>
         <Link to="/discover" className="text-link">
           {t.skipToDemo}
