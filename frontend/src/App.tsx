@@ -949,7 +949,7 @@ function useLocalStorageState<T>(key: string, initialValue: T) {
     }
 
     try {
-      const stored = window.localStorage.getItem(key);
+      const stored = window.sessionStorage.getItem(key);
       return stored ? (JSON.parse(stored) as T) : initialValue;
     } catch {
       return initialValue;
@@ -958,7 +958,7 @@ function useLocalStorageState<T>(key: string, initialValue: T) {
 
   useEffect(() => {
     try {
-      window.localStorage.setItem(key, JSON.stringify(value));
+      window.sessionStorage.setItem(key, JSON.stringify(value));
     } catch {
       // Browser storage is optional for the prototype; the UI still works in memory.
     }
@@ -2997,9 +2997,10 @@ function SettingsDrawer({
       const { error } = await supabase.rpc('delete_user');
       if (error) throw error;
 
-      ["mutualizm.profile", "mutualizm.filters", "mutualizm.passed", "mutualizm.interested", "mutualizm.saved", "mutualizm.previous"].forEach((key) =>
-        window.localStorage.removeItem(key)
-      );
+      ["mutualizm.profile", "mutualizm.filters", "mutualizm.passed", "mutualizm.interested", "mutualizm.saved", "mutualizm.previous"].forEach((key) => {
+        window.localStorage.removeItem(key);
+        window.sessionStorage.removeItem(key);
+      });
       await logout();
       onClose();
       navigate("/login");
