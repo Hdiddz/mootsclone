@@ -57,8 +57,7 @@ import {
   type SetStateAction
 } from "react";
 import { createPortal } from "react-dom";
-import Echo from "laravel-echo";
-import Pusher from "pusher-js";
+import { supabase } from "./lib/supabase";
 import {
   Link,
   NavLink,
@@ -137,15 +136,17 @@ type SymbioStore = {
   markAllNotificationsRead: () => void;
   sendMessage: (matchId: string, text: string) => void;
   addToast: (title: string, body: string, type?: "success" | "error" | "warning" | "info") => void;
-  user: { id?: number; name: string; email: string; role?: string } | null;
+  user: { id?: string; name: string; email: string; role?: string } | null;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<boolean>;
-  signup: (name: string, email: string, password: string) => Promise<void>;
+  signup: (name: string, email: string, password: string) => Promise<boolean>;
   logout: () => void;
   language: "en" | "id";
   setLanguage: (lang: "en" | "id") => void;
   theme: "light" | "dark";
   setTheme: Dispatch<SetStateAction<"light" | "dark">>;
+  dbCandidates: CandidateProfile[];
+  setDbCandidates: Dispatch<SetStateAction<CandidateProfile[]>>;
 };
 
 const defaultFilters: FilterValues = {
@@ -158,7 +159,7 @@ const defaultFilters: FilterValues = {
   level: ""
 };
 
-const candidateLookup = new Map(candidates.map((candidate) => [candidate.id, candidate]));
+const candidateLookup = new Map<string, CandidateProfile>();
 
 const navItems = [
   { to: "/discover", label: "Discover", icon: Search },
@@ -965,36 +966,7 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
-function isBackendId(value: string) {
-  return /^\d+$/.test(String(value));
-}
 
-function createRealtimeClient(token: string) {
-  const key = import.meta.env.VITE_REVERB_APP_KEY;
-  const host = import.meta.env.VITE_REVERB_HOST;
-
-  if (!key || !host) {
-    return null;
-  }
-
-  (window as any).Pusher = Pusher;
-
-  return new Echo({
-    broadcaster: "reverb",
-    key,
-    wsHost: host,
-    wsPort: Number(import.meta.env.VITE_REVERB_PORT || 80),
-    wssPort: Number(import.meta.env.VITE_REVERB_PORT || 443),
-    forceTLS: (import.meta.env.VITE_REVERB_SCHEME || "https") === "https",
-    enabledTransports: ["ws", "wss"],
-    authEndpoint: "/broadcasting/auth",
-    auth: {
-      headers: {
-        Authorization: `Bearer ${token}`
-      }
-    }
-  });
-}
 
 function AuthPage() {
   const { login, signup, isAuthenticated, addToast, theme, setTheme } = useSymbio();
@@ -1268,7 +1240,7 @@ function AuthPage() {
 import MatchesPage from "./pages/MatchesPage";
 
 function App() {
-  const [profile, setProfile] = useLocalStorageState("mutualizm.profile", starterProfile);
+  const [profile, setProfileState] = useLocalStorageState("mutualizm.profile", starterProfile);
   const [filters, setFilters] = useLocalStorageState("mutualizm.filters", defaultFilters);
   const [passedIds, setPassedIds] = useLocalStorageState<string[]>("mutualizm.passed", []);
   const [interestedIds, setInterestedIds] = useLocalStorageState<string[]>(
@@ -1276,17 +1248,14 @@ function App() {
     []
   );
   const [savedIds, setSavedIds] = useLocalStorageState<string[]>("mutualizm.saved", []);
-  const [matches, setMatches] = useLocalStorageState<MatchRecord[]>(
-    "mutualizm.matches",
-    mockMatches
-  );
+  const [matches, setMatches] = useLocalStorageState<MatchRecord[]>("mutualizm.matches", []);
   const [notifications, setNotifications] = useLocalStorageState<NotificationItem[]>(
     "mutualizm.notifications",
-    mockNotifications
+    []
   );
   const [chats, setChats] = useLocalStorageState<Record<string, ChatMessage[]>>(
     "mutualizm.chats",
-    mockChats
+    {}
   );
   const [previousActions, setPreviousActions] = useLocalStorageState<PreviousAction[]>(
     "mutualizm.previous",
@@ -1295,6 +1264,7 @@ function App() {
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [language, setLanguage] = useLocalStorageState<"en" | "id">("mutualizm.language", "en");
   const [theme, setTheme] = useLocalStorageState<"light" | "dark">("mutualizm.theme", "light");
+  const [dbCandidates, setDbCandidates] = useState<CandidateProfile[]>([]);
 
   useEffect(() => {
     if (theme === "dark") {
@@ -1312,111 +1282,395 @@ function App() {
     }, 3800);
   }, []);
 
-  const [user, setUser] = useLocalStorageState<{ id?: number; name: string; email: string; role?: string } | null>("mutualizm.user", null);
-  const [token, setToken] = useLocalStorageState<string | null>("mutualizm.token", null);
-  const isAuthenticated = Boolean(user && token);
+  const [user, setUser] = useState<{ id: string; name: string; email: string; role?: string } | null>(null);
+  const isAuthenticated = Boolean(user);
+
+  const loadUserProfile = async (userId: string) => {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", userId)
+      .single();
+
+    if (data) {
+      const formattedProfile: CandidateProfile = {
+        id: data.id,
+        name: data.name || "",
+        campus: data.campus || "",
+        program: data.program || "",
+        role: data.role || "",
+        mainSkill: data.main_skill || "",
+        skills: Array.isArray(data.skills) ? data.skills : [],
+        profileSummary: data.profile_summary || "",
+        experienceSummary: data.experience_summary || "",
+        experiences: Array.isArray(data.experiences) ? data.experiences : [],
+        lookingFor: Array.isArray(data.looking_for) ? data.looking_for : [],
+        availability: (data.availability as any) || "available",
+        availabilityDetail: data.availability_detail || "",
+        collaborationGoals: Array.isArray(data.collaboration_goals) ? data.collaboration_goals : [],
+        portfolioLinks: Array.isArray(data.portfolio_links) ? data.portfolio_links : [],
+        preferredRole: data.preferred_role || "",
+        suggestedMessage: data.suggested_message || "",
+        accent: data.accent || "accent-indigo",
+        avatarUrl: data.avatar_url || undefined,
+        avatarPosition: data.avatar_position || undefined,
+        statusLabel: data.status_label || undefined,
+        online: data.online || false
+      };
+      setProfileState(formattedProfile);
+      return formattedProfile;
+    }
+    return null;
+  };
+
+  const fetchAllProfiles = async () => {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("*");
+
+    if (data) {
+      const allLoaded = data.map((row: any) => ({
+        id: row.id,
+        name: row.name || "",
+        campus: row.campus || "",
+        program: row.program || "",
+        role: row.role || "",
+        mainSkill: row.main_skill || "",
+        skills: Array.isArray(row.skills) ? row.skills : [],
+        profileSummary: row.profile_summary || "",
+        experienceSummary: row.experience_summary || "",
+        experiences: Array.isArray(row.experiences) ? row.experiences : [],
+        lookingFor: Array.isArray(row.looking_for) ? row.looking_for : [],
+        availability: (row.availability as any) || "available",
+        availabilityDetail: row.availability_detail || "",
+        collaborationGoals: Array.isArray(row.collaboration_goals) ? row.collaboration_goals : [],
+        portfolioLinks: Array.isArray(row.portfolio_links) ? row.portfolio_links : [],
+        preferredRole: row.preferred_role || "",
+        suggestedMessage: row.suggested_message || "",
+        accent: row.accent || "accent-indigo",
+        avatarUrl: row.avatar_url || undefined,
+        avatarPosition: row.avatar_position || undefined,
+        statusLabel: row.status_label || undefined,
+        online: row.online || false
+      }));
+
+      allLoaded.forEach((c) => candidateLookup.set(c.id, c));
+      return allLoaded;
+    }
+    return [];
+  };
+
+  const fetchDiscoverAndMatches = async (userId: string) => {
+    const allProfiles = await fetchAllProfiles();
+
+    const { data: swipesData } = await supabase
+      .from("swipes")
+      .select("swiped_id")
+      .eq("swiper_id", userId);
+
+    const swipedIds = swipesData?.map((s: any) => s.swiped_id) || [];
+    swipedIds.push(userId);
+
+    const loadedCandidates = allProfiles.filter((p) => !swipedIds.includes(p.id));
+    setDbCandidates(loadedCandidates);
+
+    const { data: matchesData } = await supabase
+      .from("matches")
+      .select("*")
+      .or(`user_a_id.eq.${userId},user_b_id.eq.${userId}`);
+
+    if (matchesData) {
+      const mappedMatches = matchesData.map((m: any) => {
+        const otherId = m.user_a_id === userId ? m.user_b_id : m.user_a_id;
+        const otherUser = candidateLookup.get(otherId);
+        
+        const mySkills = profile?.skills?.map((s: any) => s.name) || [];
+        const otherSkills = otherUser?.skills?.map((s: any) => s.name) || [];
+        const overlap = otherSkills.filter((s: string) => mySkills.includes(s));
+
+        return {
+          id: m.id,
+          candidateId: otherId,
+          createdAt: new Date(m.created_at).toLocaleDateString(),
+          skillOverlap: overlap,
+          latestMessage: "",
+          unread: 0,
+          summary: [
+            otherUser?.role ? `Interested in ${otherUser.role} role.` : "",
+            overlap.length > 0 ? `Both profiles mention ${overlap.join(", ")}.` : ""
+          ].filter(Boolean)
+        };
+      });
+
+      const matchIds = mappedMatches.map((m) => m.id);
+      if (matchIds.length > 0) {
+        const { data: messagesData } = await supabase
+          .from("messages")
+          .select("*")
+          .in("match_id", matchIds)
+          .order("created_at", { ascending: true });
+
+        if (messagesData) {
+          const chatRecords: Record<string, ChatMessage[]> = {};
+          const latestMsgs: Record<string, string> = {};
+
+          messagesData.forEach((msg: any) => {
+            const chatMsg: ChatMessage = {
+              id: msg.id,
+              sender: msg.sender_id === userId ? "me" : "them",
+              text: msg.text,
+              timestamp: new Date(msg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+            };
+            if (!chatRecords[msg.match_id]) {
+              chatRecords[msg.match_id] = [];
+            }
+            chatRecords[msg.match_id].push(chatMsg);
+            latestMsgs[msg.match_id] = msg.text;
+          });
+
+          setChats(chatRecords);
+          mappedMatches.forEach((m) => {
+            m.latestMessage = latestMsgs[m.id] || "";
+          });
+        }
+      }
+      setMatches(mappedMatches);
+    }
+
+    const { data: notificationsData } = await supabase
+      .from("notifications")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false });
+
+    if (notificationsData) {
+      setNotifications(
+        notificationsData.map((n: any) => ({
+          id: n.id,
+          type: n.type,
+          title: n.title,
+          body: n.body,
+          time: new Date(n.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          read: n.read
+        }))
+      );
+    }
+  };
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        setUser({
+          id: session.user.id,
+          name: session.user.user_metadata?.name || session.user.email?.split("@")[0] || "",
+          email: session.user.email || ""
+        });
+        loadUserProfile(session.user.id);
+        fetchDiscoverAndMatches(session.user.id);
+      } else {
+        setUser(null);
+      }
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (session?.user) {
+        const u = {
+          id: session.user.id,
+          name: session.user.user_metadata?.name || session.user.email?.split("@")[0] || "",
+          email: session.user.email || ""
+        };
+        setUser(u);
+        await loadUserProfile(session.user.id);
+        await fetchDiscoverAndMatches(session.user.id);
+      } else {
+        setUser(null);
+        setProfileState(starterProfile);
+        setMatches([]);
+        setChats({});
+        setNotifications([]);
+        setDbCandidates([]);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const setProfile = useCallback(
+    async (updater: SetStateAction<CandidateProfile>) => {
+      setProfileState((current) => {
+        const next = typeof updater === "function" ? updater(current) : updater;
+        const targetUserId = user?.id || next.id;
+        
+        if (targetUserId && targetUserId !== "me") {
+          supabase
+            .from("profiles")
+            .update({
+              name: next.name,
+              campus: next.campus,
+              program: next.program,
+              role: next.role,
+              main_skill: next.mainSkill,
+              skills: next.skills,
+              profile_summary: next.profileSummary,
+              experience_summary: next.experienceSummary,
+              experiences: next.experiences,
+              looking_for: next.lookingFor,
+              availability: next.availability,
+              availability_detail: next.availabilityDetail,
+              collaboration_goals: next.collaborationGoals,
+              portfolio_links: next.portfolioLinks,
+              preferred_role: next.preferredRole,
+              suggested_message: next.suggestedMessage,
+              accent: next.accent,
+              avatar_url: next.avatarUrl,
+              avatar_position: next.avatarPosition,
+              status_label: next.statusLabel,
+              online: next.online
+            })
+            .eq("id", targetUserId)
+            .then(({ error }) => {
+              if (error) {
+                console.error("Error updating profile in Supabase:", error);
+              }
+            });
+        }
+        return { ...next, id: targetUserId };
+      });
+    },
+    [user?.id]
+  );
 
   const login = useCallback(
     async (email: string, password: string) => {
       try {
-        const response = await fetch("/api/login", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, password })
-        });
-        const data = await response.json();
-
-        if (response.ok && data.token) {
-          setToken(data.token);
-          setUser(data.user);
-          addToast(
-            language === "id" ? "Selamat datang kembali!" : "Welcome back!",
-            language === "id" ? `Masuk sebagai ${data.user.name}` : `Logged in as ${data.user.name}`,
-            "success"
-          );
-          return true;
-        } else {
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) {
           addToast(
             language === "id" ? "Login Gagal" : "Login Failed",
-            data.message || (language === "id" ? "Email atau password salah." : "Invalid email or password."),
+            error.message,
             "error"
           );
           return false;
         }
-      } catch (err) {
+
+        if (data?.user) {
+          setUser({
+            id: data.user.id,
+            name: data.user.user_metadata?.name || email.split("@")[0],
+            email: data.user.email || ""
+          });
+
+          await loadUserProfile(data.user.id);
+          await fetchDiscoverAndMatches(data.user.id);
+
+          addToast(
+            language === "id" ? "Selamat datang kembali!" : "Welcome back!",
+            language === "id" ? `Masuk sebagai ${data.user.user_metadata?.name || email.split("@")[0]}` : `Logged in as ${data.user.user_metadata?.name || email.split("@")[0]}`,
+            "success"
+          );
+          return true;
+        }
+        return false;
+      } catch (err: any) {
         addToast(
-          language === "id" ? "Kesalahan Jaringan" : "Network Error",
-          language === "id" ? "Gagal terhubung ke server." : "Failed to connect to server.",
+          language === "id" ? "Kesalahan" : "Error",
+          err.message || "An unexpected error occurred",
           "error"
         );
         return false;
       }
     },
-    [addToast, language, setUser, setToken]
+    [addToast, language]
   );
 
   const signup = useCallback(
     async (name: string, email: string, password: string) => {
       try {
-        const response = await fetch("/api/register", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name, email, password, password_confirmation: password })
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: { name }
+          }
         });
-        const data = await response.json();
 
-        if (response.ok && data.token) {
-          setToken(data.token);
-          setUser(data.user);
+        if (error) {
+          addToast(
+            language === "id" ? "Pendaftaran Gagal" : "Signup Failed",
+            error.message,
+            "error"
+          );
+          return false;
+        }
+
+        if (data?.user) {
+          setUser({
+            id: data.user.id,
+            name: name,
+            email: email
+          });
+
+          const initialProfile: CandidateProfile = {
+            ...starterProfile,
+            id: data.user.id,
+            name: name
+          };
+          setProfileState(initialProfile);
+
+          await supabase
+            .from("profiles")
+            .update({
+              name: initialProfile.name,
+              accent: initialProfile.accent,
+              skills: initialProfile.skills,
+              experiences: initialProfile.experiences,
+              looking_for: initialProfile.lookingFor,
+              collaboration_goals: initialProfile.collaborationGoals,
+              portfolio_links: initialProfile.portfolioLinks
+            })
+            .eq("id", data.user.id);
+
           addToast(
             language === "id" ? "Akun dibuat!" : "Account created!",
             language === "id" ? "Lengkapi profil onboarding Anda." : "Please complete your onboarding profile.",
             "success"
           );
-        } else {
-          addToast(
-            language === "id" ? "Pendaftaran Gagal" : "Signup Failed",
-            data.message || (language === "id" ? "Gagal membuat akun." : "Failed to create account."),
-            "error"
-          );
+          return true;
         }
-      } catch (err) {
+        return false;
+      } catch (err: any) {
         addToast(
-          language === "id" ? "Kesalahan Jaringan" : "Network Error",
-          language === "id" ? "Gagal terhubung ke server." : "Failed to connect to server.",
+          language === "id" ? "Kesalahan" : "Error",
+          err.message || "An unexpected error occurred",
           "error"
         );
+        return false;
       }
     },
-    [addToast, language, setUser, setToken]
+    [addToast, language]
   );
 
   const logout = useCallback(async () => {
     try {
-      if (token) {
-        await fetch("/api/logout", {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${token}`,
-            "Content-Type": "application/json"
-          }
-        });
-      }
-    } catch (err) {
-      // Ignore network errors on logout
-    } finally {
+      await supabase.auth.signOut();
       setUser(null);
-      setToken(null);
+      setProfileState(starterProfile);
+      setMatches([]);
+      setChats({});
+      setNotifications([]);
+      setDbCandidates([]);
       addToast(
         language === "id" ? "Keluar" : "Logged out",
         language === "id" ? "Anda sudah keluar dari sesi." : "You have been logged out of your session.",
         "info"
       );
+    } catch (err: any) {
+      console.error("Logout error:", err);
     }
-  }, [addToast, language, setUser, setToken, token]);
+  }, [addToast, language]);
 
   const actOnCandidate = useCallback(
-    (candidate: CandidateProfile, action: SwipeAction, createdMatch = false) => {
+    async (candidate: CandidateProfile, action: SwipeAction, createdMatch = false) => {
       const addUnique = (setter: Dispatch<SetStateAction<string[]>>) => {
         setter((current) =>
           current.includes(candidate.id) ? current : [candidate.id, ...current]
@@ -1433,63 +1687,34 @@ function App() {
 
       if (action === "interest") {
         addUnique(setInterestedIds);
-
-        if (createdMatch) {
-          const newMatch = createMatchFor(candidate);
-          setMatches((current) =>
-            current.some((match) => match.candidateId === candidate.id)
-              ? current
-              : [newMatch, ...current]
-          );
-          setChats((current) =>
-            current[newMatch.id]
-              ? current
-              : {
-                  ...current,
-                  [newMatch.id]: [
-                    {
-                      id: `hello-${candidate.id}`,
-                      sender: "them",
-                      text: candidate.suggestedMessage,
-                      timestamp: "Just now"
-                    }
-                  ]
-                }
-          );
-          setNotifications((current) => [
-            {
-              id: `notif-match-${candidate.id}`,
-              type: "match",
-              title: "New Mutualizm match",
-              body: `${candidate.name} is also interested in collaborating.`,
-              time: "Just now",
-              read: false
-            },
-            ...current
-          ]);
-        }
       }
 
       setPreviousActions((current) => [
         { id: candidate.id, action, createdMatch },
         ...current.slice(0, 8)
       ]);
+
+      if (user?.id) {
+        try {
+          const { error } = await supabase
+            .from("swipes")
+            .upsert({
+              swiper_id: user.id,
+              swiped_id: candidate.id,
+              action: action
+            });
+          if (error) throw error;
+        } catch (err) {
+          console.error("Error saving swipe:", err);
+        }
+      }
     },
-    [
-      addToast,
-      setChats,
-      setInterestedIds,
-      setMatches,
-      setNotifications,
-      setPassedIds,
-      setPreviousActions,
-      setSavedIds
-    ]
+    [user?.id, setPassedIds, setSavedIds, setInterestedIds, setPreviousActions]
   );
 
-  const rewindLast = useCallback(() => {
+  const rewindLast = useCallback(async () => {
     const last = previousActions[0];
-    if (!last) {
+    if (!last || !user?.id) {
       addToast("Nothing to rewind", "You can rewind after taking an action on a card.");
       return;
     }
@@ -1498,78 +1723,110 @@ function App() {
       setter((current) => current.filter((id) => id !== last.id));
     };
 
-    if (last.action === "pass") {
-      removeId(setPassedIds);
-    }
-    if (last.action === "interest") {
-      removeId(setInterestedIds);
-    }
-    if (last.action === "save") {
-      removeId(setSavedIds);
-    }
-
-    if (last.createdMatch) {
-      setMatches((current) => current.filter((match) => match.candidateId !== last.id));
-      setNotifications((current) =>
-        current.filter((notification) => notification.id !== `notif-match-${last.id}`)
-      );
-    }
+    if (last.action === "pass") removeId(setPassedIds);
+    if (last.action === "save") removeId(setSavedIds);
+    if (last.action === "interest") removeId(setInterestedIds);
 
     setPreviousActions((current) => current.slice(1));
-  }, [
-    addToast,
-    previousActions,
-    setInterestedIds,
-    setMatches,
-    setNotifications,
-    setPassedIds,
-    setPreviousActions,
-    setSavedIds
-  ]);
 
-  const resetDeck = useCallback(() => {
+    try {
+      const { error } = await supabase
+        .from("swipes")
+        .delete()
+        .eq("swiper_id", user.id)
+        .eq("swiped_id", last.id);
+      
+      if (error) throw error;
+
+      if (last.createdMatch) {
+        const userA = user.id < last.id ? user.id : last.id;
+        const userB = user.id > last.id ? user.id : last.id;
+        await supabase.from("matches").delete().eq("user_a_id", userA).eq("user_b_id", userB);
+      }
+    } catch (err) {
+      console.error("Error rewinding swipe:", err);
+    }
+  }, [user?.id, previousActions, setPassedIds, setSavedIds, setInterestedIds, setPreviousActions, addToast]);
+
+  const resetDeck = useCallback(async () => {
+    if (!user?.id) return;
     setPassedIds([]);
     setInterestedIds([]);
     setSavedIds([]);
     setPreviousActions([]);
-  }, [setInterestedIds, setPassedIds, setPreviousActions, setSavedIds]);
 
-  const clearMatches = useCallback(() => {
-    const matchIds = new Set(matches.map((match) => match.id));
+    try {
+      const { error } = await supabase
+        .from("swipes")
+        .delete()
+        .eq("swiper_id", user.id);
+      if (error) throw error;
+      await fetchDiscoverAndMatches(user.id);
+    } catch (err) {
+      console.error("Error resetting deck:", err);
+    }
+  }, [user?.id, setPassedIds, setInterestedIds, setSavedIds, setPreviousActions]);
+
+  const clearMatches = useCallback(async () => {
+    if (!user?.id) return;
     setMatches([]);
-    setChats((current) =>
-      Object.fromEntries(Object.entries(current).filter(([matchId]) => !matchIds.has(matchId)))
-    );
-    setNotifications((current) =>
-      current.filter((notification) => !notification.id.startsWith("notif-match-"))
-    );
-  }, [matches, setChats, setMatches, setNotifications]);
+    setChats({});
+
+    try {
+      const { error } = await supabase
+        .from("matches")
+        .delete()
+        .or(`user_a_id.eq.${user.id},user_b_id.eq.${user.id}`);
+      if (error) throw error;
+    } catch (err) {
+      console.error("Error clearing matches:", err);
+    }
+  }, [user?.id, setMatches, setChats]);
 
   const removeMatch = useCallback(
-    (matchId: string) => {
-      const removedMatch = matches.find((match) => match.id === matchId);
+    async (matchId: string) => {
       setMatches((current) => current.filter((match) => match.id !== matchId));
-      setChats((current) =>
-        Object.fromEntries(Object.entries(current).filter(([currentMatchId]) => currentMatchId !== matchId))
-      );
-      if (removedMatch) {
-        setNotifications((current) =>
-          current.filter((notification) => notification.id !== `notif-match-${removedMatch.candidateId}`)
+      setChats((current) => {
+        const next = { ...current };
+        delete next[matchId];
+        return next;
+      });
+
+      try {
+        const { error } = await supabase
+          .from("matches")
+          .delete()
+          .eq("id", matchId);
+        if (error) throw error;
+        addToast(
+          language === "id" ? translations.id.matchRemovedTitle : translations.en.matchRemovedTitle,
+          language === "id" ? translations.id.matchRemovedBody : translations.en.matchRemovedBody
         );
+      } catch (err) {
+        console.error("Error removing match:", err);
       }
-      addToast(
-        language === "id" ? translations.id.matchRemovedTitle : translations.en.matchRemovedTitle,
-        language === "id" ? translations.id.matchRemovedBody : translations.en.matchRemovedBody
-      );
     },
-    [addToast, language, matches, setChats, setMatches, setNotifications]
+    [addToast, language, setChats, setMatches]
   );
 
   const removeSaved = useCallback(
-    (candidateId: string) => {
+    async (candidateId: string) => {
+      if (!user?.id) return;
       setSavedIds((current) => current.filter((id) => id !== candidateId));
+
+      try {
+        const { error } = await supabase
+          .from("swipes")
+          .delete()
+          .eq("swiper_id", user.id)
+          .eq("swiped_id", candidateId)
+          .eq("action", "save");
+        if (error) throw error;
+      } catch (err) {
+        console.error("Error removing saved candidate:", err);
+      }
     },
-    [setSavedIds]
+    [user?.id, setSavedIds]
   );
 
   const clearFilters = useCallback(() => {
@@ -1577,26 +1834,45 @@ function App() {
   }, [setFilters]);
 
   const markNotificationRead = useCallback(
-    (notificationId: string) => {
+    async (notificationId: string) => {
       setNotifications((current) =>
         current.map((notification) =>
           notification.id === notificationId ? { ...notification, read: true } : notification
         )
       );
+
+      try {
+        await supabase
+          .from("notifications")
+          .update({ read: true })
+          .eq("id", notificationId);
+      } catch (err) {
+        console.error("Error marking notification read:", err);
+      }
     },
     [setNotifications]
   );
 
-  const markAllNotificationsRead = useCallback(() => {
+  const markAllNotificationsRead = useCallback(async () => {
+    if (!user?.id) return;
     setNotifications((current) =>
       current.map((notification) => ({ ...notification, read: true }))
     );
-  }, [setNotifications]);
+
+    try {
+      await supabase
+        .from("notifications")
+        .update({ read: true })
+        .eq("user_id", user.id);
+    } catch (err) {
+      console.error("Error marking all notifications read:", err);
+    }
+  }, [user?.id, setNotifications]);
 
   const sendMessage = useCallback(
     async (matchId: string, text: string) => {
       const cleanText = text.trim();
-      if (!cleanText) {
+      if (!cleanText || !user?.id) {
         return;
       }
 
@@ -1618,115 +1894,193 @@ function App() {
           }
         ]
       }));
+
       setMatches((current) =>
         current.map((match) =>
           match.id === matchId ? { ...match, latestMessage: cleanText, unread: 0 } : match
         )
       );
 
-      if (token && isBackendId(matchId)) {
-        try {
-          const response = await fetch(`/api/matches/${matchId}/messages`, {
-            method: "POST",
-            headers: {
-              "Authorization": `Bearer ${token}`,
-              "Content-Type": "application/json"
-            },
-            body: JSON.stringify({ text: cleanText })
-          });
-
-          if (!response.ok) {
-            throw new Error("Failed to persist message");
-          }
-        } catch {
-          addToast(
-            language === "id" ? "Pesan belum tersimpan" : "Message not persisted",
-            language === "id"
-              ? "Pesan tampil di UI, tetapi API backend belum berhasil menyimpannya."
-              : "The message is visible locally, but the backend API did not persist it.",
-            "warning"
-          );
-        }
+      try {
+        const { error } = await supabase.from("messages").insert({
+          match_id: matchId,
+          sender_id: user.id,
+          text: cleanText
+        });
+        if (error) throw error;
+      } catch (err) {
+        console.error("Error sending message to Supabase:", err);
+        addToast(
+          language === "id" ? "Pesan belum tersimpan" : "Message not persisted",
+          language === "id"
+            ? "Pesan tampil di UI, tetapi API backend belum berhasil menyimpannya."
+            : "The message is visible locally, but the backend API did not persist it.",
+          "warning"
+        );
       }
     },
-    [addToast, language, setChats, setMatches, token]
+    [addToast, language, setChats, setMatches, user?.id]
   );
 
   useEffect(() => {
-    if (!token) {
+    if (!user?.id) {
       return;
     }
 
-    const echo = createRealtimeClient(token);
-    if (!echo) {
-      return;
-    }
+    const realtimeChannel = supabase
+      .channel("user-realtime")
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "matches"
+        },
+        async (payload) => {
+          const newMatch = payload.new;
+          if (newMatch.user_a_id === user.id || newMatch.user_b_id === user.id) {
+            const otherId = newMatch.user_a_id === user.id ? newMatch.user_b_id : newMatch.user_a_id;
+            
+            let otherUser = candidateLookup.get(otherId);
+            if (!otherUser) {
+              const { data } = await supabase.from("profiles").select("*").eq("id", otherId).single();
+              if (data) {
+                otherUser = {
+                  id: data.id,
+                  name: data.name || "",
+                  campus: data.campus || "",
+                  program: data.program || "",
+                  role: data.role || "",
+                  mainSkill: data.main_skill || "",
+                  skills: Array.isArray(data.skills) ? data.skills : [],
+                  profileSummary: data.profile_summary || "",
+                  experienceSummary: data.experience_summary || "",
+                  experiences: Array.isArray(data.experiences) ? data.experiences : [],
+                  lookingFor: Array.isArray(data.looking_for) ? data.looking_for : [],
+                  availability: (data.availability as any) || "available",
+                  availabilityDetail: data.availability_detail || "",
+                  collaborationGoals: Array.isArray(data.collaboration_goals) ? data.collaboration_goals : [],
+                  portfolioLinks: Array.isArray(data.portfolio_links) ? data.portfolio_links : [],
+                  preferredRole: data.preferred_role || "",
+                  suggestedMessage: data.suggested_message || "",
+                  accent: data.accent || "accent-indigo",
+                  avatarUrl: data.avatar_url || undefined,
+                  avatarPosition: data.avatar_position || undefined,
+                  statusLabel: data.status_label || undefined,
+                  online: data.online || false
+                };
+                candidateLookup.set(otherId, otherUser);
+              }
+            }
 
-    const backendMatches = matches.filter((match) => isBackendId(match.id));
+            const mySkills = profile?.skills?.map((s: any) => s.name) || [];
+            const otherSkills = otherUser?.skills?.map((s: any) => s.name) || [];
+            const overlap = otherSkills.filter((s: string) => mySkills.includes(s));
 
-    backendMatches.forEach((match) => {
-      echo.private(`chat.${match.id}`).listen("MessageSent", (event: any) => {
-        if (event.sender_id && user?.id && Number(event.sender_id) === Number(user.id)) {
-          return;
-        }
+            const mappedMatch: MatchRecord = {
+              id: newMatch.id,
+              candidateId: otherId,
+              createdAt: new Date(newMatch.created_at).toLocaleDateString(),
+              skillOverlap: overlap,
+              latestMessage: "",
+              unread: 1,
+              summary: [
+                otherUser?.role ? `Interested in ${otherUser.role} role.` : "",
+                overlap.length > 0 ? `Both profiles mention ${overlap.join(", ")}.` : ""
+              ].filter(Boolean)
+            };
 
-        const nextMessage: ChatMessage = {
-          id: String(event.id ?? `reverb-${Date.now()}`),
-          sender: "them",
-          text: String(event.text ?? ""),
-          timestamp: event.created_at
-            ? new Date(event.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-            : "Just now"
-        };
+            setMatches((current) => {
+              if (current.some((m) => m.id === mappedMatch.id)) return current;
+              return [mappedMatch, ...current];
+            });
 
-        setChats((current) => {
-          const currentMessages = current[match.id] ?? [];
-          if (currentMessages.some((messageItem) => messageItem.id === nextMessage.id)) {
-            return current;
+            addToast(
+              language === "id" ? "Kecocokan baru!" : "New Match!",
+              language === "id"
+                ? `Anda cocok dengan ${otherUser?.name || "seseorang"}!`
+                : `You matched with ${otherUser?.name || "someone"}!`,
+              "success"
+            );
           }
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "messages"
+        },
+        (payload) => {
+          const newMsg = payload.new;
+          setMatches((currentMatches) => {
+            const matchIndex = currentMatches.findIndex((m) => m.id === newMsg.match_id);
+            if (matchIndex === -1) return currentMatches;
 
-          return {
-            ...current,
-            [match.id]: [...currentMessages, nextMessage]
-          };
-        });
+            const isFromThem = newMsg.sender_id !== user.id;
 
-        setMatches((current) =>
-          current.map((currentMatch) =>
-            currentMatch.id === match.id
-              ? {
-                  ...currentMatch,
-                  latestMessage: nextMessage.text,
-                  unread: currentMatch.unread + 1
-                }
-              : currentMatch
-          )
-        );
-      });
-    });
+            setChats((currentChats) => {
+              const currentMessages = currentChats[newMsg.match_id] ?? [];
+              if (currentMessages.some((msg) => msg.id === newMsg.id)) {
+                return currentChats;
+              }
 
-    if (user?.id) {
-      echo.private(`user.${user.id}`).listen("NewMatch", () => {
-        addToast(
-          language === "id" ? "Kecocokan baru" : "New match",
-          language === "id"
-            ? "Ada kecocokan baru dari backend real-time."
-            : "A new realtime backend match is available.",
-          "success"
-        );
-      });
-    }
+              const nextMessage: ChatMessage = {
+                id: newMsg.id,
+                sender: isFromThem ? "them" : "me",
+                text: newMsg.text,
+                timestamp: new Date(newMsg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+              };
+
+              return {
+                ...currentChats,
+                [newMsg.match_id]: [...currentMessages, nextMessage]
+              };
+            });
+
+            return currentMatches.map((m) =>
+              m.id === newMsg.match_id
+                ? {
+                    ...m,
+                    latestMessage: newMsg.text,
+                    unread: isFromThem ? m.unread + 1 : m.unread
+                  }
+                : m
+            );
+          });
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "notifications"
+        },
+        (payload) => {
+          const newNotif = payload.new;
+          if (newNotif.user_id === user.id) {
+            const mappedNotif: NotificationItem = {
+              id: newNotif.id,
+              type: newNotif.type as any,
+              title: newNotif.title,
+              body: newNotif.body,
+              time: new Date(newNotif.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+              read: newNotif.read
+            };
+
+            setNotifications((current) => [mappedNotif, ...current]);
+            addToast(newNotif.title, newNotif.body, "info");
+          }
+        }
+      )
+      .subscribe();
 
     return () => {
-      backendMatches.forEach((match) => {
-        echo.leave(`chat.${match.id}`);
-      });
-      if (user?.id) {
-        echo.leave(`user.${user.id}`);
-      }
-      echo.disconnect();
+      supabase.removeChannel(realtimeChannel);
     };
-  }, [addToast, language, matches, setChats, setMatches, token, user?.id]);
+  }, [addToast, language, profile?.skills, setChats, setMatches, setNotifications, user?.id]);
 
   const value = useMemo<SymbioStore>(
     () => ({
@@ -1762,7 +2116,9 @@ function App() {
       language,
       setLanguage,
       theme,
-      setTheme
+      setTheme,
+      dbCandidates,
+      setDbCandidates
     }),
     [
       actOnCandidate,
@@ -1797,7 +2153,9 @@ function App() {
       language,
       setLanguage,
       theme,
-      setTheme
+      setTheme,
+      dbCandidates,
+      setDbCandidates
     ]
   );
 
@@ -1928,9 +2286,6 @@ function LandingPage() {
             <div className="hero-actions">
               <Link className="button button-primary" to={isAuthenticated ? "/discover" : "/signup"} style={{ padding: "0 32px", borderRadius: "30px", height: "48px", fontSize: "0.95rem" }}>
                 {t.landingStartMatching}
-              </Link>
-              <Link className="button button-secondary" to="/discover" style={{ padding: "0 32px", borderRadius: "30px", height: "48px", fontSize: "0.95rem" }}>
-                {t.landingTryDemo}
               </Link>
             </div>
             <div className="hero-metrics">
@@ -3140,7 +3495,9 @@ function DiscoverPage() {
     matches,
     actOnCandidate,
     rewindLast,
-    resetDeck
+    resetDeck,
+    dbCandidates,
+    user
   } = useSymbio();
   const t = useTranslations();
   const [detailProfile, setDetailProfile] = useState<CandidateProfile | null>(null);
@@ -3153,7 +3510,7 @@ function DiscoverPage() {
   const pointerStart = useRef<{ x: number; y: number } | null>(null);
   const reducedMotion = usePrefersReducedMotion();
 
-  const filteredProfiles = useMemo(() => applyFilters(candidates, filters), [filters]);
+  const filteredProfiles = useMemo(() => applyFilters(dbCandidates, filters), [dbCandidates, filters]);
   const deck = useMemo(
     () =>
       filteredProfiles.filter(
@@ -3168,15 +3525,23 @@ function DiscoverPage() {
   const next = deck[1] ?? null;
 
   const handleAction = useCallback(
-    (action: SwipeAction) => {
-      if (!current) {
+    async (action: SwipeAction) => {
+      if (!current || !user?.id) {
         return;
       }
 
-      const createsMatch =
-        action === "interest" &&
-        Boolean(current.mutualInterest) &&
-        !matches.some((match) => match.candidateId === current.id);
+      let createsMatch = false;
+      if (action === "interest") {
+        const { data } = await supabase
+          .from("swipes")
+          .select("id")
+          .eq("swiper_id", current.id)
+          .eq("swiped_id", user.id)
+          .eq("action", "interest");
+        
+        createsMatch = !!(data && data.length > 0);
+      }
+
       actOnCandidate(current, action, createsMatch);
       setDrag({ x: 0, y: 0, active: false });
 
@@ -3184,7 +3549,7 @@ function DiscoverPage() {
         setMatchedProfile(current);
       }
     },
-    [actOnCandidate, current, matches]
+    [actOnCandidate, current, user?.id]
   );
 
   const handlePointerDown: PointerEventHandler<HTMLElement> = (event) => {
@@ -6232,10 +6597,7 @@ function localizeExperienceText(text: string, t: TranslationSet) {
     "Student Research Dashboard": "Dashboard Riset Mahasiswa",
     "Cleaned survey data, visualized insights, and built dashboard screens for decision making.":
       "Membersihkan data survei, memvisualisasikan insight, dan membangun layar dashboard untuk pengambilan keputusan.",
-    "IoT Prototype Builder": "Pembuat Prototipe IoT",
-    "Smart Locker Assignment": "Tugas Smart Locker",
-    "Connected RFID, sensors, and a dashboard proof of concept for secure locker access.":
-      "Menghubungkan RFID, sensor, dan proof of concept dashboard untuk akses locker yang aman."
+    "IoT Prototype Builder": "Pembuat Prototipe IoT"
   };
 
   return texts[text] ?? text;
@@ -6249,7 +6611,9 @@ function findBestSuggestion(suggestion: { mainSkill?: string; skills?: string[];
   );
   const role = suggestion.role?.toLowerCase() ?? "";
 
-  const ranked = candidates
+  const allProfiles = candidateLookup.size > 0 ? Array.from(candidateLookup.values()) : candidates;
+
+  const ranked = allProfiles
     .map((candidate) => {
       const skillScore = candidate.skills.reduce(
         (score, skillItem) => score + (normalizedSkills.has(skillItem.name.toLowerCase()) ? 3 : 0),
@@ -6261,14 +6625,16 @@ function findBestSuggestion(suggestion: { mainSkill?: string; skills?: string[];
     })
     .sort((left, right) => right.score - left.score);
 
-  return ranked[0]?.candidate ?? candidates[0] ?? null;
+  return ranked[0]?.candidate ?? allProfiles[0] ?? null;
 }
 
 function findCandidatesForQuery(query: string) {
   const normalized = query.toLowerCase();
   const tokens = normalized.split(/[^a-z0-9+#.]+/).filter(Boolean);
 
-  return candidates
+  const allProfiles = candidateLookup.size > 0 ? Array.from(candidateLookup.values()) : candidates;
+
+  return allProfiles
     .map((candidate) => {
       let score = 0;
       const role = candidate.role.toLowerCase();

@@ -72,6 +72,18 @@
   background: rgba(20, 18, 14, 0.92);
 }
 
+:root.dark .landing-links {
+  color: var(--on-surface-variant);
+}
+
+:root.dark .landing-links a:hover {
+  color: var(--ink);
+}
+
+:root.dark .landing-mobile-menu a {
+  color: var(--ink);
+}
+
 :root.dark .top-bar {
   background: rgba(30, 26, 20, 0.95);
 }
@@ -631,7 +643,7 @@ button:disabled {
   display: flex;
   align-items: center;
   gap: 22px;
-  color: rgba(21, 21, 21, 0.72);
+  color: var(--on-surface-variant);
   font-weight: 700;
 }
 
@@ -5083,25 +5095,35 @@ img.avatar {
   }
 
   .hero-copy h1 {
-    font-size: clamp(1.5rem, 7vw, 2.1rem) !important;
-    line-height: 1.15 !important;
+    font-size: clamp(1.6rem, 7vw, 2.2rem) !important;
+    line-height: 1.18 !important;
+    letter-spacing: -0.01em;
   }
 
   .hero-lede {
-    margin-top: 14px;
-    line-height: 1.55;
+    margin-top: 10px;
+    line-height: 1.6;
+    font-size: 0.92rem !important;
   }
 
   .hero-actions {
     justify-content: flex-start;
+    margin-top: 8px;
   }
 
   .hero-actions .button {
-    flex: 1 1 150px;
+    flex: 0 1 auto;
+    min-width: 140px;
   }
 
   .hero-metrics {
     justify-content: flex-start;
+    margin-top: 16px;
+  }
+
+  .hero-metrics span {
+    font-size: 0.78rem;
+    padding: 6px 10px;
   }
 
   .hero-preview {
@@ -7435,62 +7457,97 @@ body {
   }
 
   .hero-copy h1 {
-    font-size: clamp(1.35rem, 6vw, 1.75rem) !important;
-    line-height: 1.15 !important;
+    font-size: clamp(1.4rem, 6.5vw, 1.8rem) !important;
+    line-height: 1.18 !important;
+    letter-spacing: -0.01em;
   }
 
   .hero-copy p {
-    font-size: 0.88rem !important;
+    font-size: 0.85rem !important;
+    line-height: 1.6 !important;
   }
 
   .landing-hero {
-    gap: 16px;
-    padding: 16px 0 24px;
+    gap: 14px;
+    padding: 14px 0 20px;
   }
 
   .hero-actions {
-    margin-top: 14px !important;
+    margin-top: 10px !important;
     gap: 8px !important;
   }
 
   .hero-actions .button {
-    height: 42px !important;
-    padding: 0 16px !important;
-    font-size: 0.86rem !important;
+    height: 40px !important;
+    padding: 0 18px !important;
+    font-size: 0.84rem !important;
+    border-radius: 20px !important;
   }
 
   .hero-metrics {
-    margin-top: 14px !important;
+    margin-top: 10px !important;
     gap: 6px !important;
   }
 
   .hero-metrics span {
-    padding: 6px 10px !important;
-    font-size: 0.74rem !important;
+    padding: 5px 9px !important;
+    font-size: 0.72rem !important;
   }
 
   .hero-preview {
-    min-height: 320px !important;
+    min-height: 300px !important;
   }
 
   .preview-card-back {
-    height: 340px !important;
+    height: 310px !important;
     max-width: calc(100% - 24px) !important;
   }
 
   .preview-card-back-one {
-    transform: rotate(-4deg) translate(-12px, 14px);
+    transform: rotate(-4deg) translate(-10px, 12px);
   }
 
   .preview-card-back-two {
-    transform: rotate(4deg) translate(12px, 8px);
+    transform: rotate(4deg) translate(10px, 6px);
   }
 
-  .hero-preview .candidate-card {
-    min-height: 0 !important;
-    max-height: 380px !important;
-    transform: scale(0.82) !important;
-    transform-origin: center !important;
+  .hero-carousel {
+    height: 310px !important;
+  }
+
+  .hero-card-overlay {
+    padding: 16px !important;
+  }
+
+  .hero-card-overlay h3 {
+    font-size: 1.1rem !important;
+  }
+
+  .hero-card-overlay small {
+    font-size: 0.7rem !important;
+    -webkit-line-clamp: 2;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .hero-card-chips span {
+    font-size: 0.65rem !important;
+    padding: 3px 7px !important;
+  }
+
+  .section-band,
+  .cta-band {
+    padding: 36px 16px !important;
+  }
+
+  .section-heading h2,
+  .cta-band h2 {
+    font-size: 1.35rem !important;
+  }
+
+  .cta-band p {
+    font-size: 0.85rem !important;
   }
 
   .match-list {

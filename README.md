@@ -1,58 +1,95 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Mutualizm ✦ Campus Collaboration Matcher
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Mutualizm adalah platform kolaborasi kampus yang dirancang khusus untuk mahasiswa **Telkom University** agar dapat saling menemukan rekan kolaborator untuk kompetisi, proyek startup, tugas kuliah, riset, maupun event organisasi secara terstruktur berbasis keahlian (*skill-based discovery*).
 
-## About Laravel
+Aplikasi ini menggunakan mekanisme *card swiping* interaktif (mirip aplikasi pencari jodoh namun difokuskan pada kolaborasi profesional) untuk menyaring kandidat potensial secara cepat dan menyenangkan.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+---
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## 🚀 Fitur Utama
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+1. **Autentikasi Terintegrasi**: Login & pendaftaran akun yang aman menggunakan **Supabase Auth** (dilengkapi opsi login SSO menggunakan Google).
+2. **Interactive Card Discovery**: Antarmuka geser kartu (swipe deck) interaktif berbasis gesture sentuh/mouse untuk memilih kandidat kolaborator (Pass, Save, atau Interest).
+3. **Onboarding Flow**: Proses pembuatan profil bertahap untuk mendefinisikan peran, keahlian utama, pengalaman proyek, ketersediaan waktu, dan link portofolio secara terstruktur.
+4. **Realtime Chat & Messaging**: Fitur percakapan instan secara realtime setelah terjadi kecocokan (*mutual match*) yang ditenagai oleh **Supabase Realtime**.
+5. **Realtime Notifications & Alerts**: Pemberitahuan instan saat ada kecocokan kolaborator baru maupun pesan masuk yang dikirim langsung dari database trigger.
+6. **Smart AI Assistant**: Asisten AI pintar yang terintegrasi (didukung model Google Gemini via OpenRouter) untuk membantu mencari kandidat berdasarkan kriteria keahlian/peran secara langsung.
+7. **Warm Dark Theme & Responsive UI**: Tampilan visual premium, elegan, dan estetik dengan dukungan penuh tema gelap (*dark mode*) yang ramah di mata serta layout responsif untuk mobile view.
 
-## Learning Laravel
+---
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+## 🛠️ Tech Stack
 
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+* **Frontend**: React 18, Vite, TypeScript, React Router DOM v6, Lucide React (Icons), Vanilla CSS (Premium styling & micro-animations).
+* **Backend & Database**: Supabase (PostgreSQL, Realtime subscriptions, Row Level Security, Database Triggers).
+* **AI Completion**: OpenRouter API (Gemini 2.5 Flash Lite) di-route melalui serverless API PHP.
+* **Hosting / Deployment**: Vercel.
 
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
+---
 
-## Agentic Development
+## 📁 Struktur Proyek
 
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
-
-```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+```text
+├── frontend/                     # Kode Sumber Aplikasi Client (React + Vite)
+│   ├── src/
+│   │   ├── lib/
+│   │   │   └── supabase.ts       # Inisialisasi client Supabase SDK
+│   │   ├── pages/
+│   │   │   └── MatchesPage.tsx   # Halaman kelola kecocokan (matches)
+│   │   ├── App.tsx               # File utama React (Routes, State, View Components)
+│   │   ├── styles.css            # Stylesheet utama (desain responsif & dark mode)
+│   │   ├── types.ts              # Interface tipe data TypeScript
+│   │   └── mockData.ts           # Data preset awal (skala fallback lokal)
+│   ├── package.json
+│   └── vite.config.ts
+├── supabase_schema.sql           # Skema SQL lengkap untuk Supabase Editor
+├── vercel.json                   # Konfigurasi deployment Vercel (Routing & serverless functions)
+└── README.md                     # Dokumentasi ini
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+---
 
-## Contributing
+## ⚙️ Petunjuk Pemasangan Lokal
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+### 1. Prasyarat
+Pastikan Anda sudah menginstal [Node.js](https://nodejs.org/) di perangkat Anda.
 
-## Code of Conduct
+### 2. Kloning Repositori
+```bash
+git clone https://github.com/Hdiddz/Mutualizm-BE.git
+cd Mutualizm-BE
+```
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+### 3. Inisialisasi Database Supabase
+1. Buka [Supabase Console](https://supabase.com) dan buat proyek baru.
+2. Masuk ke menu **SQL Editor** pada panel kiri dashboard proyek Anda.
+3. Buka berkas `supabase_schema.sql` di proyek Anda, salin (copy) semua baris kodenya, tempelkan (paste) ke editor query Supabase, dan klik **Run**.
+4. Semua tabel (`profiles`, `swipes`, `matches`, `messages`, `notifications`, `ai_conversations`), trigger otomatisasi mutual-match, dan RLS policies akan langsung terkonfigurasi.
 
-## Security Vulnerabilities
+### 4. Konfigurasi File Environment (.env)
+Buat file bernama `.env` di dalam folder `frontend/` (dan root directory jika perlu), lalu isi dengan kredensial proyek Supabase Anda:
+```env
+VITE_SUPABASE_URL=https://proyek-anda.supabase.co
+VITE_SUPABASE_ANON_KEY=eyJ...anon-key-anda...
+```
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+### 5. Jalankan Aplikasi Frontend secara Lokal
+```bash
+# Pindah ke direktori frontend
+cd frontend
 
-## License
+# Instal dependensi
+npm install
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+# Jalankan server development
+npm run dev
+```
+Buka browser Anda dan akses `http://localhost:5173`.
+
+---
+
+## 🔒 Konfigurasi Keamanan (RLS)
+Keamanan data pada platform ini diatur langsung di tingkat database menggunakan PostgreSQL **Row Level Security (RLS)**:
+* **Profiles**: Semua pengguna terdaftar dapat mencari profil kolaborator, tetapi modifikasi hanya diizinkan untuk pemilik akun (`auth.uid() = id`).
+* **Swipes & Saved**: Hanya pembuat swipe yang dapat menulis dan melihat daftar geseran miliknya sendiri.
+* **Matches & Messages**: Pengguna hanya dapat membaca kecocokan dan bertukar pesan jika mereka terlibat sebagai bagian dari pasangan match tersebut (`auth.uid() = user_a_id OR auth.uid() = user_b_id`).
