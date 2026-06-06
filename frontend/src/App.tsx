@@ -5890,8 +5890,19 @@ function PhotoUploadField({
   const t = useTranslations();
   const [isCroppingModalOpen, setIsCroppingModalOpen] = useState(false);
   const [tempPhotoUrl, setTempPhotoUrl] = useState("");
-  const [tempX, setTempX] = useState(50);
-  const [tempY, setTempY] = useState(42);
+  const [scale, setScale] = useState(1.0);
+  const [panX, setPanX] = useState(0);
+  const [panY, setPanY] = useState(0);
+  const [imgAspectRatio, setImgAspectRatio] = useState(1.0);
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const dragStart = useRef({ x: 0, y: 0, panX: 0, panY: 0, active: false });
+  const touchStartInfo = useRef<{
+    touches: { id: number; x: number; y: number }[];
+    initScale: number;
+    initPanX: number;
+    initPanY: number;
+  } | null>(null);
 
   const handleFile = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -5902,25 +5913,253 @@ function PhotoUploadField({
     const reader = new FileReader();
     reader.onload = () => {
       if (typeof reader.result === "string") {
-        setTempPhotoUrl(reader.result);
-        const [x, y] = position.split(" ");
-        let xNum = 50;
-        if (x && x !== "center") {
-          const parsed = Number.parseInt(x, 10);
-          xNum = Number.isNaN(parsed) ? 50 : parsed;
-        }
-        let yNum = 42;
-        if (y && y !== "center") {
-          const parsed = Number.parseInt(y, 10);
-          yNum = Number.isNaN(parsed) ? 42 : parsed;
-        }
-        setTempX(xNum);
-        setTempY(yNum);
-        setIsCroppingModalOpen(true);
+        const resultStr = reader.result;
+        const img = new Image();
+        img.src = resultStr;
+        img.onload = () => {
+          setImgAspectRatio(img.width / img.height);
+          setTempPhotoUrl(resultStr);
+          setScale(1.0);
+          setPanX(0);
+          setPanY(0);
+          setIsCroppingModalOpen(true);
+        };
       }
     };
     reader.readAsDataURL(file);
     event.target.value = "";
+  };
+
+  const getPanBounds = (currentScale: number) => {
+    const rect = containerRef.current?.getBoundingClientRect();
+    const frameW = rect ? rect.width : 300;
+    const frameH = rect ? rect.height : 375;
+    const rFrame = frameW / frameH;
+
+    let wRendered = 0;
+    let hRendered = 0;
+
+    if (imgAspectRatio > rFrame) {
+      hRendered = frameH;
+      wRendered = frameH * imgAspectRatio;
+    } else {
+      wRendered = frameW;
+      hRendered = frameW / imgAspectRatio;
+    }
+
+    const wScaled = wRendered * currentScale;
+    const hScaled = hRendered * currentScale;
+
+    const maxPanX = Math.max(0, (wScaled - frameW) / 2);
+    const maxPanY = Math.max(0, (hScaled - frameH) / 2);
+
+    return { maxPanX, maxPanY };
+  };
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    dragStart.current = {
+      x: e.clientX,
+      y: e.clientY,
+      panX: panX,
+      panY: panY,
+      active: true
+    };
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      if (!dragStart.current.active) return;
+      const dx = moveEvent.clientX - dragStart.current.x;
+      const dy = moveEvent.clientY - dragStart.current.y;
+      
+      let newPanX = dragStart.current.panX + dx;
+      let newPanY = dragStart.current.panY + dy;
+
+      const { maxPanX, maxPanY } = getPanBounds(scale);
+      newPanX = Math.max(-maxPanX, Math.min(maxPanX, newPanX));
+      newPanY = Math.max(-maxPanY, Math.min(maxPanY, newPanY));
+
+      setPanX(newPanX);
+      setPanY(newPanY);
+    };
+
+    const handleMouseUp = () => {
+      dragStart.current.active = false;
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+    };
+
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("mouseup", handleMouseUp);
+  };
+
+  const handleWheel = (e: React.WheelEvent) => {
+    e.preventDefault();
+    const zoomIntensity = 0.08;
+    const delta = e.deltaY < 0 ? 1 : -1;
+    const nextScale = Math.max(1.0, Math.min(3.0, scale + delta * zoomIntensity));
+    
+    const { maxPanX, maxPanY } = getPanBounds(nextScale);
+    const clampedX = Math.max(-maxPanX, Math.min(maxPanX, panX));
+    const clampedY = Math.max(-maxPanY, Math.min(maxPanY, panY));
+
+    setScale(nextScale);
+    setPanX(clampedX);
+    setPanY(clampedY);
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    e.preventDefault();
+    const touches = Array.from(e.touches).map(t => ({
+      id: t.identifier,
+      x: t.clientX,
+      y: t.clientY
+    }));
+
+    touchStartInfo.current = {
+      touches,
+      initScale: scale,
+      initPanX: panX,
+      initPanY: panY
+    };
+
+    const handleTouchMove = (moveEvent: TouchEvent) => {
+      if (!touchStartInfo.current) return;
+      const currentTouches = Array.from(moveEvent.touches);
+
+      if (currentTouches.length === 1 && touchStartInfo.current.touches.length === 1) {
+        const startT = touchStartInfo.current.touches[0];
+        const currT = currentTouches[0];
+        const dx = currT.clientX - startT.x;
+        const dy = currT.clientY - startT.y;
+
+        let newPanX = touchStartInfo.current.initPanX + dx;
+        let newPanY = touchStartInfo.current.initPanY + dy;
+
+        const { maxPanX, maxPanY } = getPanBounds(scale);
+        newPanX = Math.max(-maxPanX, Math.min(maxPanX, newPanX));
+        newPanY = Math.max(-maxPanY, Math.min(maxPanY, newPanY));
+
+        setPanX(newPanX);
+        setPanY(newPanY);
+      } else if (currentTouches.length === 2 && touchStartInfo.current.touches.length === 2) {
+        const startT1 = touchStartInfo.current.touches[0];
+        const startT2 = touchStartInfo.current.touches[1];
+
+        const currT1 = currentTouches.find(t => t.identifier === startT1.id);
+        const currT2 = currentTouches.find(t => t.identifier === startT2.id);
+
+        if (currT1 && currT2) {
+          const initDist = Math.hypot(startT1.x - startT2.x, startT1.y - startT2.y);
+          const currDist = Math.hypot(currT1.clientX - currT2.clientX, currT1.clientY - currT2.clientY);
+
+          if (initDist > 0) {
+            const nextScale = Math.max(1.0, Math.min(3.0, touchStartInfo.current.initScale * (currDist / initDist)));
+            
+            const initMidX = (startT1.x + startT2.x) / 2;
+            const initMidY = (startT1.y + startT2.y) / 2;
+            const currMidX = (currT1.clientX + currT2.clientX) / 2;
+            const currMidY = (currT1.clientY + currT2.clientY) / 2;
+
+            const dx = currMidX - initMidX;
+            const dy = currMidY - initMidY;
+
+            let newPanX = touchStartInfo.current.initPanX + dx;
+            let newPanY = touchStartInfo.current.initPanY + dy;
+
+            const { maxPanX, maxPanY } = getPanBounds(nextScale);
+            newPanX = Math.max(-maxPanX, Math.min(maxPanX, newPanX));
+            newPanY = Math.max(-maxPanY, Math.min(maxPanY, newPanY));
+
+            setScale(nextScale);
+            setPanX(newPanX);
+            setPanY(newPanY);
+          }
+        }
+      }
+    };
+
+    const handleTouchEnd = (endEvent: TouchEvent) => {
+      if (endEvent.touches.length > 0) {
+        const remainingTouches = Array.from(endEvent.touches).map(t => ({
+          id: t.identifier,
+          x: t.clientX,
+          y: t.clientY
+        }));
+        touchStartInfo.current = {
+          touches: remainingTouches,
+          initScale: scale,
+          initPanX: panX,
+          initPanY: panY
+        };
+      } else {
+        touchStartInfo.current = null;
+        document.removeEventListener("touchmove", handleTouchMove);
+        document.removeEventListener("touchend", handleTouchEnd);
+      }
+    };
+
+    document.addEventListener("touchmove", handleTouchMove, { passive: false });
+    document.addEventListener("touchend", handleTouchEnd);
+  };
+
+  const handleSave = () => {
+    const image = new Image();
+    image.src = tempPhotoUrl;
+    image.onload = () => {
+      const canvas = document.createElement("canvas");
+      const canvasW = 400;
+      const canvasH = 500;
+      canvas.width = canvasW;
+      canvas.height = canvasH;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+
+      const rect = containerRef.current?.getBoundingClientRect();
+      const frameW = rect ? rect.width : 300;
+      const frameH = rect ? rect.height : 375;
+      const k = canvasW / frameW;
+
+      const imgW = image.width;
+      const imgH = image.height;
+      const rImg = imgW / imgH;
+      const rFrame = frameW / frameH;
+
+      let wRendered = 0;
+      let hRendered = 0;
+      let lRendered = 0;
+      let tRendered = 0;
+
+      if (rImg > rFrame) {
+        hRendered = frameH;
+        wRendered = frameH * rImg;
+        lRendered = -(wRendered - frameW) / 2;
+        tRendered = 0;
+      } else {
+        wRendered = frameW;
+        hRendered = frameW / rImg;
+        lRendered = 0;
+        tRendered = -(hRendered - frameH) / 2;
+      }
+
+      const wScaled = wRendered * scale;
+      const hScaled = hRendered * scale;
+      const lScaled = frameW / 2 - (frameW / 2 - lRendered) * scale + panX;
+      const tScaled = frameH / 2 - (frameH / 2 - tRendered) * scale + panY;
+
+      ctx.drawImage(
+        image,
+        lScaled * k,
+        tScaled * k,
+        wScaled * k,
+        hScaled * k
+      );
+
+      const croppedDataUrl = canvas.toDataURL("image/jpeg", 0.9);
+      onChange(croppedDataUrl);
+      onPositionChange("center");
+      setIsCroppingModalOpen(false);
+      setTempPhotoUrl("");
+    };
   };
 
   return (
@@ -5949,46 +6188,56 @@ function PhotoUploadField({
           <div className="crop-modal-content">
             <h3>{t.language === "id" ? "Sesuaikan Crop Foto" : "Adjust Photo Crop"}</h3>
             
-            <div className="photo-preview-frame" style={{ margin: "10px auto 20px" }}>
+            <div
+              className="photo-preview-frame"
+              ref={containerRef}
+              style={{
+                margin: "10px auto 20px",
+                position: "relative",
+                overflow: "hidden",
+                cursor: "move",
+                userSelect: "none",
+                touchAction: "none"
+              }}
+              onMouseDown={handleMouseDown}
+              onTouchStart={handleTouchStart}
+              onWheel={handleWheel}
+            >
               <img
                 src={tempPhotoUrl}
                 alt="Temp preview"
-                style={{ objectPosition: `${tempX}% ${tempY}%`, width: "100%", height: "100%", objectFit: "cover" }}
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "cover",
+                  transform: `translate(${panX}px, ${panY}px) scale(${scale})`,
+                  transformOrigin: "center center",
+                  pointerEvents: "none",
+                  userSelect: "none"
+                }}
               />
             </div>
 
-            <div className="crop-control-grid" style={{ gridTemplateColumns: "1fr" }}>
-              <label style={{ display: "grid", gap: "6px" }}>
-                <span style={{ fontWeight: 800, fontSize: "0.85rem" }}>{t.horizontalCrop} <small>{tempX}%</small></span>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={tempX}
-                  onChange={(event) => setTempX(Number(event.target.value))}
-                  style={{ width: "100%" }}
-                />
-              </label>
-              <label style={{ display: "grid", gap: "6px", marginTop: "10px" }}>
-                <span style={{ fontWeight: 800, fontSize: "0.85rem" }}>{t.verticalCrop} <small>{tempY}%</small></span>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={tempY}
-                  onChange={(event) => setTempY(Number(event.target.value))}
-                  style={{ width: "100%" }}
-                />
-              </label>
+            <div style={{ textAlign: "center", marginBottom: "15px" }}>
+              <small style={{ color: "var(--muted)", fontSize: "0.8rem" }}>
+                {t.language === "id" 
+                  ? "Geser foto untuk menyesuaikan posisi. Gunakan scroll mouse (desktop) atau pinch gesture (mobile) untuk zoom." 
+                  : "Drag photo to pan. Use mouse scroll (desktop) or pinch gestures (mobile) to zoom."}
+              </small>
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "center", marginBottom: "15px" }}>
               <button
                 type="button"
-                className="crop-reset-button"
                 onClick={() => {
-                  setTempX(50);
-                  setTempY(42);
+                  setScale(1.0);
+                  setPanX(0);
+                  setPanY(0);
                 }}
                 style={{
-                  marginTop: "12px",
                   padding: "6px 12px",
                   borderRadius: "20px",
                   border: "1px solid var(--border)",
@@ -5999,7 +6248,7 @@ function PhotoUploadField({
                   fontSize: "0.8rem"
                 }}
               >
-                {t.centerCrop}
+                {t.language === "id" ? "Reset Posisi" : "Reset Position"}
               </button>
             </div>
 
@@ -6018,12 +6267,7 @@ function PhotoUploadField({
               <Button
                 variant="primary"
                 type="button"
-                onClick={() => {
-                  onChange(tempPhotoUrl);
-                  onPositionChange(`${tempX}% ${tempY}%`);
-                  setIsCroppingModalOpen(false);
-                  setTempPhotoUrl("");
-                }}
+                onClick={handleSave}
                 style={{ flex: 1 }}
               >
                 {t.language === "id" ? "Simpan" : "Save Changes"}

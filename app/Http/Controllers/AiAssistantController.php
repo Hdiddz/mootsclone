@@ -39,7 +39,22 @@ class AiAssistantController extends Controller
                 ->toArray();
         }
 
-        if ($openRouterKey = config('services.openrouter.key')) {
+        // Prioritize Gemini since the user requested it specifically for Vercel deployment
+        if ($geminiKey = config('services.gemini.key')) {
+            try {
+                $reply = $this->askGemini($geminiKey, $context, $prompt, $history);
+                $provider = 'gemini';
+            } catch (RequestException $exception) {
+                $status = $exception->response?->status();
+                $apiError = "Gemini API Error [{$status}]: " . ($exception->response?->json('error.message') ?? $exception->getMessage());
+                Log::warning('Gemini AI request failed.', ['status' => $status]);
+            } catch (\Throwable $exception) {
+                $apiError = "Gemini Error: " . $exception->getMessage();
+                Log::warning('Gemini AI request failed.', ['error' => $exception->getMessage()]);
+            }
+        }
+
+        if ($reply === null && ($openRouterKey = config('services.openrouter.key'))) {
             try {
                 $reply = $this->askOpenRouter($openRouterKey, $context, $prompt, $history);
                 $provider = 'openrouter';
@@ -51,20 +66,6 @@ class AiAssistantController extends Controller
             } catch (\Throwable $exception) {
                 $apiError = "OpenRouter Error: " . $exception->getMessage();
                 Log::warning('OpenRouter AI request failed.', ['error' => $exception->getMessage()]);
-            }
-        }
-
-        if ($reply === null && ($geminiKey = config('services.gemini.key'))) {
-            try {
-                $reply = $this->askGemini($geminiKey, $context, $prompt, $history);
-                $provider = 'gemini';
-            } catch (RequestException $exception) {
-                $status = $exception->response?->status();
-                $apiError = "Gemini API Error [{$status}]: " . ($exception->response?->json('error.message') ?? $exception->getMessage());
-                Log::warning('Gemini AI request failed.', ['status' => $status]);
-            } catch (\Throwable $exception) {
-                $apiError = "Gemini Error: " . $exception->getMessage();
-                Log::warning('Gemini AI request failed.', ['error' => $exception->getMessage()]);
             }
         }
 
