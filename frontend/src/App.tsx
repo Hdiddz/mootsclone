@@ -1017,16 +1017,19 @@ function AuthPage() {
       }
       if (!emailPrefix.trim()) {
         setError(t.emailUsernameRequired);
+        setLoading(false);
         return;
       }
       if (password.length < 8) {
         setError(t.passwordMin);
+        setLoading(false);
         return;
       }
-      const fullEmail = `${emailPrefix.trim()}@telkomuniversity.ac.id`;
-      signup(fullName, fullEmail, password);
-      await signup(fullName, fullEmail, password);
-      navigate("/onboarding");
+      const fullEmail = emailPrefix.trim();
+      const success = await signup(fullName, fullEmail, password);
+      if (success) {
+        navigate("/onboarding");
+      }
     }
     setLoading(false);
   };
@@ -1117,33 +1120,16 @@ function AuthPage() {
           ) : null}
 
           <div className="auth-field">
-            <label htmlFor="email">{t.campusEmail}</label>
-            {mode === "signup" ? (
-              <div className="auth-input-wrapper">
-                <input
-                  id="email"
-                  type="text"
-                  className="auth-input auth-input-with-suffix"
-                  placeholder="username"
-                  value={emailPrefix}
-                  onChange={(e) => setEmailPrefix(e.target.value)}
-                  required
-                />
-                <div className="auth-input-suffix">
-                  @telkomuniversity.ac.id
-                </div>
-              </div>
-            ) : (
-              <input
-                id="email"
-                type="email"
-                className="auth-input"
-                placeholder="student@telkomuniversity.ac.id"
-                value={loginEmail}
-                onChange={(e) => setLoginEmail(e.target.value)}
-                required
-              />
-            )}
+            <label htmlFor="email">{mode === "signup" ? (t.language === "id" ? "Alamat Email" : "Email Address") : t.campusEmail}</label>
+            <input
+              id="email"
+              type="email"
+              className="auth-input"
+              placeholder={mode === "signup" ? "username@gmail.com" : "student@telkomuniversity.ac.id"}
+              value={mode === "signup" ? emailPrefix : loginEmail}
+              onChange={(e) => mode === "signup" ? setEmailPrefix(e.target.value) : setLoginEmail(e.target.value)}
+              required
+            />
           </div>
 
           <div className="auth-field">
@@ -1193,11 +1179,6 @@ function AuthPage() {
           <span className="auth-divider-text">{t.orContinueWith}</span>
           <div className="auth-divider-line" />
         </div>
-
-        <button type="button" className="auth-btn-social" onClick={() => handleSSOLogin("Student")}>
-          <span className="material-symbols-outlined" style={{ color: 'var(--primary)' }}>hub</span>
-          {t.teluSso}
-        </button>
 
         <button type="button" className="auth-btn-social" onClick={() => handleSSOLogin("Google")}>
           <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
