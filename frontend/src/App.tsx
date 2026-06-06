@@ -1061,7 +1061,10 @@ function AuthPage() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${window.location.origin}/discover`
+          redirectTo: `${window.location.origin}/discover`,
+          queryParams: {
+            prompt: "select_account"
+          }
         }
       });
       if (error) {
@@ -1554,6 +1557,11 @@ function App() {
         setNotifications([]);
         setDbCandidates([]);
         setShowSwiped(false);
+
+        const path = window.location.pathname;
+        if (path !== "/login" && path !== "/signup" && path !== "/") {
+          navigate("/login", { replace: true });
+        }
       }
     });
 
