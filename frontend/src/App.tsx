@@ -138,7 +138,7 @@ type SymbioStore = {
   addToast: (title: string, body: string, type?: "success" | "error" | "warning" | "info") => void;
   user: { id?: string; name: string; email: string; role?: string } | null;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<boolean>;
+  login: (email: string, password: string) => Promise<CandidateProfile | null>;
   signup: (name: string, email: string, password: string) => Promise<boolean>;
   logout: () => void;
   language: "en" | "id";
@@ -977,7 +977,7 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
 
 
 function AuthPage() {
-  const { login, signup, isAuthenticated, addToast, theme, setTheme } = useSymbio();
+  const { login, signup, isAuthenticated, addToast, theme, setTheme, profile, user } = useSymbio();
   const t = useTranslations();
   const navigate = useNavigate();
   const location = useLocation();
@@ -995,10 +995,15 @@ function AuthPage() {
   const from = (location.state as any)?.from?.pathname || "/discover";
 
   useEffect(() => {
-    if (isAuthenticated) {
-      navigate(from, { replace: true });
+    if (isAuthenticated && user && profile && profile.id === user.id) {
+      if (!profile.mainSkill || !profile.campus) {
+        navigate("/onboarding", { replace: true });
+      } else {
+        const dest = from === "/" || from === "/login" || from === "/signup" ? "/discover" : from;
+        navigate(dest, { replace: true });
+      }
     }
-  }, [isAuthenticated, navigate, from]);
+  }, [isAuthenticated, user, profile, navigate, from]);
 
   useEffect(() => {
     setMode(location.pathname === "/signup" ? "signup" : "login");
@@ -1010,9 +1015,13 @@ function AuthPage() {
     setLoading(true);
 
     if (mode === "login") {
-      const success = await login(loginEmail, password);
-      if (success) {
-        navigate(from, { replace: true });
+      const profileResult = await login(loginEmail, password);
+      if (profileResult) {
+        if (!profileResult.mainSkill || !profileResult.campus) {
+          navigate("/onboarding", { replace: true });
+        } else {
+          navigate(from === "/" || from === "/login" || from === "/signup" ? "/discover" : from, { replace: true });
+        }
       } else {
         setError(t.invalidLogin);
         setLoading(false);
@@ -1036,7 +1045,7 @@ function AuthPage() {
       const fullEmail = emailPrefix.trim();
       const success = await signup(fullName, fullEmail, password);
       if (success) {
-        navigate("/onboarding");
+        navigate("/onboarding", { replace: true });
       }
     }
     setLoading(false);
@@ -1607,7 +1616,7 @@ function App() {
             error.message,
             "error"
           );
-          return false;
+          return null;
         }
 
         if (data?.user) {
@@ -1617,7 +1626,7 @@ function App() {
             email: data.user.email || ""
           });
 
-          await loadUserProfile(data.user.id);
+          const p = await loadUserProfile(data.user.id);
           await fetchDiscoverAndMatches(data.user.id);
 
           addToast(
@@ -1625,19 +1634,19 @@ function App() {
             language === "id" ? `Masuk sebagai ${data.user.user_metadata?.name || email.split("@")[0]}` : `Logged in as ${data.user.user_metadata?.name || email.split("@")[0]}`,
             "success"
           );
-          return true;
+          return p;
         }
-        return false;
+        return null;
       } catch (err: any) {
         addToast(
           language === "id" ? "Kesalahan" : "Error",
           err.message || "An unexpected error occurred",
           "error"
         );
-        return false;
+        return null;
       }
     },
-    [addToast, language]
+    [addToast, language, loadUserProfile, fetchDiscoverAndMatches]
   );
 
   const signup = useCallback(
@@ -3911,7 +3920,7 @@ function SwipeActionButtons({
 }
 
 function OnboardingPage() {
-  const { profile, setProfile, addToast, user, fetchDiscoverAndMatches } = useSymbio();
+  const { profile, setProfile, addToast, user, fetchDiscoverAndMatches, logout } = useSymbio();
   const t = useTranslations();
   const navigate = useNavigate();
   const [draft, setDraft] = useState<CandidateProfile>(() => ({
@@ -3988,10 +3997,29 @@ function OnboardingPage() {
         <Link to="/" className="top-logo" style={{ position: "static", transform: "none" }}>
           Mutualizm <span>✦</span>
         </Link>
-        <Link to="/" className="text-link" style={{ display: 'flex', alignItems: 'center', gap: '6px', textDecoration: 'none', fontWeight: 600 }}>
+        <button
+          onClick={async () => {
+            await logout();
+            navigate("/");
+          }}
+          className="text-link"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            textDecoration: 'none',
+            fontWeight: 600,
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            padding: 0,
+            fontFamily: 'inherit',
+            fontSize: 'inherit',
+          }}
+        >
           <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>logout</span>
           {t.language === "id" ? "Batal & Keluar" : "Cancel & Exit"}
-        </Link>
+        </button>
       </header>
 
       <main className="onboarding-grid">
@@ -5860,31 +5888,10 @@ function PhotoUploadField({
   onPositionChange: (value: string) => void;
 }) {
   const t = useTranslations();
-  const [x, y] = position.split(" ");
-
-  let xNum = 50;
-  if (x) {
-    if (x === "center") {
-      xNum = 50;
-    } else {
-      const parsed = Number.parseInt(x, 10);
-      xNum = Number.isNaN(parsed) ? 50 : parsed;
-    }
-  }
-
-  let yNum = 50;
-  if (y) {
-    if (y === "center") {
-      yNum = 50;
-    } else {
-      const parsed = Number.parseInt(y, 10);
-      yNum = Number.isNaN(parsed) ? 42 : parsed;
-    }
-  }
-
-  const updatePosition = (nextX = xNum, nextY = yNum) => {
-    onPositionChange(`${nextX}% ${nextY}%`);
-  };
+  const [isCroppingModalOpen, setIsCroppingModalOpen] = useState(false);
+  const [tempPhotoUrl, setTempPhotoUrl] = useState("");
+  const [tempX, setTempX] = useState(50);
+  const [tempY, setTempY] = useState(42);
 
   const handleFile = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -5895,10 +5902,25 @@ function PhotoUploadField({
     const reader = new FileReader();
     reader.onload = () => {
       if (typeof reader.result === "string") {
-        onChange(reader.result);
+        setTempPhotoUrl(reader.result);
+        const [x, y] = position.split(" ");
+        let xNum = 50;
+        if (x && x !== "center") {
+          const parsed = Number.parseInt(x, 10);
+          xNum = Number.isNaN(parsed) ? 50 : parsed;
+        }
+        let yNum = 42;
+        if (y && y !== "center") {
+          const parsed = Number.parseInt(y, 10);
+          yNum = Number.isNaN(parsed) ? 42 : parsed;
+        }
+        setTempX(xNum);
+        setTempY(yNum);
+        setIsCroppingModalOpen(true);
       }
     };
     reader.readAsDataURL(file);
+    event.target.value = "";
   };
 
   return (
@@ -5915,41 +5937,101 @@ function PhotoUploadField({
         )}
       </div>
       <div className="photo-upload-actions">
-        <label className="button button-secondary">
+        <label className="button button-secondary" style={{ width: "100%", cursor: "pointer" }}>
+          <span className="material-symbols-outlined" style={{ fontSize: "18px" }}>upload</span>
           {t.upload}
           <input type="file" accept="image/*" onChange={handleFile} />
         </label>
-        <input
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          placeholder={t.pastePhotoUrl}
-        />
       </div>
-      <div className="crop-control-grid">
-        <label>
-          <span>{t.horizontalCrop} <small>{xNum}%</small></span>
-          <input
-            type="range"
-            min="0"
-            max="100"
-            value={xNum}
-            onChange={(event) => updatePosition(Number(event.target.value), yNum)}
-          />
-        </label>
-        <label>
-          <span>{t.verticalCrop} <small>{yNum}%</small></span>
-          <input
-            type="range"
-            min="0"
-            max="100"
-            value={yNum}
-            onChange={(event) => updatePosition(xNum, Number(event.target.value))}
-          />
-        </label>
-        <button type="button" className="crop-reset-button" onClick={() => updatePosition(50, 42)}>
-          {t.centerCrop}
-        </button>
-      </div>
+
+      {isCroppingModalOpen && tempPhotoUrl && (
+        <div className="crop-modal-overlay">
+          <div className="crop-modal-content">
+            <h3>{t.language === "id" ? "Sesuaikan Crop Foto" : "Adjust Photo Crop"}</h3>
+            
+            <div className="photo-preview-frame" style={{ margin: "10px auto 20px" }}>
+              <img
+                src={tempPhotoUrl}
+                alt="Temp preview"
+                style={{ objectPosition: `${tempX}% ${tempY}%`, width: "100%", height: "100%", objectFit: "cover" }}
+              />
+            </div>
+
+            <div className="crop-control-grid" style={{ gridTemplateColumns: "1fr" }}>
+              <label style={{ display: "grid", gap: "6px" }}>
+                <span style={{ fontWeight: 800, fontSize: "0.85rem" }}>{t.horizontalCrop} <small>{tempX}%</small></span>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={tempX}
+                  onChange={(event) => setTempX(Number(event.target.value))}
+                  style={{ width: "100%" }}
+                />
+              </label>
+              <label style={{ display: "grid", gap: "6px", marginTop: "10px" }}>
+                <span style={{ fontWeight: 800, fontSize: "0.85rem" }}>{t.verticalCrop} <small>{tempY}%</small></span>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={tempY}
+                  onChange={(event) => setTempY(Number(event.target.value))}
+                  style={{ width: "100%" }}
+                />
+              </label>
+              <button
+                type="button"
+                className="crop-reset-button"
+                onClick={() => {
+                  setTempX(50);
+                  setTempY(42);
+                }}
+                style={{
+                  marginTop: "12px",
+                  padding: "6px 12px",
+                  borderRadius: "20px",
+                  border: "1px solid var(--border)",
+                  background: "var(--surface-container-low)",
+                  color: "var(--ink)",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  fontSize: "0.8rem"
+                }}
+              >
+                {t.centerCrop}
+              </button>
+            </div>
+
+            <div className="crop-modal-actions">
+              <Button
+                variant="secondary"
+                type="button"
+                onClick={() => {
+                  setIsCroppingModalOpen(false);
+                  setTempPhotoUrl("");
+                }}
+                style={{ flex: 1 }}
+              >
+                {t.language === "id" ? "Batal" : "Cancel"}
+              </Button>
+              <Button
+                variant="primary"
+                type="button"
+                onClick={() => {
+                  onChange(tempPhotoUrl);
+                  onPositionChange(`${tempX}% ${tempY}%`);
+                  setIsCroppingModalOpen(false);
+                  setTempPhotoUrl("");
+                }}
+                style={{ flex: 1 }}
+              >
+                {t.language === "id" ? "Simpan" : "Save Changes"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

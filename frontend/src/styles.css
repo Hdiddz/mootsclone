@@ -5403,7 +5403,7 @@ img.avatar {
 
 .photo-upload-actions {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: 1fr;
   gap: 10px;
 }
 
@@ -5415,7 +5415,6 @@ img.avatar {
   pointer-events: none;
 }
 
-.photo-upload-actions > input,
 .custom-chip-input input {
   min-height: 44px;
   min-width: 0;
@@ -7627,3 +7626,56 @@ body {
     margin-bottom: 0 !important;
   }
 }
+
+/* Photo Cropping Modal Overlay */
+.crop-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  animation: modalFadeIn 0.22s ease-out;
+}
+
+.crop-modal-content {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 24px;
+  width: min(400px, calc(100vw - 32px));
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.24);
+  display: flex;
+  flex-direction: column;
+  animation: modalSlideUp 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.crop-modal-content h3 {
+  margin: 0 0 16px;
+  font-size: 1.15rem;
+  font-weight: 800;
+  text-align: center;
+  color: var(--ink);
+}
+
+.crop-modal-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+@keyframes modalFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes modalSlideUp {
+  from { transform: translateY(24px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+
