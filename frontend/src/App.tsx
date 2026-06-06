@@ -5894,6 +5894,7 @@ function PhotoUploadField({
   const [panX, setPanX] = useState(0);
   const [panY, setPanY] = useState(0);
   const [imgAspectRatio, setImgAspectRatio] = useState(1.0);
+  const [frameDimensions, setFrameDimensions] = useState({ width: 300, height: 375 });
 
   const containerRef = useRef<HTMLDivElement>(null);
   const dragStart = useRef({ x: 0, y: 0, panX: 0, panY: 0, active: false });
@@ -5903,6 +5904,29 @@ function PhotoUploadField({
     initPanX: number;
     initPanY: number;
   } | null>(null);
+
+  // Monitor frame dimensions to keep them in sync with CSS/viewport size changes
+  useEffect(() => {
+    if (!isCroppingModalOpen) return;
+
+    const updateDimensions = () => {
+      if (containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0) {
+          setFrameDimensions({ width: rect.width, height: rect.height });
+        }
+      }
+    };
+
+    updateDimensions();
+    const timer = setTimeout(updateDimensions, 100);
+
+    window.addEventListener("resize", updateDimensions);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("resize", updateDimensions);
+    };
+  }, [isCroppingModalOpen]);
 
   const handleFile = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -5930,23 +5954,28 @@ function PhotoUploadField({
     event.target.value = "";
   };
 
+  const frameW = frameDimensions.width;
+  const frameH = frameDimensions.height;
+  const rFrame = frameW / frameH;
+
+  let wRendered = 0;
+  let hRendered = 0;
+  let lRendered = 0;
+  let tRendered = 0;
+
+  if (imgAspectRatio > rFrame) {
+    hRendered = frameH;
+    wRendered = frameH * imgAspectRatio;
+    lRendered = -(wRendered - frameW) / 2;
+    tRendered = 0;
+  } else {
+    wRendered = frameW;
+    hRendered = frameW / imgAspectRatio;
+    lRendered = 0;
+    tRendered = -(hRendered - frameH) / 2;
+  }
+
   const getPanBounds = (currentScale: number) => {
-    const rect = containerRef.current?.getBoundingClientRect();
-    const frameW = rect ? rect.width : 300;
-    const frameH = rect ? rect.height : 375;
-    const rFrame = frameW / frameH;
-
-    let wRendered = 0;
-    let hRendered = 0;
-
-    if (imgAspectRatio > rFrame) {
-      hRendered = frameH;
-      wRendered = frameH * imgAspectRatio;
-    } else {
-      wRendered = frameW;
-      hRendered = frameW / imgAspectRatio;
-    }
-
     const wScaled = wRendered * currentScale;
     const hScaled = hRendered * currentScale;
 
@@ -6114,32 +6143,7 @@ function PhotoUploadField({
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
 
-      const rect = containerRef.current?.getBoundingClientRect();
-      const frameW = rect ? rect.width : 300;
-      const frameH = rect ? rect.height : 375;
       const k = canvasW / frameW;
-
-      const imgW = image.width;
-      const imgH = image.height;
-      const rImg = imgW / imgH;
-      const rFrame = frameW / frameH;
-
-      let wRendered = 0;
-      let hRendered = 0;
-      let lRendered = 0;
-      let tRendered = 0;
-
-      if (rImg > rFrame) {
-        hRendered = frameH;
-        wRendered = frameH * rImg;
-        lRendered = -(wRendered - frameW) / 2;
-        tRendered = 0;
-      } else {
-        wRendered = frameW;
-        hRendered = frameW / rImg;
-        lRendered = 0;
-        tRendered = -(hRendered - frameH) / 2;
-      }
 
       const wScaled = wRendered * scale;
       const hScaled = hRendered * scale;
@@ -6208,11 +6212,12 @@ function PhotoUploadField({
                 alt="Temp preview"
                 style={{
                   position: "absolute",
-                  top: 0,
-                  left: 0,
-                  width: "100%",
-                  height: "100%",
-                  objectFit: "cover",
+                  left: `${lRendered}px`,
+                  top: `${tRendered}px`,
+                  width: `${wRendered}px`,
+                  height: `${hRendered}px`,
+                  maxWidth: "none",
+                  maxHeight: "none",
                   transform: `translate(${panX}px, ${panY}px) scale(${scale})`,
                   transformOrigin: "center center",
                   pointerEvents: "none",

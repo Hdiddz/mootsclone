@@ -5379,6 +5379,7 @@ img.avatar {
 .photo-preview-frame {
   position: relative;
   width: min(100%, 300px);
+  max-height: 50vh;
   aspect-ratio: 4 / 5;
   overflow: hidden;
   border: 1px solid var(--border);
