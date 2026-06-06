@@ -1931,31 +1931,6 @@ function App() {
         return;
       }
 
-      const now = new Date();
-      const timestamp = now.toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit"
-      });
-
-      setChats((current) => ({
-        ...current,
-        [matchId]: [
-          ...(current[matchId] ?? []),
-          {
-            id: `msg-${Date.now()}`,
-            sender: "me",
-            text: cleanText,
-            timestamp
-          }
-        ]
-      }));
-
-      setMatches((current) =>
-        current.map((match) =>
-          match.id === matchId ? { ...match, latestMessage: cleanText, unread: 0 } : match
-        )
-      );
-
       try {
         const { error } = await supabase.from("messages").insert({
           match_id: matchId,
@@ -1966,15 +1941,15 @@ function App() {
       } catch (err) {
         console.error("Error sending message to Supabase:", err);
         addToast(
-          language === "id" ? "Pesan belum tersimpan" : "Message not persisted",
+          language === "id" ? "Pesan gagal terkirim" : "Message failed to send",
           language === "id"
-            ? "Pesan tampil di UI, tetapi API backend belum berhasil menyimpannya."
-            : "The message is visible locally, but the backend API did not persist it.",
-          "warning"
+            ? "API backend tidak berhasil menyimpan pesan Anda. Coba lagi nanti."
+            : "The backend API did not persist your message. Please try again later.",
+          "error"
         );
       }
     },
-    [addToast, language, setChats, setMatches, user?.id]
+    [user?.id, addToast, language]
   );
 
   useEffect(() => {
@@ -6584,21 +6559,30 @@ function localizeTimeLabel(time: string, t: TranslationSet) {
 }
 
 function localizeMatchSummary(match: MatchRecord, candidate: CandidateProfile, t: TranslationSet) {
+  const safeSummary = Array.isArray(match?.summary) ? match.summary : [];
   if (!isIndonesian(t)) {
-    return match.summary;
+    return safeSummary;
   }
 
-  const firstName = candidate.name.split(" ")[0];
-  const firstSkill = candidate.skills[0]?.name ?? candidate.mainSkill;
-  const secondSkill = candidate.skills[1]?.name;
+  const name = candidate?.name ? String(candidate.name) : "";
+  const firstName = name.split(" ")[0] || "";
+  const skillsArray = Array.isArray(candidate?.skills) ? candidate.skills : [];
+  const firstSkill = skillsArray[0]?.name ?? candidate?.mainSkill ?? "";
+  const secondSkill = skillsArray[1]?.name ?? "";
   const skillText = secondSkill ? `${firstSkill} dan ${secondSkill}` : firstSkill;
-  const goal = candidate.collaborationGoals[0]
-    ? localizeCollaborationGoal(candidate.collaborationGoals[0], t).toLowerCase()
+  
+  const goalsArray = Array.isArray(candidate?.collaborationGoals) ? candidate.collaborationGoals : [];
+  const goal = goalsArray[0]
+    ? localizeCollaborationGoal(goalsArray[0], t).toLowerCase()
     : "proyek";
 
+  const roleText = candidate?.role
+    ? localizeRoleLabel(candidate.role, t as unknown as Record<string, string>).toLowerCase()
+    : "kolaborator";
+
   return [
-    `Anda mencari dukungan ${localizeRoleLabel(candidate.role, t as unknown as Record<string, string>).toLowerCase()}.`,
-    `${firstName} punya pengalaman ${skillText}.`,
+    `Anda mencari dukungan ${roleText}.`,
+    `${firstName} punya pengalaman ${skillText || "yang relevan"}.`,
     `Kedua profil menyebut kolaborasi ${goal}.`
   ];
 }

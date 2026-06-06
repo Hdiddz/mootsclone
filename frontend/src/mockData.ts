@@ -325,22 +325,30 @@ export const candidates: CandidateProfile[] = [
   }
 ];
 
-export const createMatchFor = (candidate: CandidateProfile): MatchRecord => ({
-  id: `match-${candidate.id}`,
-  candidateId: candidate.id,
-  createdAt: "Just now",
-  skillOverlap: candidate.skills.slice(0, 3).map((item) => item.name),
-  latestMessage: candidate.suggestedMessage,
-  unread: 1,
-  summary: [
-    `You are looking for ${candidate.role.toLowerCase()} support.`,
-    `${candidate.name.split(" ")[0]} has ${candidate.skills
-      .slice(0, 2)
-      .map((item) => item.name)
-      .join(" and ")} experience.`,
-    `Both profiles mention ${candidate.collaborationGoals[0].toLowerCase()} collaboration.`
-  ]
-});
+export const createMatchFor = (candidate: CandidateProfile): MatchRecord => {
+  const role = candidate?.role ? String(candidate.role).toLowerCase() : "";
+  const name = candidate?.name ? String(candidate.name) : "";
+  const firstName = name.split(" ")[0] || "";
+  const skillsArray = Array.isArray(candidate?.skills) ? candidate.skills : [];
+  const mainSkillStr = candidate?.mainSkill ? String(candidate.mainSkill) : "";
+  const suggestedMessageStr = candidate?.suggestedMessage ? String(candidate.suggestedMessage) : "";
+  const goalsArray = Array.isArray(candidate?.collaborationGoals) ? candidate.collaborationGoals : [];
+  const goalStr = goalsArray[0] ? String(goalsArray[0]).toLowerCase() : "collaboration";
+
+  return {
+    id: `match-${candidate?.id || Date.now()}`,
+    candidateId: candidate?.id || "",
+    createdAt: "Just now",
+    skillOverlap: skillsArray.slice(0, 3).map((item) => item?.name || ""),
+    latestMessage: suggestedMessageStr,
+    unread: 1,
+    summary: [
+      `You are looking for ${role || "collaborator"} support.`,
+      `${firstName} has ${skillsArray.slice(0, 2).map((item) => item?.name || "").join(" and ") || mainSkillStr || "relevant"} experience.`,
+      `Both profiles mention ${goalStr} collaboration.`
+    ]
+  };
+};
 
 export const mockMatches: MatchRecord[] = [
   { ...createMatchFor(candidates[0]), unread: 2, createdAt: "Today" },
