@@ -148,6 +148,7 @@ type SymbioStore = {
   dbCandidates: CandidateProfile[];
   setDbCandidates: Dispatch<SetStateAction<CandidateProfile[]>>;
   fetchDiscoverAndMatches: (userId: string) => Promise<any>;
+  showSwiped: boolean;
 };
 
 const defaultFilters: FilterValues = {
@@ -457,6 +458,9 @@ const translations = {
     skipToDemo: "Skip to demo",
     stepOf: "Step",
     of: "of",
+    alreadyInterested: "You have added this candidate",
+    alreadyPassed: "You skipped this candidate",
+    alreadySaved: "You saved this candidate",
     profileReadyTitle: "Profile ready",
     profileReadyBody: "Your mock profile is saved for the demo.",
     back: "Back",
@@ -819,6 +823,9 @@ const translations = {
     skipToDemo: "Lewati ke demo",
     stepOf: "Tahap",
     of: "dari",
+    alreadyInterested: "Anda sudah memasukkan kandidat ini",
+    alreadyPassed: "Anda melewati kandidat ini",
+    alreadySaved: "Anda menyimpan kandidat ini",
     profileReadyTitle: "Profil siap",
     profileReadyBody: "Profil demo Anda sudah disimpan.",
     back: "Kembali",
@@ -1262,6 +1269,11 @@ function App() {
   const [language, setLanguage] = useLocalStorageState<"en" | "id">("mutualizm.language", "en");
   const [theme, setTheme] = useLocalStorageState<"light" | "dark">("mutualizm.theme", "light");
   const [dbCandidates, setDbCandidates] = useState<CandidateProfile[]>([]);
+  const [showSwiped, setShowSwiped] = useState(false);
+
+  useEffect(() => {
+    setShowSwiped(false);
+  }, [filters]);
 
   useEffect(() => {
     if (theme === "dark") {
@@ -1518,6 +1530,7 @@ function App() {
         setChats({});
         setNotifications([]);
         setDbCandidates([]);
+        setShowSwiped(false);
       }
     });
 
@@ -1693,6 +1706,7 @@ function App() {
       setChats({});
       setNotifications([]);
       setDbCandidates([]);
+      setShowSwiped(false);
       addToast(
         language === "id" ? "Keluar" : "Logged out",
         language === "id" ? "Anda sudah keluar dari sesi." : "You have been logged out of your session.",
@@ -1731,14 +1745,21 @@ function App() {
       if (user?.id) {
         try {
           if (action === "interest" && candidate.mutualInterest) {
-            // First, insert a matching swipe from the candidate to the user to trigger the mutual match trigger in postgres!
-            await supabase
-              .from("swipes")
-              .upsert({
-                swiper_id: candidate.id,
-                swiped_id: user.id,
-                action: "interest"
-              });
+            // First, call simulate_mutual_match RPC function to bypass RLS
+            const { error: rpcError } = await supabase.rpc("simulate_mutual_match", {
+              user_id: user.id,
+              candidate_id: candidate.id
+            });
+            if (rpcError) {
+              console.warn("simulate_mutual_match RPC failed, falling back to client upsert:", rpcError);
+              await supabase
+                .from("swipes")
+                .upsert({
+                  swiper_id: candidate.id,
+                  swiped_id: user.id,
+                  action: "interest"
+                });
+            }
           }
 
           const { error } = await supabase
@@ -1796,24 +1817,9 @@ function App() {
     }
   }, [user?.id, previousActions, setPassedIds, setSavedIds, setInterestedIds, setPreviousActions, addToast]);
 
-  const resetDeck = useCallback(async () => {
-    if (!user?.id) return;
-    setPassedIds([]);
-    setInterestedIds([]);
-    setSavedIds([]);
-    setPreviousActions([]);
-
-    try {
-      const { error } = await supabase
-        .from("swipes")
-        .delete()
-        .eq("swiper_id", user.id);
-      if (error) throw error;
-      await fetchDiscoverAndMatches(user.id);
-    } catch (err) {
-      console.error("Error resetting deck:", err);
-    }
-  }, [user?.id, setPassedIds, setInterestedIds, setSavedIds, setPreviousActions, fetchDiscoverAndMatches]);
+  const resetDeck = useCallback(() => {
+    setShowSwiped(true);
+  }, []);
 
   const clearMatches = useCallback(async () => {
     if (!user?.id) return;
@@ -2168,7 +2174,8 @@ function App() {
       setTheme,
       dbCandidates,
       setDbCandidates,
-      fetchDiscoverAndMatches
+      fetchDiscoverAndMatches,
+      showSwiped
     }),
     [
       actOnCandidate,
@@ -2206,7 +2213,8 @@ function App() {
       setTheme,
       dbCandidates,
       setDbCandidates,
-      fetchDiscoverAndMatches
+      fetchDiscoverAndMatches,
+      showSwiped
     ]
   );
 
@@ -3556,7 +3564,8 @@ function DiscoverPage() {
     resetDeck,
     dbCandidates,
     user,
-    language
+    language,
+    showSwiped
   } = useSymbio();
   const t = useTranslations();
   const [detailProfile, setDetailProfile] = useState<CandidateProfile | null>(null);
@@ -3571,17 +3580,28 @@ function DiscoverPage() {
 
   const filteredProfiles = useMemo(() => applyFilters(dbCandidates, filters), [dbCandidates, filters]);
   const deck = useMemo(
-    () =>
-      filteredProfiles.filter(
+    () => {
+      if (showSwiped) {
+        return filteredProfiles;
+      }
+      return filteredProfiles.filter(
         (candidate) =>
           !passedIds.includes(candidate.id) &&
           !interestedIds.includes(candidate.id) &&
           !savedIds.includes(candidate.id)
-      ),
-    [filteredProfiles, interestedIds, passedIds, savedIds]
+      );
+    },
+    [filteredProfiles, interestedIds, passedIds, savedIds, showSwiped]
   );
   const current = deck[0] ?? null;
   const next = deck[1] ?? null;
+
+  const getSwipeStatus = (candidateId: string) => {
+    if (interestedIds.includes(candidateId)) return "interest";
+    if (passedIds.includes(candidateId)) return "pass";
+    if (savedIds.includes(candidateId)) return "save";
+    return null;
+  };
 
   const handleAction = useCallback(
     async (action: SwipeAction) => {
@@ -3779,13 +3799,21 @@ function DiscoverPage() {
       <ActiveFilterChips />
 
       <div className="deck-zone">
-        {next ? <CandidateCard profile={next} className="next-card" isPreview /> : null}
+        {next ? (
+          <CandidateCard
+            profile={next}
+            className="next-card"
+            isPreview
+            swipeStatus={getSwipeStatus(next.id)}
+          />
+        ) : null}
         {current ? (
           <CandidateCard
             profile={current}
             className={`active-card ${swipeMotion ? `swiping-${swipeMotion}` : ""} ${rewindAnim ? "card-rewind-anim" : ""}`}
             style={dragStyle}
             actionHint={actionHint}
+            swipeStatus={getSwipeStatus(current.id)}
             onExpand={() => setDetailProfile(current)}
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
@@ -5109,6 +5137,7 @@ function CandidateCard({
   className = "",
   style,
   actionHint,
+  swipeStatus = null,
   onExpand,
   isPreview = false,
   onPass,
@@ -5123,6 +5152,7 @@ function CandidateCard({
   className?: string;
   style?: CSSProperties;
   actionHint?: string;
+  swipeStatus?: "interest" | "pass" | "save" | null;
   onExpand?: () => void;
   isPreview?: boolean;
   onPass?: () => void;
@@ -5162,6 +5192,14 @@ function CandidateCard({
       onPointerCancel={onPointerCancel}
       aria-label={`${profile.name}, ${localizeRoleLabel(profile.role, t)}, ${t.mainSkillLabel} ${profile.mainSkill}`}
     >
+      {swipeStatus ? (
+        <div className={`swipe-status-banner swipe-status-${swipeStatus}`}>
+          {swipeStatus === "interest" && t.alreadyInterested}
+          {swipeStatus === "pass" && t.alreadyPassed}
+          {swipeStatus === "save" && t.alreadySaved}
+        </div>
+      ) : null}
+
       {actionHint ? <div className={`action-hint ${actionHint.toLowerCase()}`}>{localizedActionHint}</div> : null}
 
       {/* Card Header Image Area */}

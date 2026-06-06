@@ -281,3 +281,15 @@ alter publication supabase_realtime add table public.messages;
 alter publication supabase_realtime add table public.notifications;
 alter publication supabase_realtime add table public.profiles;
 alter publication supabase_realtime add table public.ai_conversations;
+
+
+-- 9. SIMULATE MUTUAL MATCH RPC
+create or replace function public.simulate_mutual_match(user_id uuid, candidate_id uuid)
+returns void as $$
+begin
+  insert into public.swipes (swiper_id, swiped_id, action)
+  values (candidate_id, user_id, 'interest')
+  on conflict (swiper_id, swiped_id) do update set action = 'interest';
+end;
+$$ language plpgsql security definer;
+
