@@ -5189,7 +5189,7 @@ img.avatar {
 
   .chat-bubble {
     right: 16px;
-    bottom: 92px;
+    bottom: max(92px, calc(env(safe-area-inset-bottom) + 84px));
   }
 
   .chat-bubble.open {
@@ -6317,8 +6317,8 @@ img.avatar {
 }
 
 .chat-bubble {
-  right: max(18px, env(safe-area-inset-right));
-  bottom: max(84px, calc(env(safe-area-inset-bottom) + 24px));
+  right: max(24px, env(safe-area-inset-right));
+  bottom: 24px;
   z-index: 150;
   pointer-events: auto;
 }
@@ -6700,8 +6700,8 @@ img.avatar {
 
 .ai-assistant-bubble {
   position: fixed;
-  right: max(18px, env(safe-area-inset-right));
-  bottom: max(94px, calc(env(safe-area-inset-bottom) + 94px));
+  right: max(24px, env(safe-area-inset-right));
+  bottom: 92px;
   z-index: 151;
   display: grid;
   justify-items: end;
@@ -6754,8 +6754,7 @@ img.avatar {
   width: min(380px, calc(100vw - 32px));
   max-height: min(620px, calc(100dvh - 160px));
   gap: 14px;
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: hidden;
   border: 1px solid var(--border);
   border-radius: 14px;
   padding: 14px;
@@ -6821,10 +6820,14 @@ img.avatar {
 }
 
 .ai-assistant-response {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 12px;
   word-break: break-word;
   overflow-wrap: break-word;
+  overflow-y: auto;
+  min-height: 0;
+  padding-right: 4px;
 }
 
 .ai-assistant-response > p {
@@ -7014,7 +7017,7 @@ img.avatar {
 @media (max-width: 767px) {
   .ai-assistant-bubble {
     right: 16px;
-    bottom: max(156px, calc(env(safe-area-inset-bottom) + 146px));
+    bottom: max(160px, calc(env(safe-area-inset-bottom) + 152px));
   }
 
   .ai-assistant-bubble.open {
@@ -7042,8 +7045,7 @@ img.avatar {
     padding: 12px !important;
     padding-bottom: max(12px, env(safe-area-inset-bottom)) !important;
     gap: 10px !important;
-    overflow-y: auto !important;
-    overflow-x: hidden !important;
+    overflow: hidden !important;
   }
 
   .ai-assistant-panel h2 {
