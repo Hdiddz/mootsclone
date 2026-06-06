@@ -107,6 +107,10 @@ create policy "Allow users to update their own swipes"
   on public.swipes for update 
   using (auth.uid() = swiper_id);
 
+create policy "Allow users to delete their own swipes" 
+  on public.swipes for delete 
+  using (auth.uid() = swiper_id);
+
 
 -- 3. MATCHES TABLE
 create table public.matches (
@@ -124,6 +128,10 @@ alter table public.matches enable row level security;
 -- Policies for matches
 create policy "Allow users to select matches they are part of" 
   on public.matches for select 
+  using (auth.uid() = user_a_id or auth.uid() = user_b_id);
+
+create policy "Allow users to delete matches they are part of" 
+  on public.matches for delete 
   using (auth.uid() = user_a_id or auth.uid() = user_b_id);
 
 

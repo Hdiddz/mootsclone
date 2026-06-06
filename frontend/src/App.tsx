@@ -40,7 +40,9 @@ import {
   LogOut,
   Sparkles,
   Moon,
-  Sun
+  Sun,
+  Upload,
+  Crop
 } from "lucide-react";
 import {
   createContext,
@@ -1900,6 +1902,10 @@ function App() {
 
   const removeMatch = useCallback(
     async (matchId: string) => {
+      const matchToRemove = matches.find((m) => m.id === matchId);
+      if (!matchToRemove || !user?.id) return;
+      const candidateId = matchToRemove.candidateId;
+
       setMatches((current) => current.filter((match) => match.id !== matchId));
       setChats((current) => {
         const next = { ...current };
@@ -1907,21 +1913,41 @@ function App() {
         return next;
       });
 
+      // Clear local states so they don't immediately trigger matches or show up as swiped
+      setInterestedIds((current) => current.filter((id) => id !== candidateId));
+      setPassedIds((current) => current.filter((id) => id !== candidateId));
+      setSavedIds((current) => current.filter((id) => id !== candidateId));
+
       try {
-        const { error } = await supabase
+        // 1. Delete the match record
+        const { error: matchErr } = await supabase
           .from("matches")
           .delete()
           .eq("id", matchId);
-        if (error) throw error;
+        if (matchErr) throw matchErr;
+
+        // 2. Delete the swipes between these two users
+        const { error: swipeErr } = await supabase
+          .from("swipes")
+          .delete()
+          .or(`and(swiper_id.eq.${user.id},swiped_id.eq.${candidateId}),and(swiper_id.eq.${candidateId},swiped_id.eq.${user.id})`);
+        if (swipeErr) {
+          console.warn("Could not delete swipes, possibly due to RLS:", swipeErr);
+        }
+
+        // 3. Refresh discover and matches from Supabase
+        await fetchDiscoverAndMatches(user.id);
+
         addToast(
           language === "id" ? translations.id.matchRemovedTitle : translations.en.matchRemovedTitle,
-          language === "id" ? translations.id.matchRemovedBody : translations.en.matchRemovedBody
+          language === "id" ? translations.id.matchRemovedBody : translations.en.matchRemovedBody,
+          "success"
         );
       } catch (err) {
         console.error("Error removing match:", err);
       }
     },
-    [addToast, language, setChats, setMatches]
+    [addToast, language, user?.id, matches, setChats, setMatches, setInterestedIds, setPassedIds, setSavedIds, fetchDiscoverAndMatches]
   );
 
   const removeSaved = useCallback(
@@ -3646,8 +3672,8 @@ function DiscoverPage() {
 
   // Auto-refresh the deck when the user runs out of cards
   useEffect(() => {
-    const hasSwipes = passedIds.length > 0 || interestedIds.length > 0 || savedIds.length > 0;
-    if (dbCandidates.length === 0 && hasSwipes && !showSwiped) {
+    const hasNonMatchSwipes = passedIds.length > 0 || savedIds.length > 0 || interestedIds.some(id => !matches.some(m => m.candidateId === id));
+    if (dbCandidates.length === 0 && hasNonMatchSwipes && !showSwiped) {
       addToast(
         language === "id" ? "Semua kartu sudah habis" : "Deck complete",
         language === "id"
@@ -3660,7 +3686,7 @@ function DiscoverPage() {
       }, 1500);
       return () => clearTimeout(timer);
     }
-  }, [dbCandidates.length, passedIds.length, interestedIds.length, savedIds.length, showSwiped, resetDeck, addToast, language]);
+  }, [dbCandidates.length, passedIds.length, interestedIds.length, savedIds.length, matches, showSwiped, resetDeck, addToast, language]);
 
   const getSwipeStatus = (candidateId: string) => {
     if (interestedIds.includes(candidateId)) return "interest";
@@ -6250,12 +6276,29 @@ function PhotoUploadField({
           </div>
         )}
       </div>
-      <div className="photo-upload-actions">
-        <label className="button button-secondary" style={{ width: "100%", cursor: "pointer" }}>
-          <span className="material-symbols-outlined" style={{ fontSize: "18px" }}>upload</span>
-          {t.upload}
+      <div className="photo-upload-actions" style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
+        <label className="button button-secondary" style={{ flex: 1, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
+          <Upload size={18} />
+          {value ? (t.language === "id" ? "Unggah Baru" : "Upload New") : t.upload}
           <input type="file" accept="image/*" onChange={handleFile} />
         </label>
+        {value && (
+          <button
+            type="button"
+            className="button button-secondary"
+            style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}
+            onClick={() => {
+              setTempPhotoUrl(value);
+              setScale(1.0);
+              setPanX(0);
+              setPanY(0);
+              setIsCroppingModalOpen(true);
+            }}
+          >
+            <Crop size={18} />
+            {t.language === "id" ? "Edit / Potong" : "Edit / Crop"}
+          </button>
+        )}
       </div>
 
       {isCroppingModalOpen && tempPhotoUrl && (

@@ -29,7 +29,7 @@ return [
 
     'gemini' => [
         'key' => env('GEMINI_API_KEY', 'AIzaSyDjZT3eKW0Z9VzNNpXiJ4eUEZEXmS51WOk'),
-        'model' => env('GEMINI_MODEL', 'gemini-2.5-flash'),
+        'model' => env('GEMINI_MODEL', 'gemini-2.5-flash-lite'),
     ],
 
     'supabase' => [

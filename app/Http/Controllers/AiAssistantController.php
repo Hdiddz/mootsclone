@@ -151,7 +151,7 @@ class AiAssistantController extends Controller
 
     private function askGemini(string $key, string $context, string $prompt, array $history = []): string
     {
-        $model = config('services.gemini.model', 'gemini-2.5-flash');
+        $model = config('services.gemini.model', 'gemini-2.5-flash-lite');
 
         $contents = [];
         foreach ($history as $msg) {
