@@ -1235,6 +1235,7 @@ function AuthPage() {
 import MatchesPage from "./pages/MatchesPage";
 
 function App() {
+  const navigate = useNavigate();
   const [profile, setProfileState] = useLocalStorageState("mutualizm.profile", starterProfile);
   const [filters, setFilters] = useLocalStorageState("mutualizm.filters", defaultFilters);
   const [passedIds, setPassedIds] = useLocalStorageState<string[]>("mutualizm.passed", []);
@@ -1453,15 +1454,21 @@ function App() {
   };
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
         setUser({
           id: session.user.id,
           name: session.user.user_metadata?.name || session.user.email?.split("@")[0] || "",
           email: session.user.email || ""
         });
-        loadUserProfile(session.user.id);
-        fetchDiscoverAndMatches(session.user.id);
+        const p = await loadUserProfile(session.user.id);
+        await fetchDiscoverAndMatches(session.user.id);
+
+        if (!p || !p.mainSkill || !p.campus) {
+          if (window.location.pathname !== "/onboarding") {
+            navigate("/onboarding", { replace: true });
+          }
+        }
       } else {
         setUser(null);
       }
@@ -1475,8 +1482,14 @@ function App() {
           email: session.user.email || ""
         };
         setUser(u);
-        await loadUserProfile(session.user.id);
+        const p = await loadUserProfile(session.user.id);
         await fetchDiscoverAndMatches(session.user.id);
+
+        if (!p || !p.mainSkill || !p.campus) {
+          if (window.location.pathname !== "/onboarding") {
+            navigate("/onboarding", { replace: true });
+          }
+        }
       } else {
         setUser(null);
         setProfileState(starterProfile);
@@ -1488,7 +1501,7 @@ function App() {
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [navigate]);
 
   const setProfile = useCallback(
     async (updater: SetStateAction<CandidateProfile>) => {
