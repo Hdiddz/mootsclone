@@ -30,10 +30,10 @@
     { "src": "/robots.txt", "dest": "/robots.txt" },
     { "src": "/profile-cover-rizky.jpg", "dest": "/profile-cover-rizky.jpg" },
     { "src": "/(.*\\.(?:css|js|png|jpg|jpeg|gif|svg|ico|webp|woff|woff2))", "dest": "/$1" },
-    { "src": "/api/(.*)", "dest": "/api/index.php" },
-    { "src": "/broadcasting/auth", "dest": "/api/index.php" },
-    { "src": "/sanctum/(.*)", "dest": "/api/index.php" },
-    { "src": "/up", "dest": "/api/index.php" },
+    { "src": "/api/(.*)", "dest": "/api/index.php?__laravel_path=/api/$1" },
+    { "src": "/broadcasting/auth", "dest": "/api/index.php?__laravel_path=/broadcasting/auth" },
+    { "src": "/sanctum/(.*)", "dest": "/api/index.php?__laravel_path=/sanctum/$1" },
+    { "src": "/up", "dest": "/api/index.php?__laravel_path=/up" },
     { "src": "/(.*)", "dest": "/index.html" }
   ]
 }

@@ -23,6 +23,19 @@ foreach ($defaults as $key => $value) {
     }
 }
 
+if (isset($_GET['__laravel_path'])) {
+    $path = '/'.ltrim((string) $_GET['__laravel_path'], '/');
+    unset($_GET['__laravel_path']);
+
+    $query = http_build_query($_GET);
+    $_SERVER['REQUEST_URI'] = $path.($query !== '' ? "?{$query}" : '');
+    $_SERVER['PATH_INFO'] = $path;
+    $_SERVER['ORIG_PATH_INFO'] = $path;
+    $_SERVER['REDIRECT_URL'] = $path;
+    $_SERVER['SCRIPT_NAME'] = '/index.php';
+    $_SERVER['PHP_SELF'] = '/index.php';
+}
+
 $appKey = getenv('APP_KEY');
 if ($appKey === false || trim((string) $appKey) === '') {
     $seed = getenv('VERCEL_PROJECT_PRODUCTION_URL')
