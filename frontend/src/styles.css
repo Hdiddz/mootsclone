@@ -6855,8 +6855,8 @@ img.avatar {
   max-width: 90%;
   font-size: 0.85rem;
   line-height: 1.4;
-  word-break: break-word;
-  overflow-wrap: break-word;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
 }
 
 .ai-chat-bubble.user {
@@ -8054,12 +8054,16 @@ body {
   background: var(--primary-soft);
   color: var(--ink);
   align-self: flex-end;
+  width: fit-content;
+  max-width: 100%;
 }
 
 .ai-chat-bubble-wrapper.assistant .ai-chat-bubble {
   background: var(--surface-muted);
   color: var(--ink);
   align-self: flex-start;
+  width: fit-content;
+  max-width: 100%;
 }
 
 .ai-mentioned-cards {

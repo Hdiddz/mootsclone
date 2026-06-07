@@ -221,7 +221,31 @@ CONTEXT);
 
     private function fallbackSuggestion(string $prompt, string $context = ''): string
     {
-        $promptLower = strtolower($prompt);
+        $promptLower = strtolower(trim($prompt));
+
+        // Handle greetings and casual messages
+        $greetings = ['hello', 'hi', 'hey', 'halo', 'hai', 'hei', 'yo', 'sup', 'good morning', 'good afternoon', 'good evening', 'selamat pagi', 'selamat siang', 'selamat sore', 'selamat malam', 'apa kabar', 'how are you', 'what\'s up'];
+        foreach ($greetings as $greeting) {
+            if ($promptLower === $greeting || str_starts_with($promptLower, $greeting . ' ') || str_starts_with($promptLower, $greeting . '!') || str_starts_with($promptLower, $greeting . ',')) {
+                $isIndo = $this->isLikelyIndonesian($promptLower) || in_array($promptLower, ['halo', 'hai', 'hei', 'apa kabar', 'selamat pagi', 'selamat siang', 'selamat sore', 'selamat malam']);
+                if ($isIndo) {
+                    return "Halo! 👋 Saya **Moots AI**, asisten pencari rekan tim kamu.\n\nKamu bisa bertanya seperti:\n• \"Cari orang yang jago videography\"\n• \"Butuh backend developer yang bisa Laravel\"\n• \"Siapa yang bisa bantu pitch deck?\"\n\nSilakan tanya apa saja! 😊";
+                }
+                return "Hello! 👋 I'm **Moots AI**, your teammate finder assistant.\n\nYou can ask me things like:\n• \"Find someone skilled in videography\"\n• \"I need a backend developer with Laravel experience\"\n• \"Who can help with pitch decks?\"\n\nFeel free to ask anything! 😊";
+            }
+        }
+
+        // Handle general/vague questions
+        $vagueQueries = ['help', 'what can you do', 'apa yang bisa kamu lakukan', 'bisa apa', 'tolong', 'bantuan'];
+        foreach ($vagueQueries as $vague) {
+            if ($promptLower === $vague || str_contains($promptLower, $vague)) {
+                $isIndo = $this->isLikelyIndonesian($promptLower);
+                if ($isIndo) {
+                    return "Saya bisa membantu kamu mencari rekan tim berdasarkan **skill**, **peran**, atau **kebutuhan proyek**.\n\nContoh pertanyaan:\n• \"Cari desainer UI/UX\"\n• \"Butuh orang yang jago React dan Node.js\"\n• \"Siapa yang available untuk proyek startup?\"\n\nCoba ketik kebutuhan kamu! 🎯";
+                }
+                return "I can help you find teammates based on **skills**, **roles**, or **project needs**.\n\nExample questions:\n• \"Find a UI/UX designer\"\n• \"I need someone skilled in React and Node.js\"\n• \"Who's available for a startup project?\"\n\nTry typing what you need! 🎯";
+            }
+        }
 
         // Parse candidates from the context string
         $candidates = $this->parseCandidatesFromContext($context);
