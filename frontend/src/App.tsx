@@ -61,7 +61,13 @@ import {
   type SetStateAction
 } from "react";
 import { createPortal } from "react-dom";
-import { supabase, supabaseUrl, supabaseAnonKey } from "./lib/supabase";
+import {
+  getSupabaseRememberMe,
+  setSupabaseRememberMe,
+  supabase,
+  supabaseAnonKey,
+  supabaseUrl
+} from "./lib/supabase";
 import {
   Link,
   NavLink,
@@ -142,7 +148,7 @@ type SymbioStore = {
   addToast: (title: string, body: string, type?: "success" | "error" | "warning" | "info") => void;
   user: { id?: string; name: string; email: string; role?: string } | null;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<CandidateProfile | null>;
+  login: (email: string, password: string, rememberSession?: boolean) => Promise<CandidateProfile | null>;
   signup: (name: string, email: string, password: string) => Promise<boolean>;
   logout: () => void;
   language: "en" | "id";
@@ -153,6 +159,7 @@ type SymbioStore = {
   setDbCandidates: Dispatch<SetStateAction<CandidateProfile[]>>;
   fetchDiscoverAndMatches: (userId: string) => Promise<any>;
   showSwiped: boolean;
+  authReady: boolean;
 };
 
 const defaultFilters: FilterValues = {
@@ -165,12 +172,32 @@ const defaultFilters: FilterValues = {
   level: ""
 };
 
+const onlineStaleMs = 90_000;
+
+function isProfileOnline(row: any) {
+  if (!row?.online) {
+    return false;
+  }
+
+  const lastTouched = row.last_seen_at || row.online_at || row.updated_at;
+  if (!lastTouched) {
+    return true;
+  }
+
+  const lastTouchedTime = new Date(lastTouched).getTime();
+  if (Number.isNaN(lastTouchedTime)) {
+    return Boolean(row.online);
+  }
+
+  return Date.now() - lastTouchedTime < onlineStaleMs;
+}
+
 const candidateLookup = new Map<string, CandidateProfile>();
 
 const navItems = [
   { to: "/discover", label: "Discover", icon: Search },
   { to: "/matches", label: "Matches", icon: Users },
-  { to: "/saved", label: "Saved", icon: Bookmark },
+  { to: "/saved", label: "Saved", icon: User },
   { to: "/projects", label: "Projects", icon: Briefcase },
   { to: "/notifications", label: "Alerts", icon: Bell },
   { to: "/profile", label: "Profile", icon: User }
@@ -248,7 +275,7 @@ const translations = {
     chat: "Chat",
     details: "Details",
     remove: "Remove",
-    projectsDesc: "Suggested opportunities that show Mutualizm's future direction.",
+    projectsDesc: "Suggested opportunities that show Moots' future direction.",
     neededRoles: "Needed roles",
     skills: "Skills",
     viewProject: "View project",
@@ -258,7 +285,7 @@ const translations = {
     statsMatches: "Matches",
     statsSaved: "Saved",
     statsSkills: "Skills",
-    yourSymbioCard: "Your Mutualizm card",
+    yourSymbioCard: "Your Moots card",
     noMessagesYet: "No messages yet",
     typeMessage: "Type a message...",
     isTyping: "is typing",
@@ -285,6 +312,7 @@ const translations = {
     campusEmail: "Campus Email",
     password: "Password",
     forgotPassword: "Forgot password?",
+    rememberMe: "Remember me",
     orContinueWith: "Or continue with",
     dontHaveAccount: "Don't have an account?",
     alreadyHaveAccount: "Already have an account?",
@@ -297,7 +325,7 @@ const translations = {
     logoutTitle: "Are you sure you want to log out?",
     logoutBody: "Choose the account session you want to end. Saved accounts can still be used to log in again.",
     noActiveSession: "No active session.",
-    mutualizmUser: "Mutualizm user",
+    mootsUser: "Moots user",
     invalidLogin: "Invalid email or password. Hint: student@telkomuniversity.ac.id & hadidpassword, or use Google SSO.",
     fullNameRequired: "Full name is required.",
     emailUsernameRequired: "Email username is required.",
@@ -314,7 +342,7 @@ const translations = {
     landingOpenApp: "Open App",
     landingHeroEyebrow: "Skill-based campus collaboration",
     landingHeroTitle: "Find teammates by skill, not by random group chats.",
-    landingHeroBody: "Mutualizm helps Telkom University students discover collaborators for projects, competitions, and startups through structured, skill-based discovery profile cards.",
+    landingHeroBody: "Moots helps Telkom University students discover collaborators for projects, competitions, and startups through structured, skill-based discovery profile cards.",
     landingStartMatching: "Start Matching",
     landingTryDemo: "Try Demo",
     landingMetricsRoles: "12+ Student Roles",
@@ -327,12 +355,12 @@ const translations = {
     landingStepSwipeBody: "Discover peers with complementary abilities for your next big idea.",
     landingStepBuildTitle: "Build Together",
     landingStepBuildBody: "Match instantly and start collaborating on impactful projects.",
-    landingFeaturesTitle: "Mutualizm's core features.",
+    landingFeaturesTitle: "Moots' core features.",
     landingFeatureDiscover: "Discover by skill, role, and availability.",
     landingFeatureSwipe: "Swipe deck with pass, save, and interest animations.",
     landingFeatureChat: "Chat mockup for discussing with matches.",
     landingFeatureSettings: "Profile, language, notification, and privacy settings.",
-    landingCtaTitle: "Ready to try Mutualizm?",
+    landingCtaTitle: "Ready to try Moots?",
     landingCtaBody: "Start from onboarding or jump straight into the discovery deck.",
     landingOpenDiscover: "Open Discover",
     settingsDrawerTitle: "Profile, Language, and Preferences",
@@ -417,7 +445,7 @@ const translations = {
     noExperienceYet: "No experience yet.",
     portfolioTitle: "Portfolio",
     noPortfolioYet: "No portfolio link yet.",
-    aiAssistantTitle: "Mutualizm AI",
+    aiAssistantTitle: "Moots AI",
     aiAssistantIntro: "Ask for teammate suggestions, skill fit, role ideas, or project search help.",
     aiPlaceholder: "Ask what skills or teammate role you need...",
     aiFindDesign: "Find UI/UX support",
@@ -428,6 +456,7 @@ const translations = {
     aiMatches: "Suggested people",
     aiNoMatches: "No strong local match yet. Try a more specific skill.",
     aiError: "Sorry, the AI assistant could not respond right now.",
+    aiClearHistoryConfirm: "Clear AI chat history? This removes the saved conversation for this account.",
     matchReadyCopy: "These collaborators are ready to meet you. Open a card to start a focused project conversation.",
     removeAllSaved: "Remove all saved",
     upload: "Upload",
@@ -538,7 +567,7 @@ const translations = {
     portfolioUrlInvalid: "URL should start with http or https.",
     availabilityRequired: "Availability is required.",
     lookingForRequired: "Select at least one role you are looking for.",
-    matchEyebrow: "It is a Mutualizm match",
+    matchEyebrow: "It is a Moots match",
     matchTitlePrefix: "You and",
     matchTitleSuffix: "are both interested in collaborating.",
     suggestionMatch: "Suggestion match",
@@ -613,7 +642,7 @@ const translations = {
     chat: "Obrolan",
     details: "Detail",
     remove: "Hapus",
-    projectsDesc: "Peluang yang disarankan untuk menunjukkan arah masa depan Mutualizm.",
+    projectsDesc: "Peluang yang disarankan untuk menunjukkan arah masa depan Moots.",
     neededRoles: "Peran yang dibutuhkan",
     skills: "Keahlian",
     viewProject: "Lihat proyek",
@@ -623,7 +652,7 @@ const translations = {
     statsMatches: "Kecocokan",
     statsSaved: "Disimpan",
     statsSkills: "Keahlian",
-    yourSymbioCard: "Kartu Mutualizm Anda",
+    yourSymbioCard: "Kartu Moots Anda",
     noMessagesYet: "Belum ada pesan",
     typeMessage: "Ketik pesan...",
     isTyping: "sedang mengetik",
@@ -650,6 +679,7 @@ const translations = {
     campusEmail: "Email Kampus",
     password: "Kata Sandi",
     forgotPassword: "Lupa kata sandi?",
+    rememberMe: "Ingat saya",
     orContinueWith: "Atau lanjutkan dengan",
     dontHaveAccount: "Belum punya akun?",
     alreadyHaveAccount: "Sudah punya akun?",
@@ -662,7 +692,7 @@ const translations = {
     logoutTitle: "Yakin ingin keluar?",
     logoutBody: "Pilih sesi akun yang ingin dikeluarkan. Akun yang tersimpan tetap bisa dipakai masuk lagi.",
     noActiveSession: "Tidak ada sesi aktif.",
-    mutualizmUser: "Pengguna Mutualizm",
+    mootsUser: "Pengguna Moots",
     invalidLogin: "Email atau kata sandi tidak valid. Petunjuk: student@telkomuniversity.ac.id & hadidpassword, atau gunakan Google SSO.",
     fullNameRequired: "Nama lengkap wajib diisi.",
     emailUsernameRequired: "Username email wajib diisi.",
@@ -679,7 +709,7 @@ const translations = {
     landingOpenApp: "Buka Aplikasi",
     landingHeroEyebrow: "Kolaborasi kampus berbasis keahlian",
     landingHeroTitle: "Temukan rekan tim berdasarkan keahlian, bukan dari grup acak.",
-    landingHeroBody: "Mutualizm membantu mahasiswa Telkom University menemukan kolaborator untuk proyek, kompetisi, dan startup melalui kartu profil berbasis keahlian yang terstruktur.",
+    landingHeroBody: "Moots membantu mahasiswa Telkom University menemukan kolaborator untuk proyek, kompetisi, dan startup melalui kartu profil berbasis keahlian yang terstruktur.",
     landingStartMatching: "Mulai Mencari",
     landingTryDemo: "Coba Demo",
     landingMetricsRoles: "12+ Peran Mahasiswa",
@@ -692,12 +722,12 @@ const translations = {
     landingStepSwipeBody: "Temukan teman dengan kemampuan pelengkap untuk ide besar berikutnya.",
     landingStepBuildTitle: "Bangun Bersama",
     landingStepBuildBody: "Dapatkan kecocokan dan mulai berkolaborasi pada proyek berdampak.",
-    landingFeaturesTitle: "Fitur utama Mutualizm.",
+    landingFeaturesTitle: "Fitur utama Moots.",
     landingFeatureDiscover: "Temukan berdasarkan keahlian, peran, dan ketersediaan.",
     landingFeatureSwipe: "Kartu geser dengan animasi lewati, simpan, dan minat.",
     landingFeatureChat: "Mockup obrolan untuk berdiskusi dengan kecocokan.",
     landingFeatureSettings: "Pengaturan profil, bahasa, notifikasi, dan privasi.",
-    landingCtaTitle: "Siap mencoba Mutualizm?",
+    landingCtaTitle: "Siap mencoba Moots?",
     landingCtaBody: "Mulai dari onboarding atau langsung masuk ke dek penemuan.",
     landingOpenDiscover: "Buka Temukan",
     settingsDrawerTitle: "Profil, Bahasa, dan Preferensi",
@@ -782,7 +812,7 @@ const translations = {
     noExperienceYet: "Belum ada pengalaman.",
     portfolioTitle: "Portofolio",
     noPortfolioYet: "Belum ada link portofolio.",
-    aiAssistantTitle: "AI Mutualizm",
+    aiAssistantTitle: "AI Moots",
     aiAssistantIntro: "Minta saran rekan tim, kecocokan skill, ide peran, atau bantuan mencari proyek.",
     aiPlaceholder: "Tanyakan skill atau peran rekan tim yang dibutuhkan...",
     aiFindDesign: "Cari bantuan UI/UX",
@@ -793,6 +823,7 @@ const translations = {
     aiMatches: "Orang yang disarankan",
     aiNoMatches: "Belum ada kecocokan lokal yang kuat. Coba skill yang lebih spesifik.",
     aiError: "Maaf, asisten AI belum bisa menjawab sekarang.",
+    aiClearHistoryConfirm: "Hapus riwayat chat AI? Percakapan tersimpan untuk akun ini akan dihapus.",
     matchReadyCopy: "Kolaborator ini siap bertemu dengan Anda. Buka kartu untuk memulai percakapan proyek terarah.",
     removeAllSaved: "Hapus semua simpanan",
     upload: "Unggah",
@@ -903,7 +934,7 @@ const translations = {
     portfolioUrlInvalid: "URL harus diawali http atau https.",
     availabilityRequired: "Ketersediaan wajib diisi.",
     lookingForRequired: "Pilih minimal satu peran yang Anda cari.",
-    matchEyebrow: "Ini kecocokan Mutualizm",
+    matchEyebrow: "Ini kecocokan Moots",
     matchTitlePrefix: "Anda dan",
     matchTitleSuffix: "sama-sama tertarik berkolaborasi.",
     suggestionMatch: "Saran kecocokan",
@@ -943,13 +974,18 @@ export function useSymbio() {
 }
 
 function useLocalStorageState<T>(key: string, initialValue: T) {
+  const legacyKey = key.startsWith("moots.") ? `mutualizm.${key.slice("moots.".length)}` : null;
+
   const [value, setValue] = useState<T>(() => {
     if (typeof window === "undefined") {
       return initialValue;
     }
 
     try {
-      const stored = window.sessionStorage.getItem(key);
+      const storageKeys = legacyKey ? [key, legacyKey] : [key];
+      const stored = storageKeys
+        .map((storageKey) => window.localStorage.getItem(storageKey) ?? window.sessionStorage.getItem(storageKey))
+        .find((storedValue): storedValue is string => Boolean(storedValue));
       return stored ? (JSON.parse(stored) as T) : initialValue;
     } catch {
       return initialValue;
@@ -958,7 +994,7 @@ function useLocalStorageState<T>(key: string, initialValue: T) {
 
   useEffect(() => {
     try {
-      window.sessionStorage.setItem(key, JSON.stringify(value));
+      window.localStorage.setItem(key, JSON.stringify(value));
     } catch {
       // Browser storage is optional for the prototype; the UI still works in memory.
     }
@@ -968,8 +1004,12 @@ function useLocalStorageState<T>(key: string, initialValue: T) {
 }
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
-  const { isAuthenticated } = useSymbio();
+  const { authReady, isAuthenticated } = useSymbio();
   const location = useLocation();
+
+  if (!authReady) {
+    return <ScreenLoader />;
+  }
 
   if (!isAuthenticated) {
     return <Navigate to="/login" state={{ from: location }} replace />;
@@ -978,10 +1018,28 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
+function RootRoute() {
+  const { authReady, isAuthenticated } = useSymbio();
+
+  if (!authReady) {
+    return <ScreenLoader />;
+  }
+
+  return isAuthenticated ? <Navigate to="/discover" replace /> : <LandingPage />;
+}
+
+function ScreenLoader() {
+  return (
+    <div className="screen-loader" role="status" aria-live="polite">
+      <span className="spinner" aria-hidden="true" />
+    </div>
+  );
+}
+
 
 
 function AuthPage() {
-  const { login, signup, isAuthenticated, addToast, theme, setTheme, profile, user } = useSymbio();
+  const { login, signup, isAuthenticated, authReady, addToast, theme, setTheme, profile, user } = useSymbio();
   const t = useTranslations();
   const navigate = useNavigate();
   const location = useLocation();
@@ -993,12 +1051,17 @@ function AuthPage() {
   const [loginEmail, setLoginEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(() => getSupabaseRememberMe());
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   const from = (location.state as any)?.from?.pathname || "/discover";
 
   useEffect(() => {
+    if (!authReady) {
+      return;
+    }
+
     if (isAuthenticated && user && profile && profile.id === user.id) {
       if (!profile.mainSkill || !profile.campus) {
         navigate("/onboarding", { replace: true });
@@ -1007,7 +1070,7 @@ function AuthPage() {
         navigate(dest, { replace: true });
       }
     }
-  }, [isAuthenticated, user, profile, navigate, from]);
+  }, [authReady, isAuthenticated, user, profile, navigate, from]);
 
   useEffect(() => {
     setMode(location.pathname === "/signup" ? "signup" : "login");
@@ -1019,7 +1082,7 @@ function AuthPage() {
     setLoading(true);
 
     if (mode === "login") {
-      const profileResult = await login(loginEmail, password);
+      const profileResult = await login(loginEmail, password, rememberMe);
       if (profileResult) {
         if (!profileResult.mainSkill || !profileResult.campus) {
           navigate("/onboarding", { replace: true });
@@ -1058,6 +1121,7 @@ function AuthPage() {
   const handleSSOLogin = async (provider: string) => {
     if (provider.toLowerCase() === "google") {
       setLoading(true);
+      setSupabaseRememberMe(rememberMe);
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
@@ -1101,13 +1165,13 @@ function AuthPage() {
       </div>
 
       <div className="auth-layout">
-        <section className="auth-brand-panel" aria-label="Mutualizm introduction">
+        <section className="auth-brand-panel" aria-label="Moots introduction">
           <Link to="/" className="auth-home-link">
             <ArrowLeft size={18} aria-hidden="true" />
             {t.home}
           </Link>
           <div>
-            <span className="auth-brand-mark">Mutualizm</span>
+            <span className="auth-brand-mark">Moots</span>
             <h1>{t.landingHeroTitle}</h1>
             <p>{t.landingHeroBody}</p>
           </div>
@@ -1217,6 +1281,17 @@ function AuthPage() {
             ) : null}
           </div>
 
+          {mode === "login" ? (
+            <label className="auth-remember">
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(event) => setRememberMe(event.target.checked)}
+              />
+              <span>{t.rememberMe}</span>
+            </label>
+          ) : null}
+
           <button type="submit" className="auth-btn-primary" disabled={loading}>
             {loading ? "..." : (mode === "login" ? t.signIn : t.createAccount)}
           </button>
@@ -1270,32 +1345,35 @@ import MatchesPage from "./pages/MatchesPage";
 
 function App() {
   const navigate = useNavigate();
-  const [profile, setProfileState] = useLocalStorageState("mutualizm.profile", starterProfile);
-  const [filters, setFilters] = useLocalStorageState("mutualizm.filters", defaultFilters);
-  const [passedIds, setPassedIds] = useLocalStorageState<string[]>("mutualizm.passed", []);
+  const [profile, setProfileState] = useLocalStorageState("moots.profile", starterProfile);
+  const [filters, setFilters] = useLocalStorageState("moots.filters", defaultFilters);
+  const [passedIds, setPassedIds] = useLocalStorageState<string[]>("moots.passed", []);
   const [interestedIds, setInterestedIds] = useLocalStorageState<string[]>(
-    "mutualizm.interested",
+    "moots.interested",
     []
   );
-  const [savedIds, setSavedIds] = useLocalStorageState<string[]>("mutualizm.saved", []);
-  const [matches, setMatches] = useLocalStorageState<MatchRecord[]>("mutualizm.matches", []);
+  const [savedIds, setSavedIds] = useLocalStorageState<string[]>("moots.saved", []);
+  const [matches, setMatches] = useLocalStorageState<MatchRecord[]>("moots.matches", []);
   const [notifications, setNotifications] = useLocalStorageState<NotificationItem[]>(
-    "mutualizm.notifications",
+    "moots.notifications",
     []
   );
   const [chats, setChats] = useLocalStorageState<Record<string, ChatMessage[]>>(
-    "mutualizm.chats",
+    "moots.chats",
     {}
   );
   const [previousActions, setPreviousActions] = useLocalStorageState<PreviousAction[]>(
-    "mutualizm.previous",
+    "moots.previous",
     []
   );
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
-  const [language, setLanguage] = useLocalStorageState<"en" | "id">("mutualizm.language", "en");
-  const [theme, setTheme] = useLocalStorageState<"light" | "dark">("mutualizm.theme", "light");
+  const toastTimerRef = useRef<number | null>(null);
+  const [language, setLanguage] = useLocalStorageState<"en" | "id">("moots.language", "en");
+  const [theme, setTheme] = useLocalStorageState<"light" | "dark">("moots.theme", "light");
   const [dbCandidates, setDbCandidates] = useState<CandidateProfile[]>([]);
   const [showSwiped, setShowSwiped] = useState(false);
+  const [authReady, setAuthReady] = useState(false);
+  const authTokenRef = useRef<string | null>(null);
 
   useEffect(() => {
     setShowSwiped(false);
@@ -1311,9 +1389,13 @@ function App() {
 
   const addToast = useCallback((title: string, body: string, type?: "success" | "error" | "warning" | "info") => {
     const id = `toast-${Date.now()}`;
-    setToasts((current) => [...current, { id, title, body, type }]);
-    setTimeout(() => {
-      setToasts((current) => current.filter((toast) => toast.id !== id));
+    if (toastTimerRef.current) {
+      window.clearTimeout(toastTimerRef.current);
+    }
+    setToasts([{ id, title, body, type }]);
+    toastTimerRef.current = window.setTimeout(() => {
+      setToasts((current) => (current.some((toast) => toast.id === id) ? [] : current));
+      toastTimerRef.current = null;
     }, 3800);
   }, []);
 
@@ -1324,7 +1406,11 @@ function App() {
     if (!user?.id) return;
 
     const setStatus = async (isOnline: boolean) => {
-      await supabase.from("profiles").update({ online: isOnline }).eq("id", user.id);
+      const payload = { online: isOnline, updated_at: new Date().toISOString() };
+      const { error } = await supabase.from("profiles").update(payload).eq("id", user.id);
+      if (error) {
+        await supabase.from("profiles").update({ online: isOnline }).eq("id", user.id);
+      }
     };
 
     setStatus(true);
@@ -1336,20 +1422,33 @@ function App() {
           method: "PATCH",
           headers: {
             "apikey": supabaseAnonKey,
-            "Authorization": `Bearer ${supabaseAnonKey}`,
+            "Authorization": `Bearer ${authTokenRef.current || supabaseAnonKey}`,
             "Content-Type": "application/json"
           },
-          body: JSON.stringify({ online: false }),
+          body: JSON.stringify({ online: false, updated_at: new Date().toISOString() }),
           keepalive: true
         });
       }
     };
 
+    const handleVisibility = () => {
+      setStatus(!document.hidden);
+    };
+
+    const heartbeat = window.setInterval(() => {
+      if (!document.hidden) {
+        setStatus(true);
+      }
+    }, 45_000);
+
     window.addEventListener("beforeunload", handleUnload);
+    document.addEventListener("visibilitychange", handleVisibility);
 
     return () => {
+      window.clearInterval(heartbeat);
       setStatus(false);
       window.removeEventListener("beforeunload", handleUnload);
+      document.removeEventListener("visibilitychange", handleVisibility);
     };
   }, [user?.id]);
 
@@ -1383,7 +1482,7 @@ function App() {
         avatarUrl: data.avatar_url || undefined,
         avatarPosition: data.avatar_position || undefined,
         statusLabel: data.status_label || undefined,
-        online: data.online || false,
+        online: isProfileOnline(data),
         mutualInterest: data.mutual_interest !== false
       };
       setProfileState(formattedProfile);
@@ -1420,7 +1519,7 @@ function App() {
         avatarUrl: row.avatar_url || undefined,
         avatarPosition: row.avatar_position || undefined,
         statusLabel: row.status_label || undefined,
-        online: row.online || false,
+        online: isProfileOnline(row),
         mutualInterest: row.mutual_interest !== false
       }));
 
@@ -1536,41 +1635,21 @@ function App() {
   }, [profile?.skills, setPassedIds, setInterestedIds, setSavedIds, setDbCandidates, setMatches, setChats, setNotifications, fetchAllProfiles]);
 
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (session?.user) {
-        setUser({
-          id: session.user.id,
-          name: session.user.user_metadata?.name || session.user.email?.split("@")[0] || "",
-          email: session.user.email || ""
-        });
-        const p = await loadUserProfile(session.user.id);
-        await fetchDiscoverAndMatches(session.user.id);
+    let mounted = true;
 
-        if (!p || !p.mainSkill || !p.campus) {
-          if (window.location.pathname !== "/onboarding") {
-            navigate("/onboarding", { replace: true });
-          }
-        } else {
-          const path = window.location.pathname;
-          if (path === "/" || path === "/login" || path === "/signup") {
-            navigate("/discover", { replace: true });
-          }
-        }
-      } else {
-        setUser(null);
-      }
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const applySession = async (session: any, redirectSignedOut = true) => {
       if (session?.user) {
         const u = {
           id: session.user.id,
           name: session.user.user_metadata?.name || session.user.email?.split("@")[0] || "",
           email: session.user.email || ""
         };
+        if (!mounted) return;
+        authTokenRef.current = session.access_token ?? null;
         setUser(u);
         const p = await loadUserProfile(session.user.id);
         await fetchDiscoverAndMatches(session.user.id);
+        if (!mounted) return;
 
         if (!p || !p.mainSkill || !p.campus) {
           if (window.location.pathname !== "/onboarding") {
@@ -1583,6 +1662,8 @@ function App() {
           }
         }
       } else {
+        if (!mounted) return;
+        authTokenRef.current = null;
         setUser(null);
         setProfileState(starterProfile);
         setMatches([]);
@@ -1592,14 +1673,31 @@ function App() {
         setShowSwiped(false);
 
         const path = window.location.pathname;
-        if (path !== "/login" && path !== "/signup" && path !== "/") {
+        if (redirectSignedOut && path !== "/login" && path !== "/signup" && path !== "/" && path !== "/terms" && path !== "/privacy") {
           navigate("/login", { replace: true });
         }
       }
+    };
+
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      await applySession(session, false);
+      if (mounted) {
+        setAuthReady(true);
+      }
     });
 
-    return () => subscription.unsubscribe();
-  }, [navigate]);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      await applySession(session);
+      if (mounted) {
+        setAuthReady(true);
+      }
+    });
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, [fetchDiscoverAndMatches, loadUserProfile, navigate, setChats, setMatches, setNotifications]);
 
   const setProfile = useCallback(
     async (updater: SetStateAction<CandidateProfile>) => {
@@ -1631,8 +1729,7 @@ function App() {
                 accent: next.accent,
                 avatar_url: next.avatarUrl,
                 avatar_position: next.avatarPosition,
-                status_label: next.statusLabel,
-                online: next.online
+                status_label: next.statusLabel
               })
               .eq("id", targetUserId)
               .then(({ error }) => {
@@ -1652,8 +1749,9 @@ function App() {
   );
 
   const login = useCallback(
-    async (email: string, password: string) => {
+    async (email: string, password: string, rememberSession = true) => {
       try {
+        setSupabaseRememberMe(rememberSession);
         const { data, error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) {
           addToast(
@@ -1697,6 +1795,7 @@ function App() {
   const signup = useCallback(
     async (name: string, email: string, password: string) => {
       try {
+        setSupabaseRememberMe(true);
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
@@ -1764,7 +1863,10 @@ function App() {
   const logout = useCallback(async () => {
     try {
       if (user?.id) {
-        await supabase.from("profiles").update({ online: false }).eq("id", user.id);
+        await supabase
+          .from("profiles")
+          .update({ online: false, updated_at: new Date().toISOString() })
+          .eq("id", user.id);
       }
       await supabase.auth.signOut();
       setUser(null);
@@ -2064,14 +2166,58 @@ function App() {
         return;
       }
 
+      const tempId = `local-${Date.now()}`;
+      const optimisticMessage: ChatMessage = {
+        id: tempId,
+        sender: "me",
+        text: cleanText,
+        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+      };
+
+      setChats((current) => ({
+        ...current,
+        [matchId]: [...(current[matchId] ?? []), optimisticMessage]
+      }));
+      setMatches((current) =>
+        current.map((match) =>
+          match.id === matchId ? { ...match, latestMessage: cleanText, unread: 0 } : match
+        )
+      );
+
       try {
-        const { error } = await supabase.from("messages").insert({
-          match_id: matchId,
-          sender_id: user.id,
-          text: cleanText
-        });
+        const { data, error } = await supabase
+          .from("messages")
+          .insert({
+            match_id: matchId,
+            sender_id: user.id,
+            text: cleanText
+          })
+          .select("id, text, created_at")
+          .single();
         if (error) throw error;
+
+        if (data) {
+          const persistedMessage: ChatMessage = {
+            id: data.id,
+            sender: "me",
+            text: data.text,
+            timestamp: new Date(data.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+          };
+
+          setChats((current) => {
+            const nextMessages = (current[matchId] ?? []).filter((message) => message.id !== tempId);
+            if (nextMessages.some((message) => message.id === data.id)) {
+              return { ...current, [matchId]: nextMessages };
+            }
+
+            return { ...current, [matchId]: [...nextMessages, persistedMessage] };
+          });
+        }
       } catch (err) {
+        setChats((current) => ({
+          ...current,
+          [matchId]: (current[matchId] ?? []).filter((chatMessage) => chatMessage.id !== tempId)
+        }));
         console.error("Error sending message to Supabase:", err);
         addToast(
           language === "id" ? "Pesan gagal terkirim" : "Message failed to send",
@@ -2082,7 +2228,7 @@ function App() {
         );
       }
     },
-    [user?.id, addToast, language]
+    [addToast, language, setChats, setMatches, user?.id]
   );
 
   useEffect(() => {
@@ -2090,83 +2236,97 @@ function App() {
       return;
     }
 
+    const handleMatchInsert = async (payload: any) => {
+      const newMatch = payload.new;
+      if (newMatch.user_a_id !== user.id && newMatch.user_b_id !== user.id) {
+        return;
+      }
+
+      const otherId = newMatch.user_a_id === user.id ? newMatch.user_b_id : newMatch.user_a_id;
+      let otherUser = candidateLookup.get(otherId);
+      if (!otherUser) {
+        const { data } = await supabase.from("profiles").select("*").eq("id", otherId).single();
+        if (data) {
+          otherUser = {
+            id: data.id,
+            name: data.name || "",
+            campus: data.campus || "",
+            program: data.program || "",
+            role: data.role || "",
+            mainSkill: data.main_skill || "",
+            skills: Array.isArray(data.skills) ? data.skills : [],
+            profileSummary: data.profile_summary || "",
+            experienceSummary: data.experience_summary || "",
+            experiences: Array.isArray(data.experiences) ? data.experiences : [],
+            lookingFor: Array.isArray(data.looking_for) ? data.looking_for : [],
+            availability: (data.availability as any) || "available",
+            availabilityDetail: data.availability_detail || "",
+            collaborationGoals: Array.isArray(data.collaboration_goals) ? data.collaboration_goals : [],
+            portfolioLinks: Array.isArray(data.portfolio_links) ? data.portfolio_links : [],
+            preferredRole: data.preferred_role || "",
+            suggestedMessage: data.suggested_message || "",
+            accent: data.accent || "accent-indigo",
+            avatarUrl: data.avatar_url || undefined,
+            avatarPosition: data.avatar_position || undefined,
+            statusLabel: data.status_label || undefined,
+            online: isProfileOnline(data)
+          };
+          candidateLookup.set(otherId, otherUser);
+        }
+      }
+
+      const mySkills = profile?.skills?.map((s: any) => s.name) || [];
+      const otherSkills = otherUser?.skills?.map((s: any) => s.name) || [];
+      const overlap = otherSkills.filter((s: string) => mySkills.includes(s));
+
+      const mappedMatch: MatchRecord = {
+        id: newMatch.id,
+        candidateId: otherId,
+        createdAt: new Date(newMatch.created_at).toLocaleDateString(),
+        skillOverlap: overlap,
+        latestMessage: "",
+        unread: 1,
+        summary: [
+          otherUser?.role ? `Interested in ${otherUser.role} role.` : "",
+          overlap.length > 0 ? `Both profiles mention ${overlap.join(", ")}.` : ""
+        ].filter(Boolean)
+      };
+
+      setMatches((current) => {
+        if (current.some((m) => m.id === mappedMatch.id)) return current;
+        return [mappedMatch, ...current];
+      });
+
+      addToast(
+        language === "id" ? "Kecocokan baru!" : "New Match!",
+        language === "id"
+          ? `Anda cocok dengan ${otherUser?.name || "seseorang"}!`
+          : `You matched with ${otherUser?.name || "someone"}!`,
+        "success"
+      );
+    };
+
     const realtimeChannel = supabase
-      .channel("user-realtime")
+      .channel(`moots-user-realtime-${user.id}`)
       .on(
         "postgres_changes",
         {
           event: "INSERT",
           schema: "public",
-          table: "matches"
+          table: "matches",
+          filter: `user_a_id=eq.${user.id}`
         },
-        async (payload) => {
-          const newMatch = payload.new;
-          if (newMatch.user_a_id === user.id || newMatch.user_b_id === user.id) {
-            const otherId = newMatch.user_a_id === user.id ? newMatch.user_b_id : newMatch.user_a_id;
-            
-            let otherUser = candidateLookup.get(otherId);
-            if (!otherUser) {
-              const { data } = await supabase.from("profiles").select("*").eq("id", otherId).single();
-              if (data) {
-                otherUser = {
-                  id: data.id,
-                  name: data.name || "",
-                  campus: data.campus || "",
-                  program: data.program || "",
-                  role: data.role || "",
-                  mainSkill: data.main_skill || "",
-                  skills: Array.isArray(data.skills) ? data.skills : [],
-                  profileSummary: data.profile_summary || "",
-                  experienceSummary: data.experience_summary || "",
-                  experiences: Array.isArray(data.experiences) ? data.experiences : [],
-                  lookingFor: Array.isArray(data.looking_for) ? data.looking_for : [],
-                  availability: (data.availability as any) || "available",
-                  availabilityDetail: data.availability_detail || "",
-                  collaborationGoals: Array.isArray(data.collaboration_goals) ? data.collaboration_goals : [],
-                  portfolioLinks: Array.isArray(data.portfolio_links) ? data.portfolio_links : [],
-                  preferredRole: data.preferred_role || "",
-                  suggestedMessage: data.suggested_message || "",
-                  accent: data.accent || "accent-indigo",
-                  avatarUrl: data.avatar_url || undefined,
-                  avatarPosition: data.avatar_position || undefined,
-                  statusLabel: data.status_label || undefined,
-                  online: data.online || false
-                };
-                candidateLookup.set(otherId, otherUser);
-              }
-            }
-
-            const mySkills = profile?.skills?.map((s: any) => s.name) || [];
-            const otherSkills = otherUser?.skills?.map((s: any) => s.name) || [];
-            const overlap = otherSkills.filter((s: string) => mySkills.includes(s));
-
-            const mappedMatch: MatchRecord = {
-              id: newMatch.id,
-              candidateId: otherId,
-              createdAt: new Date(newMatch.created_at).toLocaleDateString(),
-              skillOverlap: overlap,
-              latestMessage: "",
-              unread: 1,
-              summary: [
-                otherUser?.role ? `Interested in ${otherUser.role} role.` : "",
-                overlap.length > 0 ? `Both profiles mention ${overlap.join(", ")}.` : ""
-              ].filter(Boolean)
-            };
-
-            setMatches((current) => {
-              if (current.some((m) => m.id === mappedMatch.id)) return current;
-              return [mappedMatch, ...current];
-            });
-
-            addToast(
-              language === "id" ? "Kecocokan baru!" : "New Match!",
-              language === "id"
-                ? `Anda cocok dengan ${otherUser?.name || "seseorang"}!`
-                : `You matched with ${otherUser?.name || "someone"}!`,
-              "success"
-            );
-          }
-        }
+        handleMatchInsert
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "matches",
+          filter: `user_b_id=eq.${user.id}`
+        },
+        handleMatchInsert
       )
       .on(
         "postgres_changes",
@@ -2219,7 +2379,8 @@ function App() {
         {
           event: "INSERT",
           schema: "public",
-          table: "notifications"
+          table: "notifications",
+          filter: `user_id=eq.${user.id}`
         },
         (payload) => {
           const newNotif = payload.new;
@@ -2247,13 +2408,14 @@ function App() {
         },
         (payload) => {
           const updated = payload.new;
+          const online = isProfileOnline(updated);
           const existing = candidateLookup.get(updated.id);
           if (existing) {
             const nextProfile = {
               ...existing,
               name: updated.name || existing.name,
               avatarUrl: updated.avatar_url || existing.avatarUrl,
-              online: updated.online ?? existing.online,
+              online,
               campus: updated.campus || existing.campus,
               program: updated.program || existing.program,
               role: updated.role || existing.role,
@@ -2269,7 +2431,7 @@ function App() {
               if (!current) return current;
               return {
                 ...current,
-                online: updated.online ?? current.online
+                online
               };
             });
           }
@@ -2277,7 +2439,7 @@ function App() {
           setDbCandidates((current) =>
             current.map((c) =>
               c.id === updated.id
-                ? { ...c, online: updated.online ?? c.online }
+                ? { ...c, online }
                 : c
             )
           );
@@ -2330,7 +2492,8 @@ function App() {
       dbCandidates,
       setDbCandidates,
       fetchDiscoverAndMatches,
-      showSwiped
+      showSwiped,
+      authReady
     }),
     [
       actOnCandidate,
@@ -2369,14 +2532,15 @@ function App() {
       dbCandidates,
       setDbCandidates,
       fetchDiscoverAndMatches,
-      showSwiped
+      showSwiped,
+      authReady
     ]
   );
 
   return (
     <SymbioContext.Provider value={value}>
       <Routes>
-        <Route path="/" element={<LandingPage />} />
+        <Route path="/" element={<RootRoute />} />
         <Route path="/login" element={<AuthPage />} />
         <Route path="/signup" element={<AuthPage />} />
         <Route
@@ -2426,9 +2590,9 @@ function LandingPage() {
       <div className="auth-bg-blob-2" />
 
       <header className="landing-nav">
-        <Link to="/" className="brand-mark" aria-label="Mutualizm home" style={{ display: "flex", alignItems: "center", gap: "8px", fontWeight: "700", fontSize: "1.25rem", color: "var(--primary)" }}>
+        <Link to="/" className="brand-mark" aria-label="Moots home" style={{ display: "flex", alignItems: "center", gap: "8px", fontWeight: "700", fontSize: "1.25rem", color: "var(--primary)" }}>
           <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1", fontSize: "28px" }}>hub</span>
-          <span>Mutualizm</span>
+          <span>Moots</span>
         </Link>
         <nav className="landing-links" aria-label="Landing navigation" style={{ fontWeight: "600" }}>
           <a href="#how" onClick={(e) => { e.preventDefault(); scrollToSection("how"); }}>{t.landingHow}</a>
@@ -2701,7 +2865,7 @@ function HeroCardCarousel() {
   } as CSSProperties;
 
   return (
-    <div className="hero-preview" aria-label="Mutualizm card preview">
+    <div className="hero-preview" aria-label="Moots card preview">
       <div className="preview-card-back preview-card-back-one" />
       <div className="preview-card-back preview-card-back-two" />
 
@@ -2821,9 +2985,9 @@ function AppShell() {
                 to="/discover"
                 className="top-logo"
                 onClick={() => setMobileDrawerOpen(false)}
-                aria-label="Mutualizm discover"
+                aria-label="Moots discover"
               >
-                Mutualizm <span>✦</span>
+                Moots <span>✦</span>
               </Link>
               <button className="close-btn" aria-label="Close menu" onClick={() => setMobileDrawerOpen(false)}>
                 <X size={20} />
@@ -2871,18 +3035,14 @@ function AppShell() {
         {!isChatRoute ? <BottomNav unreadCount={unreadCount} /> : null}
       </main>
 
-      {!isChatRoute && (
-        <>
-          <AiAssistantBubble
-            isOpen={activeFloatingPanel === "ai"}
-            onToggle={(open) => setActiveFloatingPanel(open ? "ai" : null)}
-          />
-          <FollowChatBubble
-            isOpen={activeFloatingPanel === "chat"}
-            onToggle={(open) => setActiveFloatingPanel(open ? "chat" : null)}
-          />
-        </>
-      )}
+      <AiAssistantBubble
+        isOpen={activeFloatingPanel === "ai"}
+        onToggle={(open) => setActiveFloatingPanel(open ? "ai" : null)}
+      />
+      <FollowChatBubble
+        isOpen={activeFloatingPanel === "chat"}
+        onToggle={(open) => setActiveFloatingPanel(open ? "chat" : null)}
+      />
 
       {settingsOpen ? <SettingsDrawer onClose={() => setSettingsOpen(false)} onLogoutRequest={() => setLogoutOpen(true)} /> : null}
       {logoutOpen ? <LogoutConfirmModal onClose={() => setLogoutOpen(false)} /> : null}
@@ -2906,8 +3066,8 @@ function TopBar({
       <button className="top-icon-button" aria-label="Open menu" onClick={onMenuClick}>
         <Menu size={22} aria-hidden="true" />
       </button>
-      <Link to="/discover" className="top-logo" aria-label="Mutualizm discover">
-        Mutualizm <span>✦</span>
+      <Link to="/discover" className="top-logo" aria-label="Moots discover">
+        Moots <span>✦</span>
       </Link>
       <div className="top-actions" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
         <button
@@ -3039,12 +3199,12 @@ function SettingsDrawer({
         return;
       }
 
-      const registeredUsers = JSON.parse(window.localStorage.getItem("mutualizm.users") || "[]") as Array<{
+      const registeredUsers = JSON.parse(window.localStorage.getItem("moots.users") || window.localStorage.getItem("mutualizm.users") || "[]") as Array<{
         email: string;
         password?: string;
       }>;
       window.localStorage.setItem(
-        "mutualizm.users",
+        "moots.users",
         JSON.stringify(
           registeredUsers.map((account) =>
             account.email === user?.email ? { ...account, password: draft.newPassword } : account
@@ -3084,9 +3244,11 @@ function SettingsDrawer({
       const { error } = await supabase.rpc('delete_user');
       if (error) throw error;
 
-      ["mutualizm.profile", "mutualizm.filters", "mutualizm.passed", "mutualizm.interested", "mutualizm.saved", "mutualizm.previous"].forEach((key) => {
-        window.localStorage.removeItem(key);
-        window.sessionStorage.removeItem(key);
+      ["profile", "filters", "passed", "interested", "saved", "previous"].forEach((key) => {
+        [`moots.${key}`, `mutualizm.${key}`].forEach((storageKey) => {
+          window.localStorage.removeItem(storageKey);
+          window.sessionStorage.removeItem(storageKey);
+        });
       });
       await logout();
       onClose();
@@ -3237,7 +3399,7 @@ function LogoutConfirmModal({ onClose }: { onClose: () => void }) {
   const navigate = useNavigate();
   const [selectedEmail, setSelectedEmail] = useState(user?.email ?? "");
   const accounts = useMemo(() => {
-    const registered = JSON.parse(window.localStorage.getItem("mutualizm.users") || "[]") as Array<{
+    const registered = JSON.parse(window.localStorage.getItem("moots.users") || window.localStorage.getItem("mutualizm.users") || "[]") as Array<{
       name: string;
       email: string;
       role?: string;
@@ -3271,7 +3433,7 @@ function LogoutConfirmModal({ onClose }: { onClose: () => void }) {
                 onChange={() => setSelectedEmail(account.email)}
               />
               <span>
-                <strong>{account.name || t.mutualizmUser}</strong>
+                <strong>{account.name || t.mootsUser}</strong>
                 <small>{account.email}</small>
               </span>
             </label>
@@ -3383,6 +3545,7 @@ function AiAssistantBubble({ isOpen, onToggle }: { isOpen: boolean; onToggle: (o
   const [history, setHistory] = useState<{role: string, message: string}[]>([]);
   const [results, setResults] = useState<CandidateProfile[]>([]);
   const [detailProfile, setDetailProfile] = useState<CandidateProfile | null>(null);
+  const responseRef = useRef<HTMLDivElement>(null);
 
   const renderMessage = (text: string) => {
     const parts = text.split(/(\*\*.*?\*\*|\*.*?\*)/g);
@@ -3398,6 +3561,10 @@ function AiAssistantBubble({ isOpen, onToggle }: { isOpen: boolean; onToggle: (o
   };
 
   const clearHistory = async () => {
+    if (!window.confirm(t.aiClearHistoryConfirm)) {
+      return;
+    }
+
     setHistory([]);
     setResults([]);
     const { data: { user } } = await supabase.auth.getUser();
@@ -3419,6 +3586,23 @@ function AiAssistantBubble({ isOpen, onToggle }: { isOpen: boolean; onToggle: (o
         });
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen || !responseRef.current) {
+      return;
+    }
+
+    window.requestAnimationFrame(() => {
+      if (!responseRef.current) {
+        return;
+      }
+
+      responseRef.current.scrollTo({
+        top: responseRef.current.scrollHeight,
+        behavior: "smooth"
+      });
+    });
+  }, [history.length, isOpen, loading]);
 
   const presets = [
     { label: t.aiFindDesign, prompt: "I need a UI/UX designer who can help with Figma, wireframes, and user testing." },
@@ -3443,7 +3627,7 @@ function AiAssistantBubble({ isOpen, onToggle }: { isOpen: boolean; onToggle: (o
 
     const allProfiles = candidateLookup.size > 0 ? Array.from(candidateLookup.values()) : candidates;
     const siteContext = `
-You are Mutualizm AI, a website assistant for Mutualizm.
+You are Moots AI, a website assistant for Moots.
 Your job is not to interrupt chats. Help the user search for collaborators by skill, role, program, availability, and project goal.
 Reply in ${language === "id" ? "Indonesian" : "English"}.
 Available demo candidates:
@@ -3517,7 +3701,7 @@ ${allProfiles.map((candidate) => {
             ))}
           </div>
 
-          <div className="ai-assistant-response">
+          <div className="ai-assistant-response" ref={responseRef}>
             <div className="ai-chat-history">
               {history.map((msg, i) => (
                 <div key={i} className={`ai-chat-bubble ${msg.role === "user" ? "user" : "assistant"}`}>
@@ -3849,8 +4033,13 @@ function DiscoverPage() {
     if (!current || swipeMotion) {
       return;
     }
+
+    if ((event.target as HTMLElement | null)?.closest("button, a, input, textarea, select")) {
+      return;
+    }
+
     pointerStart.current = { x: event.clientX, y: event.clientY };
-    event.currentTarget.setPointerCapture(event.pointerId);
+    event.currentTarget.setPointerCapture?.(event.pointerId);
     setDrag({ x: 0, y: 0, active: true });
   };
 
@@ -3858,9 +4047,17 @@ function DiscoverPage() {
     if (!pointerStart.current) {
       return;
     }
-    setDrag({
+    const nextDrag = {
       x: event.clientX - pointerStart.current.x,
       y: event.clientY - pointerStart.current.y,
+      active: true
+    };
+    if (Math.abs(nextDrag.x) > 8 && Math.abs(nextDrag.x) > Math.abs(nextDrag.y)) {
+      event.preventDefault();
+    }
+    setDrag({
+      x: nextDrag.x,
+      y: nextDrag.y,
       active: true
     });
   };
@@ -3878,10 +4075,7 @@ function DiscoverPage() {
       if (drag.x > 0) {
         handleAction("interest");
       } else {
-        rewindLast();
-        setRewindAnim(true);
-        window.setTimeout(() => setRewindAnim(false), 450);
-        setDrag({ x: 0, y: 0, active: false });
+        handleAction("pass");
       }
       return;
     }
@@ -3916,7 +4110,9 @@ function DiscoverPage() {
   );
 
   useEffect(() => {
-    const storedSuggestion = window.sessionStorage.getItem("mutualizm.signupSuggestion");
+    const storedSuggestion =
+      window.sessionStorage.getItem("moots.signupSuggestion") ??
+      window.sessionStorage.getItem("mutualizm.signupSuggestion");
     if (!storedSuggestion) {
       return;
     }
@@ -3934,6 +4130,7 @@ function DiscoverPage() {
     } catch {
       // The suggestion payload is optional UI state; ignore malformed session data.
     } finally {
+      window.sessionStorage.removeItem("moots.signupSuggestion");
       window.sessionStorage.removeItem("mutualizm.signupSuggestion");
     }
   }, []);
@@ -4020,7 +4217,7 @@ function DiscoverPage() {
         {current ? (
           <CandidateCard
             profile={current}
-            className={`active-card ${swipeMotion ? `swiping-${swipeMotion}` : ""} ${rewindAnim ? "card-rewind-anim" : ""}`}
+            className={`active-card ${drag.active ? "dragging" : ""} ${swipeMotion ? `swiping-${swipeMotion}` : ""} ${rewindAnim ? "card-rewind-anim" : ""}`}
             style={dragStyle}
             actionHint={actionHint}
             swipeStatus={getSwipeStatus(current.id)}
@@ -4183,7 +4380,7 @@ function OnboardingPage() {
         }
         addToast(t.profileReadyTitle, t.profileReadyBody);
         window.sessionStorage.setItem(
-          "mutualizm.signupSuggestion",
+          "moots.signupSuggestion",
           JSON.stringify({
             mainSkill: draft.mainSkill,
             skills: (draft.skills || []).map((skill) => skill.name),
@@ -4210,7 +4407,7 @@ function OnboardingPage() {
     <div className="onboarding-shell page-transition">
       <header className="onboarding-top">
         <Link to="/" className="top-logo" style={{ position: "static", transform: "none" }}>
-          Mutualizm <span>✦</span>
+          Moots <span>✦</span>
         </Link>
         <button
           onClick={async () => {
@@ -7646,10 +7843,10 @@ function TermsPage() {
       <p>{id ? "Terakhir diperbarui: Juni 2025" : "Last updated: June 2025"}</p>
 
       <h2>{id ? "1. Penerimaan Syarat" : "1. Acceptance of Terms"}</h2>
-      <p>{id ? "Dengan mengakses atau menggunakan Mutualizm, Anda setuju untuk terikat dengan syarat ini. Jika tidak setuju, mohon jangan gunakan platform." : 'By accessing or using Mutualizm ("the Platform"), you agree to be bound by these Terms of Service. If you do not agree, please do not use the Platform.'}</p>
+      <p>{id ? "Dengan mengakses atau menggunakan Moots, Anda setuju untuk terikat dengan syarat ini. Jika tidak setuju, mohon jangan gunakan platform." : 'By accessing or using Moots ("the Platform"), you agree to be bound by these Terms of Service. If you do not agree, please do not use the Platform.'}</p>
 
       <h2>{id ? "2. Deskripsi Layanan" : "2. Description of Service"}</h2>
-      <p>{id ? "Mutualizm adalah platform kolaborasi kampus yang menghubungkan mahasiswa, pengembang, desainer, dan strategis bisnis untuk kerja tim berbasis proyek." : "Mutualizm is a campus collaboration platform that connects students, developers, designers, and business strategists for project-based teamwork."}</p>
+      <p>{id ? "Moots adalah platform kolaborasi kampus yang menghubungkan mahasiswa, pengembang, desainer, dan strategis bisnis untuk kerja tim berbasis proyek." : "Moots is a campus collaboration platform that connects students, developers, designers, and business strategists for project-based teamwork."}</p>
 
       <h2>{id ? "3. Akun Pengguna" : "3. User Accounts"}</h2>
       <p>{id ? "Anda harus memberikan informasi yang akurat dan lengkap saat membuat akun. Anda bertanggung jawab menjaga kerahasiaan kredensial masuk." : "You must provide accurate and complete information when creating an account. You are responsible for maintaining the confidentiality of your login credentials."}</p>
@@ -7662,13 +7859,13 @@ function TermsPage() {
       </ul>
 
       <h2>{id ? "5. Kekayaan Intelektual" : "5. Intellectual Property"}</h2>
-      <p>{id ? "Semua konten yang Anda buat dan bagikan tetap menjadi milik Anda. Dengan memposting konten, Anda memberi Mutualizm lisensi non-eksklusif untuk menampilkannya di dalam platform." : "All content you create and share on the Platform remains your property. By posting content, you grant Mutualizm a non-exclusive license to display it within the Platform."}</p>
+      <p>{id ? "Semua konten yang Anda buat dan bagikan tetap menjadi milik Anda. Dengan memposting konten, Anda memberi Moots lisensi non-eksklusif untuk menampilkannya di dalam platform." : "All content you create and share on the Platform remains your property. By posting content, you grant Moots a non-exclusive license to display it within the Platform."}</p>
 
       <h2>{id ? "6. Batasan Tanggung Jawab" : "6. Limitation of Liability"}</h2>
-      <p>{id ? "Mutualizm disediakan apa adanya tanpa jaminan apa pun. Kami tidak bertanggung jawab atas kerugian yang timbul dari penggunaan platform." : 'Mutualizm is provided "as is" without warranties of any kind. We are not liable for any damages resulting from your use of the Platform.'}</p>
+      <p>{id ? "Moots disediakan apa adanya tanpa jaminan apa pun. Kami tidak bertanggung jawab atas kerugian yang timbul dari penggunaan platform." : 'Moots is provided "as is" without warranties of any kind. We are not liable for any damages resulting from your use of the Platform.'}</p>
 
       <h2>{id ? "7. Kontak" : "7. Contact"}</h2>
-      <p>{id ? "Untuk pertanyaan tentang syarat ini, hubungi support@mutualizm.id." : "For questions about these Terms, contact us at support@mutualizm.id."}</p>
+      <p>{id ? "Untuk pertanyaan tentang syarat ini, hubungi support@moots.id." : "For questions about these Terms, contact us at support@moots.id."}</p>
     </div>
   );
 }
@@ -7708,7 +7905,7 @@ function PrivacyPage() {
       </ul>
 
       <h2>{id ? "6. Kontak" : "6. Contact"}</h2>
-      <p>{id ? "Untuk pertanyaan privasi, hubungi privacy@mutualizm.id." : "For privacy concerns, contact us at privacy@mutualizm.id."}</p>
+      <p>{id ? "Untuk pertanyaan privasi, hubungi privacy@moots.id." : "For privacy concerns, contact us at privacy@moots.id."}</p>
     </div>
   );
 }

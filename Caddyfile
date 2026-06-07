@@ -1,0 +1,9 @@
+{
+    frankenphp
+}
+
+:{$PORT:8080} {
+    root * public
+    encode zstd gzip
+    php_server
+}

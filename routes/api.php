@@ -11,7 +11,7 @@ use App\Http\Controllers\AiAssistantController;
 use Illuminate\Support\Facades\Route;
 
 // Health check
-Route::get('/health', fn() => response()->json(['status' => 'ok', 'app' => 'Mutualizm', 'version' => '1.0.0']));
+Route::get('/health', fn() => response()->json(['status' => 'ok', 'app' => 'Moots', 'version' => '1.0.0']));
 
 // Public auth routes
 Route::post('/register', [AuthController::class, 'register']);

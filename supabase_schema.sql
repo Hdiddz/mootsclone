@@ -1,4 +1,4 @@
--- Supabase Database Schema for Mutualizm
+-- Supabase Database Schema for Moots
 -- Copy and paste this script into the Supabase SQL Editor to initialize all tables, RLS policies, triggers, and functions.
 
 -- Drop existing tables from Laravel migration to avoid uuid vs bigint type conflicts

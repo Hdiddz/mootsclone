@@ -1,4 +1,4 @@
-# 📋 Mutualizm Changelog — v1.0
+# 📋 Moots Changelog — v1.0
 
 > **Version**: 1.0.0  
 > **Status**: 🟡 Beta Release  
@@ -12,7 +12,7 @@
 
 ```
 ╔══════════════════════════════════════╗
-║     MUTUALIZM v1.0.0 — BETA         ║
+║     MOOTS v1.0.0 — BETA         ║
 ║     Campus Collaboration Platform    ║
 ║     Telkom University                ║
 ╚══════════════════════════════════════╝
@@ -27,7 +27,7 @@
 
 | # | Hash | Pesan Commit | Kategori |
 |---|---|---|---|
-| 1 | `f139ee9` | Initial Mutualizm Laravel backend — Sanctum auth, Reverb real-time chat, full REST API | 🚀 Init |
+| 1 | `f139ee9` | Initial Moots Laravel backend — Sanctum auth, Reverb real-time chat, full REST API | 🚀 Init |
 | 2 | `37409be` | fix deployment build image network timeouts | 🔧 Deploy |
 | 3 | `4c13753` | rebase after pull | 🔧 Deploy |
 | 4 | `b1cea5c` | optimize: Alpine, IPv4 resolve, pre-compiled installer | 🔧 Deploy |
@@ -82,7 +82,7 @@
   - Tahap 9: Ketersediaan Kolaborasi
   - Tahap 10: Preview Profil Lengkap
 - **[ONB-002]** Indikator progres tahap ("Tahap 1 dari 5", "Tahap 2 dari 5", dst.)
-- **[ONB-003]** Logo Mutualizm di pojok kiri atas halaman onboarding
+- **[ONB-003]** Logo Moots di pojok kiri atas halaman onboarding
 - **[ONB-004]** Navigasi langsung ke Discover setelah onboarding selesai dengan pre-loading data kandidat
 
 ##### 🔍 Halaman Discover
@@ -200,7 +200,7 @@
 
 | ID | Perubahan | Detail |
 |---|---|---|
-| **UI-001** | Logo placement di Onboarding | Logo Mutualizm ditempatkan di pojok kiri atas, konsisten dengan halaman Discover |
+| **UI-001** | Logo placement di Onboarding | Logo Moots ditempatkan di pojok kiri atas, konsisten dengan halaman Discover |
 | **UI-002** | Step indicators di Onboarding | Menampilkan "Tahap X dari 5" untuk membantu pengguna mengetahui progres |
 | **UI-003** | Label "Sudah diminati" | Badge pada kandidat yang sudah di-interest saat refresh deck |
 | **UI-004** | Animasi swipe card | Smooth card animations menggunakan Framer Motion dengan spring physics |
@@ -290,7 +290,7 @@
 ## 📝 Catatan Rilis
 
 > [!IMPORTANT]
-> **Versi 1.0** merupakan rilis beta pertama dari Mutualizm. Platform ini masih dalam tahap pengembangan aktif. Beberapa fitur mungkin belum sepenuhnya stabil dan akan terus diperbaiki berdasarkan feedback pengguna.
+> **Versi 1.0** merupakan rilis beta pertama dari Moots. Platform ini masih dalam tahap pengembangan aktif. Beberapa fitur mungkin belum sepenuhnya stabil dan akan terus diperbaiki berdasarkan feedback pengguna.
 
 ### Known Issues (v1.0)
 - Performa mungkin menurun pada jumlah kandidat yang sangat besar (>1000)
@@ -304,4 +304,4 @@
 
 ---
 
-> _Mutualizm v1.0 — Building connections that matter._ 🤝
+> _Moots v1.0 — Building connections that matter._ 🤝

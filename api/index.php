@@ -19,7 +19,7 @@ $defaults = [
     'LARAVEL_STORAGE_PATH' => '/tmp/storage',
 ];
 
-function mutualizmUseLaravelPath(string $path): void
+function mootsUseLaravelPath(string $path): void
 {
     $path = '/'.ltrim($path, '/');
 
@@ -32,23 +32,23 @@ function mutualizmUseLaravelPath(string $path): void
     $_SERVER['PHP_SELF'] = '/index.php';
 }
 
-function mutualizmSetEnv(string $key, string $value): void
+function mootsSetEnv(string $key, string $value): void
 {
     putenv("{$key}={$value}");
     $_ENV[$key] = $value;
     $_SERVER[$key] = $value;
 }
 
-function mutualizmHasEnv(string $key): bool
+function mootsHasEnv(string $key): bool
 {
     $value = getenv($key);
 
     return $value !== false && trim((string) $value) !== '';
 }
 
-function mutualizmPrepareServerlessDatabase(Application $app): void
+function mootsPrepareServerlessDatabase(Application $app): void
 {
-    if (getenv('MUTUALIZM_SERVERLESS_SQLITE') !== '1') {
+    if (getenv('MOOTS_SERVERLESS_SQLITE') !== '1' && getenv('MUTUALIZM_SERVERLESS_SQLITE') !== '1') {
         return;
     }
 
@@ -64,7 +64,7 @@ function mutualizmPrepareServerlessDatabase(Application $app): void
         touch($database);
     }
 
-    $lock = fopen('/tmp/mutualizm-database.lock', 'c');
+    $lock = fopen('/tmp/moots-database.lock', 'c');
     if ($lock === false) {
         return;
     }
@@ -72,7 +72,7 @@ function mutualizmPrepareServerlessDatabase(Application $app): void
     try {
         flock($lock, LOCK_EX);
 
-        $migratedFlag = '/tmp/mutualizm-database-ready.flag';
+        $migratedFlag = '/tmp/moots-database-ready.flag';
         if ($freshDatabase || ! file_exists($migratedFlag)) {
             $kernel = $app->make(ConsoleKernel::class);
             $kernel->call('migrate', [
@@ -97,20 +97,20 @@ function mutualizmPrepareServerlessDatabase(Application $app): void
 
 foreach ($defaults as $key => $value) {
     if (getenv($key) === false) {
-        mutualizmSetEnv($key, $value);
+        mootsSetEnv($key, $value);
     }
 }
 
-if (! mutualizmHasEnv('DATABASE_URL') && ! mutualizmHasEnv('DB_URL') && ! mutualizmHasEnv('DB_HOST')) {
-    mutualizmSetEnv('DB_CONNECTION', 'sqlite');
-    mutualizmSetEnv('DB_DATABASE', '/tmp/mutualizm.sqlite');
-    mutualizmSetEnv('MUTUALIZM_SERVERLESS_SQLITE', '1');
+if (! mootsHasEnv('DATABASE_URL') && ! mootsHasEnv('DB_URL') && ! mootsHasEnv('DB_HOST')) {
+    mootsSetEnv('DB_CONNECTION', 'sqlite');
+    mootsSetEnv('DB_DATABASE', '/tmp/moots.sqlite');
+    mootsSetEnv('MOOTS_SERVERLESS_SQLITE', '1');
 }
 
 if (isset($_GET['__laravel_path'])) {
     $path = (string) $_GET['__laravel_path'];
     unset($_GET['__laravel_path']);
-    mutualizmUseLaravelPath($path);
+    mootsUseLaravelPath($path);
 } else {
     $currentPath = parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH) ?: '/';
     $firstSegment = explode('/', trim($currentPath, '/'))[0] ?? '';
@@ -133,7 +133,7 @@ if (isset($_GET['__laravel_path'])) {
     ];
 
     if ($currentPath !== '/' && ! str_starts_with($currentPath, '/api/') && in_array($firstSegment, $apiSegments, true)) {
-        mutualizmUseLaravelPath('/api'.$currentPath);
+        mootsUseLaravelPath('/api'.$currentPath);
     }
 }
 
@@ -142,11 +142,11 @@ if ($appKey === false || trim((string) $appKey) === '') {
     $seed = getenv('VERCEL_PROJECT_PRODUCTION_URL')
         ?: getenv('VERCEL_URL')
         ?: getenv('VERCEL_GIT_REPO_ID')
-        ?: 'mutualizm-vercel-fallback-key';
+        ?: 'moots-vercel-fallback-key';
 
-    $fallbackKey = 'base64:'.base64_encode(hash('sha256', 'mutualizm:'.$seed, true));
+    $fallbackKey = 'base64:'.base64_encode(hash('sha256', 'moots:'.$seed, true));
 
-    mutualizmSetEnv('APP_KEY', $fallbackKey);
+    mootsSetEnv('APP_KEY', $fallbackKey);
 }
 
 foreach ([
@@ -172,6 +172,6 @@ require __DIR__.'/../vendor/autoload.php';
 /** @var Application $app */
 $app = require_once __DIR__.'/../bootstrap/app.php';
 
-mutualizmPrepareServerlessDatabase($app);
+mootsPrepareServerlessDatabase($app);
 
 $app->handleRequest(Request::capture());

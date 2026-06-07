@@ -1,13 +1,13 @@
-# Mutualizm ✦ Campus Collaboration Matcher
+# Moots ✦ Campus Collaboration Matcher
 
-Mutualizm adalah platform kolaborasi kampus yang dirancang khusus untuk mahasiswa **Telkom University** agar dapat saling menemukan rekan kolaborator untuk kompetisi, proyek startup, tugas kuliah, riset, maupun event organisasi secara terstruktur berbasis keahlian (*skill-based discovery*).
+Moots adalah platform kolaborasi kampus yang dirancang khusus untuk mahasiswa **Telkom University** agar dapat saling menemukan rekan kolaborator untuk kompetisi, proyek startup, tugas kuliah, riset, maupun event organisasi secara terstruktur berbasis keahlian (*skill-based discovery*).
 
 Platform ini hadir sebagai solusi bagi mahasiswa yang sering kesulitan menemukan rekan kerja tim yang memiliki visi, misi, kecocokan peran, dan keahlian yang saling melengkapi di lingkungan kampus.
 
 ---
 
-## 🎯 Mengapa Mutualizm?
-Dalam lingkungan akademik dan kompetisi, keberhasilan suatu proyek sangat ditentukan oleh komposisi tim. Mutualizm mempermudah proses ini dengan menyediakan antarmuka pencarian rekan kolaborator yang intuitif dan menyenangkan:
+## 🎯 Mengapa Moots?
+Dalam lingkungan akademik dan kompetisi, keberhasilan suatu proyek sangat ditentukan oleh komposisi tim. Moots mempermudah proses ini dengan menyediakan antarmuka pencarian rekan kolaborator yang intuitif dan menyenangkan:
 * **Pencarian Berbasis Keahlian**: Menemukan rekan tim yang memiliki keahlian spesifik yang dibutuhkan proyek Anda.
 * **Kecocokan Peran**: Membagi peran tim secara jelas (seperti bidang teknis/engineering, desain, bisnis, dll.).
 * **Koneksi Cepat & Menyenangkan**: Menggunakan mekanisme kurasi kartu (*card deck*) untuk menyaring kandidat potensial secara efisien.

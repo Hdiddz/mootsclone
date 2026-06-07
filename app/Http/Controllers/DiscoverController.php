@@ -81,7 +81,7 @@ class DiscoverController extends Controller
                     AppNotification::create([
                         'user_id' => $data['swiped_id'],
                         'type' => 'new_match',
-                        'title' => 'New Mutualizm Match!',
+                        'title' => 'New Moots Match!',
                         'body' => $request->user()->name . ' matched with you!',
                         'data' => ['match_id' => $match->id],
                     ]);

@@ -135,7 +135,7 @@ class AiAssistantController extends Controller
                 'Authorization' => 'Bearer '.$key,
                 'Content-Type' => 'application/json',
                 'HTTP-Referer' => config('app.url'),
-                'X-Title' => 'Mutualizm',
+                'X-Title' => 'Moots',
             ])
             ->post('https://openrouter.ai/api/v1/chat/completions', [
                 'model' => config('services.openrouter.model', 'google/gemini-2.5-flash'),
@@ -206,7 +206,7 @@ class AiAssistantController extends Controller
         ])->filter()->map(fn ($value, $key) => "{$key}: {$value}")->implode("\n");
 
         return trim(<<<CONTEXT
-You are Mutualizm AI, an assistant inside a Telkom University campus collaboration platform.
+You are Moots AI, an assistant inside a Telkom University campus collaboration platform.
 You understand the whole product: onboarding, profile skills, discover swipes, saved profiles, matches, chat, alerts, and project discovery.
 Help users find collaborators, write concise chat openers, compare skill fit, and suggest next steps based on the skills or project goals they mention.
 Keep answers practical, under three short paragraphs, and reply in Indonesian or English based on the user's wording.

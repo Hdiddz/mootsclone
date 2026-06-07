@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <meta
       name="description"
-      content="Mutualizm helps Telkom University students discover collaborators, chat in real time, and get AI-assisted skill matching suggestions."
+      content="Moots helps Telkom University students discover collaborators, chat in real time, and get AI-assisted skill matching suggestions."
     />
-    <title>Mutualizm | Skill-based campus collaboration</title>
+    <title>Moots | Skill-based campus collaboration</title>
     <!-- Google Fonts: Montserrat -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
