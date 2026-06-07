@@ -3721,7 +3721,7 @@ function FollowChatBubble({ isOpen, onToggle }: { isOpen: boolean; onToggle: (op
 }
 
 function AiAssistantBubble({ isOpen, onToggle }: { isOpen: boolean; onToggle: (open: boolean) => void }) {
-  const { language, matches, setMatches, setChats, interestedIds, actOnCandidate, user } = useSymbio();
+  const { language, matches, setMatches, setChats, interestedIds, actOnCandidate, user, removeMatch, fetchDiscoverAndMatches } = useSymbio();
   const t = useTranslations();
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
@@ -3755,8 +3755,33 @@ function AiAssistantBubble({ isOpen, onToggle }: { isOpen: boolean; onToggle: (o
   };
 
   const handleFollow = async (candidate: CandidateProfile) => {
-    const isFollowed = interestedIds.includes(candidate.id) || matches.some(m => m.candidateId === candidate.id);
-    if (isFollowed) return;
+    const existingMatch = matches.find((m) => m.candidateId === candidate.id);
+    const isFollowed = interestedIds.includes(candidate.id) || !!existingMatch;
+
+    if (isFollowed) {
+      const confirmText = language === "id" 
+        ? `Apakah kamu yakin ingin berhenti mengikuti ${candidate.name}?` 
+        : `Are you sure you want to unfollow ${candidate.name}?`;
+      if (window.confirm(confirmText)) {
+        if (existingMatch) {
+          await removeMatch(existingMatch.id);
+        } else {
+          if (user?.id) {
+            try {
+              await supabase
+                .from("swipes")
+                .delete()
+                .eq("swiper_id", user.id)
+                .eq("swiped_id", candidate.id);
+              await fetchDiscoverAndMatches(user.id);
+            } catch (err) {
+              console.warn("Error deleting swipe on unfollow:", err);
+            }
+          }
+        }
+      }
+      return;
+    }
 
     if (user?.id) {
       try {
@@ -6093,14 +6118,37 @@ export function CandidateDetailSheet({
 }) {
   const t = useTranslations();
   const groupedSkills = groupSkills(profile.skills);
-  const { language, matches, setMatches, setChats, interestedIds, actOnCandidate, user } = useSymbio();
+  const { language, matches, setMatches, setChats, interestedIds, actOnCandidate, user, removeMatch, fetchDiscoverAndMatches } = useSymbio();
   const navigate = useNavigate();
 
-  const isFollowed = interestedIds.includes(profile.id) || matches.some(m => m.candidateId === profile.id);
+  const existingMatch = matches.find((m) => m.candidateId === profile.id);
+  const isFollowed = interestedIds.includes(profile.id) || !!existingMatch;
 
   const handleFollow = async () => {
-    const isFollowed = interestedIds.includes(profile.id) || matches.some(m => m.candidateId === profile.id);
-    if (isFollowed) return;
+    if (isFollowed) {
+      const confirmText = language === "id" 
+        ? `Apakah kamu yakin ingin berhenti mengikuti ${profile.name}?` 
+        : `Are you sure you want to unfollow ${profile.name}?`;
+      if (window.confirm(confirmText)) {
+        if (existingMatch) {
+          await removeMatch(existingMatch.id);
+        } else {
+          if (user?.id) {
+            try {
+              await supabase
+                .from("swipes")
+                .delete()
+                .eq("swiper_id", user.id)
+                .eq("swiped_id", profile.id);
+              await fetchDiscoverAndMatches(user.id);
+            } catch (err) {
+              console.warn("Error deleting swipe on unfollow:", err);
+            }
+          }
+        }
+      }
+      return;
+    }
 
     if (user?.id) {
       try {
