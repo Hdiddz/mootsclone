@@ -29,3 +29,6 @@ Thumbs.db
 .vercel
 /frontend/dist
 /frontend/node_modules
+
+/Foto
+/outputs

@@ -2800,25 +2800,46 @@ function FeatureItem({ icon, text }: { icon: ReactNode; text: string }) {
 
 const heroCarouselCards = [
   {
-    name: "Ahmad Rizky Ivanzya",
-    role: "Publikasi Assistant",
-    summary: "Database System Practicum Assistant yang cocok untuk tim publikasi, UI, dan dokumentasi produk.",
-    skills: ["Publikasi", "UI/UX", "Documentation"],
-    avatarUrl: "/profile-cover-rizky.jpg"
+    name: "Aditya Pratama",
+    role: "UI/UX Designer",
+    summary: "Mencari developer untuk membuat prototype aplikasi belajar kelompok interaktif.",
+    skills: ["UI/UX", "Figma", "Prototyping"],
+    avatarUrl: "/foto-1.jpg"
   },
   {
-    name: "Sarah Chen",
-    role: "Full-Stack Developer",
-    summary: "Building scalable web applications with React and Laravel. Seeking a designer co-founder for an EdTech startup.",
-    skills: ["React", "Laravel", "TypeScript"],
-    avatarUrl: "https://lh3.googleusercontent.com/aida-public/AB6AXuDbuH2czzOu3XpPXAgDIG9uZp9JwHSVP5HOJeoUdFxXZ7TAGd7GkRsON_8T5J3AgGiJK7ohhXr0be8IcHYnmeRnfTdS1GB8fUSrqDYgU8LLIY0iMx6UDdC8-u43fVQ4jqTFz-NE6ONoMDrkd0maVzDgIlWhnfUn4fGBPkdsIOWthrzx2zd6cCu7a4cB2MM4_ra5Sv91UXx0qPL6QYYcqZbW6b4uMdpHW4KHgkRkS0LrUdaEdMKJ8jwGgaGUuK8ZBXEoyKpHMHfvDoM"
+    name: "Farhan Hakim",
+    role: "Backend Developer",
+    summary: "Fokus pada Laravel dan REST API. Ingin berkolaborasi dalam proyek web e-learning.",
+    skills: ["Laravel", "MySQL", "API Development"],
+    avatarUrl: "/foto-2.jpg"
   },
   {
-    name: "Marcus Rivera",
-    role: "Business Strategist",
-    summary: "Experienced in go-to-market strategies and pitch deck design. Looking for technical co-founders for a campus marketplace.",
-    skills: ["Strategy", "Pitching", "Market Research"],
-    avatarUrl: "https://lh3.googleusercontent.com/aida-public/AB6AXuDPDk4pHub8NGPABmj2-xqKPQvhCXXp9oL3wtVphFeA4h-G6751JbmjVdA2LusfwXMQLJEioYWLASijLvIrFgzy-K4b2y5UjlI56N6Pz0kCmDehf9y5j6Oz1hYSaMPJ47h2XWUeTklPEMoz-CBvEMAZtJ0DyeDYmBiTkV4NfBcdVN6rrBXaKSISC9TDP91IUrXZGXcfD__GsRCLQj3oDhiUK_Y30YENnJBlsCJ2sV7Cny_BMz7uTdmO7sPhbpfidcF6NG6274UCaWw"
+    name: "Rian Hidayat",
+    role: "Mobile Developer",
+    summary: "Flutter developer yang tertarik dengan aplikasi produktivitas mahasiswa.",
+    skills: ["Flutter", "Dart", "Firebase"],
+    avatarUrl: "/foto-3.jpg"
+  },
+  {
+    name: "Naufal Hadi",
+    role: "Front-End Developer",
+    summary: "Senang membangun antarmuka web yang interaktif dan responsif menggunakan React.",
+    skills: ["React", "CSS Grid", "JavaScript"],
+    avatarUrl: "/foto-4.jpg"
+  },
+  {
+    name: "Dian Saputra",
+    role: "Machine Learning Engineer",
+    summary: "Tertarik pada riset AI untuk analisis sentimen media sosial. Butuh partner frontend.",
+    skills: ["Python", "TensorFlow", "Scikit-Learn"],
+    avatarUrl: "/foto-5.jpg"
+  },
+  {
+    name: "Zacky Ahmad",
+    role: "Project Manager",
+    summary: "Terbiasa mengelola timeline proyek kuliah dan metodologi Scrum. Siap memimpin tim.",
+    skills: ["Agile", "Scrum", "Trello"],
+    avatarUrl: "/foto-6.jpg"
   }
 ];
 
