@@ -7880,3 +7880,14 @@ body {
   color: #ffffff !important;
 }
 
+/* Dark Mode Icon and Status Contrast Fixes */
+:root.dark .chat-bubble-button,
+:root.dark .ai-assistant-button {
+  color: #12100a !important;
+}
+
+:root.dark .availability-available {
+  color: #12100a !important;
+}
+
+

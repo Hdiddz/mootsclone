@@ -6280,7 +6280,7 @@ export function EmptyState({
   return (
     <section className="empty-state">
       <div className="empty-icon">
-        <SlidersHorizontal size={28} aria-hidden="true" />
+        <User size={28} aria-hidden="true" />
       </div>
       <h2>{title}</h2>
       <p>{body}</p>
