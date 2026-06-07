@@ -1171,7 +1171,10 @@ function AuthPage() {
             {t.home}
           </Link>
           <div>
-            <span className="auth-brand-mark">Moots</span>
+            <span className="auth-brand-mark" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <img src="/logo-moots.svg" alt="Moots Logo" style={{ width: "28px", height: "28px" }} />
+              <span>Moots</span>
+            </span>
             <h1>{t.landingHeroTitle}</h1>
             <p>{t.landingHeroBody}</p>
           </div>
@@ -1199,7 +1202,7 @@ function AuthPage() {
         </div>
         <div className="auth-header">
           <div className="auth-logo-wrap">
-            <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>hub</span>
+            <img src="/logo-moots.svg" alt="Moots Logo" style={{ width: "38px", height: "38px" }} />
           </div>
           <h1>{mode === "login" ? t.welcomeBack : t.createAccount}</h1>
           <p>
@@ -2638,8 +2641,8 @@ function LandingPage() {
       <div className="auth-bg-blob-2" />
 
       <header className="landing-nav">
-        <Link to="/" className="brand-mark" aria-label="Moots home" style={{ display: "flex", alignItems: "center", gap: "8px", fontWeight: "700", fontSize: "1.25rem", color: "var(--primary)" }}>
-          <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1", fontSize: "28px" }}>hub</span>
+        <Link to="/" className="brand-mark" aria-label="Moots home" style={{ display: "flex", alignItems: "center", gap: "8px", fontWeight: "700", fontSize: "1.25rem" }}>
+          <img src="/logo-moots.svg" alt="Moots Logo" style={{ width: "28px", height: "28px" }} />
           <span>Moots</span>
         </Link>
         <nav className="landing-links" aria-label="Landing navigation" style={{ fontWeight: "600" }}>
@@ -3055,8 +3058,10 @@ function AppShell() {
                 className="top-logo"
                 onClick={() => setMobileDrawerOpen(false)}
                 aria-label="Moots discover"
+                style={{ display: "flex", alignItems: "center", gap: "8px" }}
               >
-                Moots <span>✦</span>
+                <img src="/logo-moots.svg" alt="Moots Logo" style={{ width: "24px", height: "24px" }} />
+                <span>Moots</span>
               </Link>
               <button className="close-btn" aria-label="Close menu" onClick={() => setMobileDrawerOpen(false)}>
                 <X size={20} />
@@ -3135,8 +3140,9 @@ function TopBar({
       <button className="top-icon-button" aria-label="Open menu" onClick={onMenuClick}>
         <Menu size={22} aria-hidden="true" />
       </button>
-      <Link to="/discover" className="top-logo" aria-label="Moots discover">
-        Moots <span>✦</span>
+      <Link to="/discover" className="top-logo" aria-label="Moots discover" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+        <img src="/logo-moots.svg" alt="Moots Logo" style={{ width: "24px", height: "24px" }} />
+        <span>Moots</span>
       </Link>
       <div className="top-actions" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
         <button

@@ -7866,3 +7866,17 @@ body {
     top: max(12px, env(safe-area-inset-top));
   }
 }
+
+/* Moots Brand Color Overrides */
+.brand-mark,
+.auth-brand-mark,
+.top-logo {
+  color: #000000 !important;
+}
+
+:root.dark .brand-mark,
+:root.dark .auth-brand-mark,
+:root.dark .top-logo {
+  color: #ffffff !important;
+}
+
