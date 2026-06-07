@@ -261,6 +261,7 @@ const translations = {
     verified: "Verified profile",
     settingsTitle: "Edit Profile & Settings",
     cancel: "Cancel",
+    confirm: "Confirm",
     campus: "Campus",
     program: "Program Major",
     preferredRole: "Preferred Role",
@@ -628,6 +629,7 @@ const translations = {
     verified: "Profil terverifikasi",
     settingsTitle: "Ubah Profil & Pengaturan",
     cancel: "Batal",
+    confirm: "Konfirmasi",
     campus: "Kampus",
     program: "Program Studi",
     preferredRole: "Peran Pilihan",
@@ -2236,10 +2238,78 @@ function App() {
       );
 
       try {
+        let dbMatchId = matchId;
+
+        // If the matchId is a mock ID (starts with match- or match_)
+        if (matchId.startsWith("match-") || matchId.startsWith("match_")) {
+          const candidateId = matchId.replace(/^match[-_]/, "");
+          const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+          if (uuidRegex.test(candidateId)) {
+            const user_a = user.id < candidateId ? user.id : candidateId;
+            const user_b = user.id > candidateId ? user.id : candidateId;
+
+            // Check if match already exists in DB
+            let { data: existingDbMatch } = await supabase
+              .from("matches")
+              .select("id")
+              .eq("user_a_id", user_a)
+              .eq("user_b_id", user_b)
+              .maybeSingle();
+
+            if (!existingDbMatch) {
+              // Simulate mutual match
+              await supabase.rpc("simulate_mutual_match", {
+                user_id: user.id,
+                candidate_id: candidateId
+              });
+              await supabase
+                .from("swipes")
+                .upsert({
+                  swiper_id: user.id,
+                  swiped_id: candidateId,
+                  action: "interest"
+                });
+
+              // Retrieve the new match's real UUID
+              const { data: newDbMatch } = await supabase
+                .from("matches")
+                .select("id")
+                .eq("user_a_id", user_a)
+                .eq("user_b_id", user_b)
+                .single();
+
+              if (newDbMatch) {
+                existingDbMatch = newDbMatch;
+              }
+            }
+
+            if (existingDbMatch) {
+              dbMatchId = existingDbMatch.id;
+
+              // Update state to use the real DB match ID
+              setMatches((current) =>
+                current.map((m) => (m.id === matchId ? { ...m, id: dbMatchId } : m))
+              );
+              setChats((current) => {
+                const next = { ...current };
+                if (next[matchId]) {
+                  next[dbMatchId] = next[matchId];
+                  delete next[matchId];
+                }
+                return next;
+              });
+
+              // Update browser URL silently
+              window.history.replaceState(null, "", `/chat/${dbMatchId}`);
+            }
+          }
+        }
+
         const { data, error } = await supabase
           .from("messages")
           .insert({
-            match_id: matchId,
+            match_id: dbMatchId,
             sender_id: user.id,
             text: cleanText
           })
@@ -2256,19 +2326,23 @@ function App() {
           };
 
           setChats((current) => {
-            const nextMessages = (current[matchId] ?? []).filter((message) => message.id !== tempId);
+            const nextMessages = (current[dbMatchId] ?? []).filter((message) => message.id !== tempId);
             if (nextMessages.some((message) => message.id === data.id)) {
-              return { ...current, [matchId]: nextMessages };
+              return { ...current, [dbMatchId]: nextMessages };
             }
 
-            return { ...current, [matchId]: [...nextMessages, persistedMessage] };
+            return { ...current, [dbMatchId]: [...nextMessages, persistedMessage] };
           });
         }
       } catch (err) {
-        setChats((current) => ({
-          ...current,
-          [matchId]: (current[matchId] ?? []).filter((chatMessage) => chatMessage.id !== tempId)
-        }));
+        setChats((current) => {
+          const targetKey = matchId.startsWith("match-") || matchId.startsWith("match_") ? matchId : matchId;
+          const next = { ...current };
+          if (next[targetKey]) {
+            next[targetKey] = next[targetKey].filter((chatMessage) => chatMessage.id !== tempId);
+          }
+          return next;
+        });
         console.error("Error sending message to Supabase:", err);
         addToast(
           language === "id" ? "Pesan gagal terkirim" : "Message failed to send",
@@ -3369,6 +3443,11 @@ function SettingsDrawer({
     language
   });
   const [settingsError, setSettingsError] = useState("");
+  const [confirmConfig, setConfirmConfig] = useState<{
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  } | null>(null);
 
   const saveSettings = () => {
     setSettingsError("");
@@ -3417,161 +3496,172 @@ function SettingsDrawer({
     setDraft((current) => ({ ...current, [key]: value }));
   };
 
-  const deleteAccount = async () => {
-    const confirmed = window.confirm(t.deleteAccountConfirm);
-    if (!confirmed) {
-      return;
-    }
+  const deleteAccount = () => {
+    setConfirmConfig({
+      title: language === "id" ? "Hapus Akun?" : "Delete Account?",
+      message: t.deleteAccountConfirm,
+      onConfirm: async () => {
+        try {
+          const { error } = await supabase.rpc('delete_user');
+          if (error) throw error;
 
-    try {
-      const { error } = await supabase.rpc('delete_user');
-      if (error) throw error;
-
-      ["profile", "filters", "passed", "interested", "saved", "previous"].forEach((key) => {
-        [`moots.${key}`, `mutualizm.${key}`].forEach((storageKey) => {
-          window.localStorage.removeItem(storageKey);
-          window.sessionStorage.removeItem(storageKey);
-        });
-      });
-      await logout();
-      onClose();
-      navigate("/login");
-    } catch (err: any) {
-      console.error("Error deleting user account:", err);
-      addToast(
-        language === "id" ? "Gagal menghapus akun" : "Failed to delete account",
-        err.message || "An error occurred while deleting your account.",
-        "error"
-      );
-    }
+          ["profile", "filters", "passed", "interested", "saved", "previous"].forEach((key) => {
+            [`moots.${key}`, `mutualizm.${key}`].forEach((storageKey) => {
+              window.localStorage.removeItem(storageKey);
+              window.sessionStorage.removeItem(storageKey);
+            });
+          });
+          await logout();
+          onClose();
+          navigate("/login");
+        } catch (err: any) {
+          console.error("Error deleting user account:", err);
+          addToast(
+            language === "id" ? "Gagal menghapus akun" : "Failed to delete account",
+            err.message || "An error occurred while deleting your account.",
+            "error"
+          );
+        }
+      }
+    });
   };
 
   return createPortal(
-    <div className="overlay settings-overlay" role="presentation" onClick={onClose}>
-      <aside
-        className="settings-drawer"
-        role="dialog"
-        aria-modal="true"
-        aria-label="Profile and website settings"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <header className="settings-drawer-header">
-          <div>
-            <p className="eyebrow">{t.settings}</p>
-            <h2>{t.settingsDrawerTitle}</h2>
-          </div>
-          <Button variant="circle" aria-label="Close settings" onClick={onClose}>
-            <X size={18} aria-hidden="true" />
-          </Button>
-        </header>
-
-        <div className="settings-note">
-          <strong>{t.settingsRulesTitle}</strong>
-          <p>{t.settingsRulesBody}</p>
-        </div>
-
-        <div className="settings-form-grid">
-          <TextField label={t.name} value={draft.name} onChange={(value) => updateDraft("name", value)} />
-          <PhotoUploadField
-            label={t.profilePhoto}
-            value={draft.avatarUrl}
-            position={draft.avatarPosition}
-            onChange={(value) => updateDraft("avatarUrl", value)}
-            onPositionChange={(value) => updateDraft("avatarPosition", value)}
-          />
-          <TextField label={t.campus} value={draft.campus} onChange={(value) => updateDraft("campus", value)} />
-          <TextField label={t.program} value={draft.program} onChange={(value) => updateDraft("program", value)} />
-          <TextField label={t.roleMain} value={draft.role} onChange={(value) => updateDraft("role", value)} />
-          <TextField label={t.mainSkill} value={draft.mainSkill} onChange={(value) => updateDraft("mainSkill", value)} />
-          <label className="field settings-select-field">
-            <span>{t.statusBadge}</span>
-            <select
-              value={draft.statusLabel}
-              onChange={(event) => updateDraft("statusLabel", event.target.value)}
-            >
-              <option value="">{t.defaultStatus}</option>
-              <option value="Looking for project">{t.lookingForProject}</option>
-              <option value="Available this week">{t.availableThisWeek}</option>
-              <option value="Busy, message first">{t.busyMessageFirst}</option>
-            </select>
-          </label>
-          <label className="field settings-select-field">
-            <span>{t.websiteLanguage}</span>
-            <select
-              value={draft.language}
-              onChange={(event) => updateDraft("language", event.target.value)}
-            >
-              <option value="id">{t.indonesian}</option>
-              <option value="en">{t.english}</option>
-            </select>
-          </label>
-          <TextAreaField
-            label={t.aboutProfile}
-            value={draft.bio}
-            onChange={(value) => updateDraft("bio", value)}
-            minRows={4}
-          />
-        </div>
-
-        <div className="settings-security-grid">
-          <TextField
-            label={t.currentPassword}
-            value={draft.currentPassword}
-            onChange={(value) => updateDraft("currentPassword", value)}
-            placeholder={t.optionalDemo}
-            type="password"
-          />
-          <TextField
-            label={t.newPassword}
-            value={draft.newPassword}
-            onChange={(value) => updateDraft("newPassword", value)}
-            placeholder={t.passwordHint}
-            type="password"
-          />
-          <TextField
-            label={t.confirmNewPassword}
-            value={draft.confirmPassword}
-            onChange={(value) => updateDraft("confirmPassword", value)}
-            type="password"
-          />
-        </div>
-        {settingsError ? <div className="error-box"><p>{settingsError}</p></div> : null}
-
-        <div className="settings-preference-list">
-          <label>
-            <input type="checkbox" defaultChecked />
-            {t.notifyPreference}
-          </label>
-          <label>
-            <input type="checkbox" defaultChecked />
-            {t.chatPreference}
-          </label>
-          <label>
-            <input type="checkbox" />
-            {t.emailPreference}
-          </label>
-        </div>
-
-        <div className="settings-actions">
-          <Button variant="ghostDanger" onClick={() => { onClose(); onLogoutRequest(); }}>
-            <LogOut size={18} aria-hidden="true" />
-            {t.logoutAccount}
-          </Button>
-          <Button variant="ghostDanger" onClick={deleteAccount}>
-            <Trash2 size={18} aria-hidden="true" />
-            {t.deleteAccount}
-          </Button>
-          <div>
-            <Button variant="secondary" onClick={onClose}>
-              {t.cancel}
+    <>
+      <div className="overlay settings-overlay" role="presentation" onClick={onClose}>
+        <aside
+          className="settings-drawer"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Profile and website settings"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <header className="settings-drawer-header">
+            <div>
+              <p className="eyebrow">{t.settings}</p>
+              <h2>{t.settingsDrawerTitle}</h2>
+            </div>
+            <Button variant="circle" aria-label="Close settings" onClick={onClose}>
+              <X size={18} aria-hidden="true" />
             </Button>
-            <Button variant="primary" onClick={saveSettings}>
-              {t.save}
-            </Button>
+          </header>
+
+          <div className="settings-note">
+            <strong>{t.settingsRulesTitle}</strong>
+            <p>{t.settingsRulesBody}</p>
           </div>
-        </div>
-      </aside>
-    </div>,
+
+          <div className="settings-form-grid">
+            <TextField label={t.name} value={draft.name} onChange={(value) => updateDraft("name", value)} />
+            <PhotoUploadField
+              label={t.profilePhoto}
+              value={draft.avatarUrl}
+              position={draft.avatarPosition}
+              onChange={(value) => updateDraft("avatarUrl", value)}
+              onPositionChange={(value) => updateDraft("avatarPosition", value)}
+            />
+            <TextField label={t.campus} value={draft.campus} onChange={(value) => updateDraft("campus", value)} />
+            <TextField label={t.program} value={draft.program} onChange={(value) => updateDraft("program", value)} />
+            <TextField label={t.roleMain} value={draft.role} onChange={(value) => updateDraft("role", value)} />
+            <TextField label={t.mainSkill} value={draft.mainSkill} onChange={(value) => updateDraft("mainSkill", value)} />
+            <label className="field settings-select-field">
+              <span>{t.statusBadge}</span>
+              <select
+                value={draft.statusLabel}
+                onChange={(event) => updateDraft("statusLabel", event.target.value)}
+              >
+                <option value="">{t.defaultStatus}</option>
+                <option value="Looking for project">{t.lookingForProject}</option>
+                <option value="Available this week">{t.availableThisWeek}</option>
+                <option value="Busy, message first">{t.busyMessageFirst}</option>
+              </select>
+            </label>
+            <label className="field settings-select-field">
+              <span>{t.websiteLanguage}</span>
+              <select
+                value={draft.language}
+                onChange={(event) => updateDraft("language", event.target.value)}
+              >
+                <option value="id">{t.indonesian}</option>
+                <option value="en">{t.english}</option>
+              </select>
+            </label>
+            <TextAreaField
+              label={t.aboutProfile}
+              value={draft.bio}
+              onChange={(value) => updateDraft("bio", value)}
+              minRows={4}
+            />
+          </div>
+
+          <div className="settings-security-grid">
+            <TextField
+              label={t.currentPassword}
+              value={draft.currentPassword}
+              onChange={(value) => updateDraft("currentPassword", value)}
+              placeholder={t.optionalDemo}
+              type="password"
+            />
+            <TextField
+              label={t.newPassword}
+              value={draft.newPassword}
+              onChange={(value) => updateDraft("newPassword", value)}
+              placeholder={t.passwordHint}
+              type="password"
+            />
+            <TextField
+              label={t.confirmNewPassword}
+              value={draft.confirmPassword}
+              onChange={(value) => updateDraft("confirmPassword", value)}
+              type="password"
+            />
+          </div>
+          {settingsError ? <div className="error-box"><p>{settingsError}</p></div> : null}
+
+          <div className="settings-preference-list">
+            <label>
+              <input type="checkbox" defaultChecked />
+              {t.notifyPreference}
+            </label>
+            <label>
+              <input type="checkbox" defaultChecked />
+              {t.chatPreference}
+            </label>
+            <label>
+              <input type="checkbox" />
+              {t.emailPreference}
+            </label>
+          </div>
+
+          <div className="settings-actions">
+            <Button variant="ghostDanger" onClick={() => { onClose(); onLogoutRequest(); }}>
+              <LogOut size={18} aria-hidden="true" />
+              {t.logoutAccount}
+            </Button>
+            <Button variant="ghostDanger" onClick={deleteAccount}>
+              <Trash2 size={18} aria-hidden="true" />
+              {t.deleteAccount}
+            </Button>
+            <div>
+              <Button variant="secondary" onClick={onClose}>
+                {t.cancel}
+              </Button>
+              <Button variant="primary" onClick={saveSettings}>
+                {t.save}
+              </Button>
+            </div>
+          </div>
+        </aside>
+      </div>
+      {confirmConfig && (
+        <ConfirmModal
+          title={confirmConfig.title}
+          message={confirmConfig.message}
+          onConfirm={confirmConfig.onConfirm}
+          onClose={() => setConfirmConfig(null)}
+        />
+      )}
+    </>,
     document.body
   );
 }
@@ -3728,6 +3818,11 @@ function AiAssistantBubble({ isOpen, onToggle }: { isOpen: boolean; onToggle: (o
   const [history, setHistory] = useState<{role: string, message: string}[]>([]);
   const [results, setResults] = useState<CandidateProfile[]>([]);
   const [detailProfile, setDetailProfile] = useState<CandidateProfile | null>(null);
+  const [confirmConfig, setConfirmConfig] = useState<{
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  } | null>(null);
   const responseRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
@@ -3759,33 +3854,35 @@ function AiAssistantBubble({ isOpen, onToggle }: { isOpen: boolean; onToggle: (o
     const isFollowed = interestedIds.includes(candidate.id) || !!existingMatch;
 
     if (isFollowed) {
-      const confirmText = language === "id" 
-        ? `Apakah kamu yakin ingin berhenti mengikuti ${candidate.name}?` 
-        : `Are you sure you want to unfollow ${candidate.name}?`;
-      if (window.confirm(confirmText)) {
-        if (existingMatch) {
-          await removeMatch(existingMatch.id);
-        } else {
-          if (user?.id) {
-            try {
-              await supabase
-                .from("swipes")
-                .delete()
-                .eq("swiper_id", user.id)
-                .eq("swiped_id", candidate.id);
-              await fetchDiscoverAndMatches(user.id);
-            } catch (err) {
-              console.warn("Error deleting swipe on unfollow:", err);
+      setConfirmConfig({
+        title: language === "id" ? "Berhenti Mengikuti?" : "Unfollow?",
+        message: language === "id" 
+          ? `Apakah kamu yakin ingin berhenti mengikuti ${candidate.name}?` 
+          : `Are you sure you want to unfollow ${candidate.name}?`,
+        onConfirm: async () => {
+          if (existingMatch) {
+            await removeMatch(existingMatch.id);
+          } else {
+            if (user?.id) {
+              try {
+                await supabase
+                  .from("swipes")
+                  .delete()
+                  .eq("swiper_id", user.id)
+                  .eq("swiped_id", candidate.id);
+                await fetchDiscoverAndMatches(user.id);
+              } catch (err) {
+                console.warn("Error deleting swipe on unfollow:", err);
+              }
             }
           }
         }
-      }
+      });
       return;
     }
 
     if (user?.id) {
       try {
-        // Force a mutual match on follow
         await supabase.rpc("simulate_mutual_match", {
           user_id: user.id,
           candidate_id: candidate.id
@@ -3801,7 +3898,7 @@ function AiAssistantBubble({ isOpen, onToggle }: { isOpen: boolean; onToggle: (o
         console.warn("Error simulating mutual match on follow:", err);
       }
     }
-    await actOnCandidate(candidate, "interest");
+    actOnCandidate(candidate, "interest");
   };
 
   const renderMessage = (text: string) => {
@@ -3817,17 +3914,19 @@ function AiAssistantBubble({ isOpen, onToggle }: { isOpen: boolean; onToggle: (o
     });
   };
 
-  const clearHistory = async () => {
-    if (!window.confirm(t.aiClearHistoryConfirm)) {
-      return;
-    }
-
-    setHistory([]);
-    setResults([]);
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      await supabase.from("ai_conversations").delete().eq("user_id", user.id);
-    }
+  const clearHistory = () => {
+    setConfirmConfig({
+      title: language === "id" ? "Hapus Riwayat?" : "Clear History?",
+      message: t.aiClearHistoryConfirm,
+      onConfirm: async () => {
+        setHistory([]);
+        setResults([]);
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          await supabase.from("ai_conversations").delete().eq("user_id", user.id);
+        }
+      }
+    });
   };
 
   useEffect(() => {
@@ -4074,6 +4173,15 @@ ${allProfiles.map((candidate) => {
       {detailProfile ? (
         <CandidateDetailSheet profile={detailProfile} onClose={() => setDetailProfile(null)} />
       ) : null}
+
+      {confirmConfig && (
+        <ConfirmModal
+          title={confirmConfig.title}
+          message={confirmConfig.message}
+          onConfirm={confirmConfig.onConfirm}
+          onClose={() => setConfirmConfig(null)}
+        />
+      )}
     </div>
   );
 }
@@ -6123,30 +6231,38 @@ export function CandidateDetailSheet({
 
   const existingMatch = matches.find((m) => m.candidateId === profile.id);
   const isFollowed = interestedIds.includes(profile.id) || !!existingMatch;
+  const [confirmConfig, setConfirmConfig] = useState<{
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  } | null>(null);
 
   const handleFollow = async () => {
     if (isFollowed) {
-      const confirmText = language === "id" 
-        ? `Apakah kamu yakin ingin berhenti mengikuti ${profile.name}?` 
-        : `Are you sure you want to unfollow ${profile.name}?`;
-      if (window.confirm(confirmText)) {
-        if (existingMatch) {
-          await removeMatch(existingMatch.id);
-        } else {
-          if (user?.id) {
-            try {
-              await supabase
-                .from("swipes")
-                .delete()
-                .eq("swiper_id", user.id)
-                .eq("swiped_id", profile.id);
-              await fetchDiscoverAndMatches(user.id);
-            } catch (err) {
-              console.warn("Error deleting swipe on unfollow:", err);
+      setConfirmConfig({
+        title: language === "id" ? "Berhenti Mengikuti?" : "Unfollow?",
+        message: language === "id" 
+          ? `Apakah kamu yakin ingin berhenti mengikuti ${profile.name}?` 
+          : `Are you sure you want to unfollow ${profile.name}?`,
+        onConfirm: async () => {
+          if (existingMatch) {
+            await removeMatch(existingMatch.id);
+          } else {
+            if (user?.id) {
+              try {
+                await supabase
+                  .from("swipes")
+                  .delete()
+                  .eq("swiper_id", user.id)
+                  .eq("swiped_id", profile.id);
+                await fetchDiscoverAndMatches(user.id);
+              } catch (err) {
+                console.warn("Error deleting swipe on unfollow:", err);
+              }
             }
           }
         }
-      }
+      });
       return;
     }
 
@@ -6167,7 +6283,7 @@ export function CandidateDetailSheet({
         console.warn("Error simulating mutual match on follow:", err);
       }
     }
-    await actOnCandidate(profile, "interest");
+    actOnCandidate(profile, "interest");
   };
 
   const handleChat = () => {
@@ -6202,7 +6318,8 @@ export function CandidateDetailSheet({
   }, [onClose]);
 
   return createPortal(
-    <div className="overlay detail-overlay" role="presentation" onClick={onClose}>
+    <>
+      <div className="overlay detail-overlay" role="presentation" onClick={onClose}>
       <aside
         className="detail-sheet"
         role="dialog"
@@ -6339,7 +6456,16 @@ export function CandidateDetailSheet({
           </DetailSection>
         </div>
       </aside>
-    </div>,
+    </div>
+    {confirmConfig && (
+      <ConfirmModal
+        title={confirmConfig.title}
+        message={confirmConfig.message}
+        onConfirm={confirmConfig.onConfirm}
+        onClose={() => setConfirmConfig(null)}
+      />
+    )}
+    </>,
     document.body
   );
 }
@@ -6708,6 +6834,43 @@ export function Avatar({ profile, size }: { profile: CandidateProfile; size: "xs
     >
       {getInitials(profile.name)}
     </span>
+  );
+}
+
+export function ConfirmModal({
+  title,
+  message,
+  onConfirm,
+  onClose,
+  confirmText,
+  cancelText,
+  variant = "danger"
+}: {
+  title: string;
+  message: string;
+  onConfirm: () => void;
+  onClose: () => void;
+  confirmText?: string;
+  cancelText?: string;
+  variant?: "primary" | "secondary" | "ghost" | "danger" | "ghostDanger";
+}) {
+  const t = useTranslations();
+  return createPortal(
+    <div className="overlay confirm-overlay" role="presentation" onClick={onClose}>
+      <section className="confirm-modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
+        <h2>{title}</h2>
+        <p style={{ marginTop: "8px", marginBottom: "16px" }}>{message}</p>
+        <div className="modal-actions" style={{ justifyContent: "flex-end", marginTop: 0 }}>
+          <Button variant="secondary" onClick={onClose}>
+            {cancelText || t.cancel}
+          </Button>
+          <Button variant={variant} onClick={() => { onConfirm(); onClose(); }}>
+            {confirmText || t.confirm}
+          </Button>
+        </div>
+      </section>
+    </div>,
+    document.body
   );
 }
 
