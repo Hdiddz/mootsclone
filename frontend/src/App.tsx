@@ -8186,6 +8186,13 @@ function findCandidatesForQuery(query: string) {
   ]);
   const tokens = normalized.split(/[^a-z0-9+#.]+/).filter((t) => t && !stopWords.has(t));
 
+  // Role synonym mapping for broader matching
+  const roleSynonyms: Record<string, string[]> = {
+    business: ["strategist", "strategy", "bisnis", "strategi", "pitch", "market", "research", "validation", "riset", "pasar", "validasi", "presentasi", "deck"],
+    technical: ["developer", "backend", "frontend", "fullstack", "programmer", "coding", "code", "api", "database", "laravel", "react", "pemrograman", "web", "mobile", "app"],
+    design: ["designer", "desainer", "ui", "ux", "figma", "wireframe", "desain", "graphic", "visual", "prototype", "video", "videography", "videografi", "editing", "motion", "animation", "animasi", "foto", "photography", "fotografi", "illustra"],
+  };
+
   const allProfiles = candidateLookup.size > 0 ? Array.from(candidateLookup.values()) : candidates;
 
   return allProfiles
@@ -8195,6 +8202,7 @@ function findCandidatesForQuery(query: string) {
       const role = candidate.role ? String(candidate.role).toLowerCase() : "";
       const mainSkill = candidate.mainSkill ? String(candidate.mainSkill).toLowerCase() : "";
       const summary = candidate.profileSummary ? String(candidate.profileSummary).toLowerCase() : "";
+      const expSummary = candidate.experienceSummary ? String(candidate.experienceSummary).toLowerCase() : "";
 
       if (mainSkill && normalized.includes(mainSkill)) {
         score += 8;
@@ -8221,6 +8229,34 @@ function findCandidatesForQuery(query: string) {
       tokens.forEach((token) => {
         if ((role && role.includes(token)) || (mainSkill && mainSkill.includes(token)) || (summary && summary.includes(token))) {
           score += 1;
+        }
+        // Also check experience summary for keyword matches
+        if (expSummary && expSummary.includes(token)) {
+          score += 1;
+        }
+      });
+
+      // Role-based synonym matching: boost candidates whose role category matches query synonyms
+      for (const [roleKey, synonyms] of Object.entries(roleSynonyms)) {
+        if (role.toLowerCase().includes(roleKey)) {
+          for (const synonym of synonyms) {
+            if (normalized.includes(synonym)) {
+              score += 6;
+              break;
+            }
+          }
+        }
+      }
+
+      // Also check if any skill name partially matches any token
+      tokens.forEach((token) => {
+        if (token.length >= 4) {
+          skillsArray.forEach((skillItem) => {
+            const skillName = skillItem?.name ? String(skillItem.name).toLowerCase() : "";
+            if (skillName && (skillName.includes(token) || token.includes(skillName))) {
+              score += 2;
+            }
+          });
         }
       });
 

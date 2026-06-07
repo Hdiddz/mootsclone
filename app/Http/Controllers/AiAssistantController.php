@@ -72,10 +72,10 @@ class AiAssistantController extends Controller
         if ($reply === null) {
             if ($apiError !== null) {
                 Log::warning('AI provider fallback used.', ['error' => $apiError]);
-                $reply = $this->fallbackSuggestion($prompt);
+                $reply = $this->fallbackSuggestion($prompt, $context);
                 $provider = 'local';
             } else {
-                $reply = $this->fallbackSuggestion($prompt);
+                $reply = $this->fallbackSuggestion($prompt, $context);
                 $provider = 'local';
             }
         }
@@ -219,12 +219,259 @@ Additional page context:
 CONTEXT);
     }
 
-    private function fallbackSuggestion(string $prompt): string
+    private function fallbackSuggestion(string $prompt, string $context = ''): string
     {
-        if (str_contains(strtolower($prompt), 'message')) {
+        $promptLower = strtolower($prompt);
+
+        // Parse candidates from the context string
+        $candidates = $this->parseCandidatesFromContext($context);
+
+        // If the user asks for a message/opener, give them one
+        if (str_contains($promptLower, 'message') || str_contains($promptLower, 'opener') || str_contains($promptLower, 'pesan')) {
             return 'Hi, I saw your skills and think they fit well with my project. Are you open to discussing a simple role split and timeline this week?';
         }
 
-        return 'Start by matching the project need with one main skill, then ask about availability, expected role, and one concrete next step such as a 15-minute planning chat.';
+        // Score candidates against the user's prompt
+        $scored = $this->scoreCandidates($candidates, $promptLower);
+
+        if (empty($scored)) {
+            // Detect language: if prompt contains Indonesian words, respond in Indonesian
+            $isIndo = $this->isLikelyIndonesian($promptLower);
+            if ($isIndo) {
+                return 'Maaf, saya tidak menemukan kandidat yang cocok dengan pencarian Anda saat ini. Coba gunakan kata kunci skill atau peran yang berbeda, misalnya "desainer UI/UX", "backend developer", atau "business strategist".';
+            }
+            return 'Sorry, I couldn\'t find candidates matching your search right now. Try using different skill or role keywords, such as "UI/UX designer", "backend developer", or "business strategist".';
+        }
+
+        $isIndo = $this->isLikelyIndonesian($promptLower);
+
+        // Build a meaningful response listing the top matches
+        $topMatches = array_slice($scored, 0, 3);
+        $lines = [];
+
+        if ($isIndo) {
+            $lines[] = 'Berdasarkan pencarian Anda, berikut beberapa rekomendasi:';
+            $lines[] = '';
+            foreach ($topMatches as $i => $match) {
+                $num = $i + 1;
+                $c = $match['candidate'];
+                $lines[] = "**{$num}. {$c['name']}** — {$c['role']}";
+                $line = "   Skill utama: {$c['mainSkill']}";
+                if (!empty($c['skills'])) {
+                    $line .= '. Skill lainnya: ' . implode(', ', array_slice($c['skills'], 0, 4));
+                }
+                $lines[] = $line;
+                if (!empty($c['availability'])) {
+                    $lines[] = "   Ketersediaan: {$c['availability']}";
+                }
+                $lines[] = '';
+            }
+            $lines[] = 'Anda bisa klik profil mereka di bawah untuk melihat detail lebih lanjut, lalu mulai chat atau follow.';
+        } else {
+            $lines[] = 'Based on your search, here are some recommendations:';
+            $lines[] = '';
+            foreach ($topMatches as $i => $match) {
+                $num = $i + 1;
+                $c = $match['candidate'];
+                $lines[] = "**{$num}. {$c['name']}** — {$c['role']}";
+                $line = "   Main skill: {$c['mainSkill']}";
+                if (!empty($c['skills'])) {
+                    $line .= '. Other skills: ' . implode(', ', array_slice($c['skills'], 0, 4));
+                }
+                $lines[] = $line;
+                if (!empty($c['availability'])) {
+                    $lines[] = "   Availability: {$c['availability']}";
+                }
+                $lines[] = '';
+            }
+            $lines[] = 'Click on their profiles below for more details, then start a chat or follow them.';
+        }
+
+        return implode("\n", $lines);
+    }
+
+    /**
+     * Parse candidate profiles from the context string sent by the frontend.
+     * The context contains lines like:
+     * - Name: Role, main skill X, skills A, B, goals G1, G2, availability Avail
+     */
+    private function parseCandidatesFromContext(string $context): array
+    {
+        $candidates = [];
+        $lines = explode("\n", $context);
+
+        foreach ($lines as $line) {
+            $line = trim($line);
+            if (!str_starts_with($line, '- ')) {
+                continue;
+            }
+
+            $line = substr($line, 2); // Remove "- "
+
+            // Parse "Name: Role, main skill X, skills A, B, goals G1, G2, availability Detail"
+            $colonPos = strpos($line, ':');
+            if ($colonPos === false) {
+                continue;
+            }
+
+            $name = trim(substr($line, 0, $colonPos));
+            $rest = trim(substr($line, $colonPos + 1));
+
+            $candidate = [
+                'name' => $name,
+                'role' => '',
+                'mainSkill' => '',
+                'skills' => [],
+                'goals' => [],
+                'availability' => '',
+                'raw' => strtolower($rest),
+            ];
+
+            // Extract role (text before first comma)
+            $parts = explode(',', $rest);
+            if (!empty($parts)) {
+                $candidate['role'] = trim($parts[0]);
+            }
+
+            // Extract main skill
+            if (preg_match('/main skill\s+(.+?)(?:,|$)/i', $rest, $m)) {
+                $candidate['mainSkill'] = trim($m[1]);
+            }
+
+            // Extract skills list
+            if (preg_match('/skills\s+(.+?)(?:,\s*goals|$)/i', $rest, $m)) {
+                $skillsStr = trim($m[1]);
+                $candidate['skills'] = array_map('trim', explode(',', $skillsStr));
+                $candidate['skills'] = array_filter($candidate['skills']);
+            }
+
+            // Extract goals
+            if (preg_match('/goals\s+(.+?)(?:,\s*availability|$)/i', $rest, $m)) {
+                $goalsStr = trim($m[1]);
+                $candidate['goals'] = array_map('trim', explode(',', $goalsStr));
+                $candidate['goals'] = array_filter($candidate['goals']);
+            }
+
+            // Extract availability
+            if (preg_match('/availability\s+(.+)$/i', $rest, $m)) {
+                $candidate['availability'] = trim($m[1]);
+            }
+
+            $candidates[] = $candidate;
+        }
+
+        return $candidates;
+    }
+
+    /**
+     * Score candidates against the user's prompt based on keyword matching.
+     * Returns an array of candidates sorted by relevance score (descending).
+     */
+    private function scoreCandidates(array $candidates, string $promptLower): array
+    {
+        // Extract meaningful keywords from the prompt (remove stop words)
+        $stopWords = [
+            'i', 'need', 'a', 'an', 'the', 'who', 'can', 'help', 'with', 'and', 'or', 'for',
+            'me', 'my', 'is', 'are', 'to', 'in', 'of', 'find', 'search', 'looking', 'want',
+            'someone', 'person', 'people', 'saya', 'butuh', 'yang', 'bisa', 'bantu', 'dengan',
+            'dan', 'atau', 'untuk', 'di', 'cari', 'orang', 'mau', 'perlu', 'tolong',
+            'have', 'has', 'be', 'been', 'do', 'does', 'did', 'it', 'that', 'this',
+            'jago', 'ahli', 'mahir', 'handal', 'pintar', 'bagus', 'baik',
+        ];
+
+        $words = preg_split('/[\s,\.\/\-]+/', $promptLower);
+        $keywords = array_filter($words, function ($word) use ($stopWords) {
+            return strlen($word) > 2 && !in_array($word, $stopWords);
+        });
+        $keywords = array_values($keywords);
+
+        if (empty($keywords)) {
+            // If no keywords extracted, return all candidates
+            return array_map(function ($c) {
+                return ['candidate' => $c, 'score' => 1];
+            }, array_slice($candidates, 0, 3));
+        }
+
+        $scored = [];
+
+        foreach ($candidates as $candidate) {
+            $score = 0;
+            $searchable = $candidate['raw'] . ' ' . strtolower($candidate['name']);
+
+            foreach ($keywords as $keyword) {
+                // Check for direct substring matches
+                if (str_contains($searchable, $keyword)) {
+                    $score += 3;
+                }
+
+                // Check partial/fuzzy matches (keyword is at least 4 chars)
+                if (strlen($keyword) >= 4) {
+                    foreach ($candidate['skills'] as $skill) {
+                        if (str_contains(strtolower($skill), $keyword) || str_contains($keyword, strtolower($skill))) {
+                            $score += 2;
+                        }
+                    }
+
+                    if (str_contains(strtolower($candidate['role']), $keyword)) {
+                        $score += 4;
+                    }
+
+                    if (str_contains(strtolower($candidate['mainSkill']), $keyword)) {
+                        $score += 5;
+                    }
+
+                    foreach ($candidate['goals'] as $goal) {
+                        if (str_contains(strtolower($goal), $keyword) || str_contains($keyword, strtolower($goal))) {
+                            $score += 2;
+                        }
+                    }
+                }
+            }
+
+            // Also check for role-based synonym matching
+            $roleKeywordMap = [
+                'business' => ['strategist', 'strategy', 'bisnis', 'strategi', 'pitch', 'market', 'research', 'validation', 'riset', 'pasar', 'validasi'],
+                'technical' => ['developer', 'backend', 'frontend', 'fullstack', 'programmer', 'coding', 'code', 'api', 'database', 'laravel', 'react', 'pemrograman'],
+                'design' => ['designer', 'ui', 'ux', 'figma', 'wireframe', 'desain', 'graphic', 'visual', 'prototype', 'desainer'],
+            ];
+
+            $candidateRoleLower = strtolower($candidate['role']);
+            foreach ($roleKeywordMap as $roleKey => $synonyms) {
+                if (str_contains($candidateRoleLower, $roleKey)) {
+                    foreach ($synonyms as $synonym) {
+                        if (str_contains($promptLower, $synonym)) {
+                            $score += 6;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if ($score > 0) {
+                $scored[] = ['candidate' => $candidate, 'score' => $score];
+            }
+        }
+
+        // Sort by score descending
+        usort($scored, function ($a, $b) {
+            return $b['score'] - $a['score'];
+        });
+
+        return $scored;
+    }
+
+    /**
+     * Simple heuristic to detect if the prompt is likely in Indonesian.
+     */
+    private function isLikelyIndonesian(string $text): bool
+    {
+        $indoWords = ['saya', 'butuh', 'cari', 'yang', 'bisa', 'dengan', 'untuk', 'orang', 'tolong', 'bantu', 'mau', 'ingin', 'perlu', 'bagaimana', 'siapa', 'apa', 'dimana'];
+        $count = 0;
+        foreach ($indoWords as $word) {
+            if (str_contains($text, $word)) {
+                $count++;
+            }
+        }
+        return $count >= 2;
     }
 }
