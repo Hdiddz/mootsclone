@@ -3150,6 +3150,54 @@ function AppShell() {
       <main className={`app-grid ${sidebarCollapsed ? "sidebar-collapsed" : ""}`}>
         <aside className="left-panel" aria-label="Navigation and filters">
           <MiniProfile profile={profile} isCollapsed={sidebarCollapsed} />
+          
+          {/* Desktop Search Component */}
+          {!sidebarCollapsed && (
+            <div className="desktop-sidebar-search">
+              <div className="search-input-wrapper">
+                <Search size={16} className="search-icon" />
+                <input
+                  type="text"
+                  placeholder={language === "id" ? "Cari nama..." : "Search name..."}
+                  value={mobileSearchQuery}
+                  onChange={(e) => setMobileSearchQuery(e.target.value)}
+                />
+                {mobileSearchQuery && (
+                  <button className="clear-search-btn" onClick={() => setMobileSearchQuery("")}>
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+
+              {mobileSearchQuery.trim() && (
+                <div className="desktop-sidebar-search-results">
+                  {searchResults.length > 0 ? (
+                    searchResults.map((candidate) => (
+                      <div
+                        key={candidate.id}
+                        className="search-result-row"
+                        onClick={() => {
+                          setSearchDetailProfile(candidate);
+                          setMobileSearchQuery("");
+                        }}
+                      >
+                        <Avatar profile={candidate} size="xs" />
+                        <div className="search-result-info">
+                          <strong>{candidate.name}</strong>
+                          <small>{localizeRoleLabel(candidate.role, t)}</small>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="search-no-results">
+                      {language === "id" ? "Tidak ada hasil ditemukan" : "No results found"}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           <SidebarNav
             isCollapsed={sidebarCollapsed}
             onSettingsClick={() => setSettingsOpen(true)}
