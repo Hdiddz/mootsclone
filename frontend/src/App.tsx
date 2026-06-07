@@ -6093,6 +6093,55 @@ export function CandidateDetailSheet({
 }) {
   const t = useTranslations();
   const groupedSkills = groupSkills(profile.skills);
+  const { language, matches, setMatches, setChats, interestedIds, actOnCandidate, user } = useSymbio();
+  const navigate = useNavigate();
+
+  const isFollowed = interestedIds.includes(profile.id) || matches.some(m => m.candidateId === profile.id);
+
+  const handleFollow = async () => {
+    const isFollowed = interestedIds.includes(profile.id) || matches.some(m => m.candidateId === profile.id);
+    if (isFollowed) return;
+
+    if (user?.id) {
+      try {
+        await supabase.rpc("simulate_mutual_match", {
+          user_id: user.id,
+          candidate_id: profile.id
+        });
+        await supabase
+          .from("swipes")
+          .upsert({
+            swiper_id: profile.id,
+            swiped_id: user.id,
+            action: "interest"
+          });
+      } catch (err) {
+        console.warn("Error simulating mutual match on follow:", err);
+      }
+    }
+    await actOnCandidate(profile, "interest");
+  };
+
+  const handleChat = () => {
+    let existingMatch = matches.find((m) => m.candidateId === profile.id);
+    if (!existingMatch) {
+      existingMatch = createMatchFor(profile);
+      setMatches((prev) => [existingMatch!, ...prev]);
+      setChats((prev) => ({
+        ...prev,
+        [existingMatch!.id]: [
+          {
+            id: `sheet-init-${profile.id}`,
+            sender: "them",
+            text: language === "id" ? `Halo! Saya ${profile.name}. Senang bertemu dengan Anda. Mari kita mulai kolaborasi.` : `Hi there! I'm ${profile.name}. Nice to meet you. Let's start collaborating.`,
+            timestamp: "Just now"
+          }
+        ]
+      }));
+    }
+    onClose(); // Close sheet
+    navigate(`/chat/${existingMatch.id}`);
+  };
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -6113,17 +6162,52 @@ export function CandidateDetailSheet({
         aria-label={`${profile.name} profile details`}
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="sheet-header">
-          <div className="saved-card-top">
-            <Avatar profile={profile} size="md" />
-            <div>
+        <div className="sheet-profile-hero">
+          {/* Cover background using candidate's accent class/color */}
+          <div className={`sheet-profile-cover ${profile.accent || "accent-indigo"}`} />
+          
+          <button 
+            type="button" 
+            className="sheet-close-btn" 
+            aria-label={t.close} 
+            onClick={onClose}
+          >
+            <X size={18} />
+          </button>
+
+          <div className="sheet-profile-header-content">
+            <div className="sheet-avatar-container">
+              <Avatar profile={profile} size="xl" />
+            </div>
+            
+            <div className="sheet-profile-title-info">
               <h2>{profile.name}</h2>
-              <p>{localizeRoleLabel(profile.role, t)} · {profile.mainSkill}</p>
+              <p className="sheet-profile-role">{localizeRoleLabel(profile.role, t)} · {profile.mainSkill}</p>
+              <div style={{ marginTop: '8px', display: 'flex' }}>
+                <AvailabilityBadge availability={profile.availability} label={profile.statusLabel} />
+              </div>
             </div>
           </div>
-          <Button variant="circle" aria-label={t.close} onClick={onClose}>
-            <X size={20} aria-hidden="true" />
-          </Button>
+        </div>
+
+        <div className="sheet-profile-actions">
+          <button
+            type="button"
+            className={`sheet-action-btn follow-btn ${isFollowed ? "followed" : ""}`}
+            onClick={handleFollow}
+            title={isFollowed ? "Mutual Interest / Followed" : "Follow / Show Interest"}
+          >
+            <Heart size={16} fill={isFollowed ? "var(--danger)" : "none"} stroke={isFollowed ? "var(--danger)" : "currentColor"} />
+            <span>{isFollowed ? (language === "id" ? "Mengikuti" : "Followed") : (language === "id" ? "Ikuti" : "Follow")}</span>
+          </button>
+          <button
+            type="button"
+            className="sheet-action-btn chat-btn"
+            onClick={handleChat}
+          >
+            <MessageCircle size={16} />
+            <span>{language === "id" ? "Obrolan" : "Chat"}</span>
+          </button>
         </div>
 
         <div className="detail-content">
@@ -6557,7 +6641,7 @@ function AvailabilityBadge({
   return <span className={`availability availability-${availability}`}>{localizeStatusLabel(label, t) || fallback}</span>;
 }
 
-export function Avatar({ profile, size }: { profile: CandidateProfile; size: "xs" | "sm" | "md" | "lg" }) {
+export function Avatar({ profile, size }: { profile: CandidateProfile; size: "xs" | "sm" | "md" | "lg" | "xl" }) {
   if (profile.avatarUrl) {
     return (
       <img
