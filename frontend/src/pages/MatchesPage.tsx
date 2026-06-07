@@ -15,10 +15,9 @@ import {
 } from "../App";
 
 export default function MatchesPage() {
-  const { matches, removeMatch, addToast, createGroupChat } = useSymbio();
+  const { matches, removeMatch, addToast, createGroupChat, fetchDiscoverAndMatches, user, interestedIds, incomingInterests } = useSymbio();
   const t = useTranslations();
   const navigate = useNavigate();
-  const [selectedId, setSelectedId] = useState(matches[0]?.id ?? "");
   const [openMenuId, setOpenMenuId] = useState("");
   const [detailProfile, setDetailProfile] = useState<CandidateProfile | null>(null);
   const [groupModalOpen, setGroupModalOpen] = useState(false);
@@ -27,12 +26,27 @@ export default function MatchesPage() {
   const [groupError, setGroupError] = useState("");
 
   useEffect(() => {
-    if (!matches.some((match) => match.id === selectedId)) {
-      setSelectedId(matches[0]?.id ?? "");
+    if (user?.id) {
+      fetchDiscoverAndMatches(user.id);
     }
-  }, [matches, selectedId]);
+  }, [user?.id, fetchDiscoverAndMatches]);
 
-  if (!matches.length) {
+  const approvedMatches = matches.filter((match) =>
+    match.isGroup || (
+      (interestedIds || []).includes(match.candidateId) &&
+      (incomingInterests || []).includes(match.candidateId)
+    )
+  );
+
+  const [selectedId, setSelectedId] = useState(approvedMatches[0]?.id ?? "");
+
+  useEffect(() => {
+    if (!approvedMatches.some((match) => match.id === selectedId)) {
+      setSelectedId(approvedMatches[0]?.id ?? "");
+    }
+  }, [approvedMatches, selectedId]);
+
+  if (!approvedMatches.length) {
     return (
       <div className="page-stack">
         <BeelineIntro />
@@ -49,8 +63,8 @@ export default function MatchesPage() {
     );
   }
 
-  const selected = matches.find((match) => match.id === selectedId) ?? matches[0];
-  const directMatches = matches.filter((match) => !match.isGroup && getCandidate(match.candidateId));
+  const selected = approvedMatches.find((match) => match.id === selectedId) ?? approvedMatches[0];
+  const directMatches = approvedMatches.filter((match) => !match.isGroup && getCandidate(match.candidateId));
   const showPrototypeActionToast = (title: string, body: string) => addToast(title, body);
 
   const toggleGroupMember = (candidateId: string) => {
@@ -86,7 +100,7 @@ export default function MatchesPage() {
       </div>
       <div className="matches-grid">
         <section className="match-list" aria-label="Match list">
-          {matches.map((match) => {
+          {approvedMatches.map((match) => {
             const candidate = match.isGroup ? null : getCandidate(match.candidateId);
             if (!candidate && !match.isGroup) {
               return null;

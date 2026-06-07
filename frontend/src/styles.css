@@ -8701,3 +8701,21 @@ body {
     max-height: 44vh;
   }
 }
+
+.status-text {
+  font-size: 0.875rem;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: var(--radius);
+  display: inline-block;
+}
+
+.status-text.approved {
+  color: var(--success);
+  background-color: rgba(16, 185, 129, 0.1);
+}
+
+.status-text.rejected {
+  color: var(--danger);
+  background-color: rgba(186, 26, 26, 0.1);
+}

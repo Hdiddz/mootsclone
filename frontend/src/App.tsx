@@ -125,6 +125,7 @@ type SymbioStore = {
   setFilters: Dispatch<SetStateAction<FilterValues>>;
   passedIds: string[];
   interestedIds: string[];
+  incomingInterests: string[];
   savedIds: string[];
   matches: MatchRecord[];
   setMatches: Dispatch<SetStateAction<MatchRecord[]>>;
@@ -201,7 +202,6 @@ const navItems = [
   { to: "/discover", label: "Discover", icon: Compass },
   { to: "/matches", label: "Matches", icon: Users },
   { to: "/saved", label: "Saved", icon: User },
-  { to: "/projects", label: "Projects", icon: Briefcase },
   { to: "/notifications", label: "Alerts", icon: Bell },
   { to: "/profile", label: "Profile", icon: User }
 ];
@@ -274,6 +274,8 @@ const translations = {
     markRead: "Mark read",
     approve: "Approve",
     reject: "Reject",
+    approved: "Approved",
+    rejected: "Rejected",
     matchRequestType: "Match Request",
     matchRequestTitle: "Someone wants to match with you",
     matchRequestBody: "wants to match with you. Approve to open a chat.",
@@ -679,6 +681,8 @@ const translations = {
     markRead: "Tandai dibaca",
     approve: "Setujui",
     reject: "Tolak",
+    approved: "Disetujui",
+    rejected: "Ditolak",
     matchRequestType: "Permintaan Kecocokan",
     matchRequestTitle: "Ada yang ingin match dengan Anda",
     matchRequestBody: "ingin match dengan Anda. Setujui untuk membuka obrolan.",
@@ -1435,6 +1439,7 @@ function App() {
     []
   );
   const [savedIds, setSavedIds] = useLocalStorageState<string[]>("moots.saved", []);
+  const [incomingInterests, setIncomingInterests] = useState<string[]>([]);
   const [matches, setMatches] = useLocalStorageState<MatchRecord[]>("moots.matches", []);
   const [notifications, setNotifications] = useLocalStorageState<NotificationItem[]>(
     "moots.notifications",
@@ -1636,22 +1641,24 @@ function App() {
 
     const { data: swipesData } = await supabase
       .from("swipes")
-      .select("swiped_id, action")
-      .eq("swiper_id", userId);
+      .select("swiper_id, swiped_id, action")
+      .or(`swiper_id.eq.${userId},swiped_id.eq.${userId}`);
 
-    const swipedIds = swipesData?.map((s: any) => s.swiped_id) || [];
+    const swipedIds = swipesData?.filter((s: any) => s.swiper_id === userId).map((s: any) => s.swiped_id) || [];
     swipedIds.push(userId);
 
     const loadedCandidates = allProfiles.filter((p) => !swipedIds.includes(p.id));
     setDbCandidates(loadedCandidates);
 
-    const passed = swipesData?.filter((s: any) => s.action === "pass").map((s: any) => s.swiped_id) || [];
-    const interested = swipesData?.filter((s: any) => s.action === "interest").map((s: any) => s.swiped_id) || [];
-    const saved = swipesData?.filter((s: any) => s.action === "save").map((s: any) => s.swiped_id) || [];
+    const passed = swipesData?.filter((s: any) => s.swiper_id === userId && s.action === "pass").map((s: any) => s.swiped_id) || [];
+    const interested = swipesData?.filter((s: any) => s.swiper_id === userId && s.action === "interest").map((s: any) => s.swiped_id) || [];
+    const saved = swipesData?.filter((s: any) => s.swiper_id === userId && s.action === "save").map((s: any) => s.swiped_id) || [];
+    const incoming = swipesData?.filter((s: any) => s.swiped_id === userId && s.action === "interest").map((s: any) => s.swiper_id) || [];
 
     setPassedIds(passed);
     setInterestedIds(interested);
     setSavedIds(saved);
+    setIncomingInterests(incoming);
 
     const { data: matchesData } = await supabase
       .from("matches")
@@ -2132,6 +2139,24 @@ function App() {
 
       if (user?.id) {
         try {
+          if (action === "interest" && candidate.mutualInterest) {
+            try {
+              await supabase.rpc("simulate_mutual_match", {
+                user_id: user.id,
+                candidate_id: candidate.id
+              });
+              await supabase
+                .from("swipes")
+                .upsert({
+                  swiper_id: candidate.id,
+                  swiped_id: user.id,
+                  action: "interest"
+                });
+            } catch (err) {
+              console.warn("Error simulating mutual match for mock candidate:", err);
+            }
+          }
+
           const { error } = await supabase
             .from("swipes")
             .upsert({
@@ -2982,6 +3007,7 @@ function App() {
       setFilters,
       passedIds,
       interestedIds,
+      incomingInterests,
       savedIds,
       matches,
       setMatches,
@@ -3028,6 +3054,7 @@ function App() {
       clearFilters,
       filters,
       interestedIds,
+      incomingInterests,
       markAllNotificationsRead,
       markNotificationRead,
       matches,
@@ -3087,7 +3114,6 @@ function App() {
           <Route path="/chat/:matchId" element={<ChatPage />} />
           <Route path="/saved" element={<SavedPage />} />
           <Route path="/notifications" element={<NotificationsPage />} />
-          <Route path="/projects" element={<ProjectsPage />} />
           <Route path="/profile" element={<ProfilePage />} />
         </Route>
         <Route path="/terms" element={<TermsPage />} />
@@ -4683,41 +4709,7 @@ ${allProfiles.map((candidate) => {
 }
 
 function BottomNav({ unreadCount }: { unreadCount: number }) {
-  const t = useTranslations();
-  const mobileItems = navItems.filter((item) =>
-    ["/discover", "/matches", "/saved", "/profile"].includes(item.to)
-  );
-
-  const getNavLabel = (to: string) => {
-    switch (to) {
-      case "/discover": return t.discover;
-      case "/matches": return t.matches;
-      case "/saved": return t.saved;
-      case "/profile": return t.profile;
-      default: return "";
-    }
-  };
-
-  return (
-    <nav className="bottom-nav" aria-label="Mobile navigation">
-      {mobileItems.map((item) => {
-        const Icon = item.icon;
-        const label = getNavLabel(item.to);
-        const tourKey = item.to === "/discover" ? "discover" : item.to === "/matches" ? "matches" : undefined;
-        return (
-          <NavLink key={item.to} to={item.to} data-tour={tourKey}>
-            <span className="bottom-icon-wrap">
-              <Icon size={20} aria-hidden="true" />
-              {item.to === "/matches" && unreadCount > 0 ? (
-                <span className="mini-dot" aria-label={`${unreadCount} ${t.unreadBadge}`} />
-              ) : null}
-            </span>
-            <span>{label}</span>
-          </NavLink>
-        );
-      })}
-    </nav>
-  );
+  return null;
 }
 
 function MiniProfile({ profile, isCollapsed = false }: { profile: CandidateProfile; isCollapsed?: boolean }) {
@@ -4809,22 +4801,7 @@ function RightRail() {
         </div>
       </section>
 
-      {mockProjects.length > 0 && (
-        <section className="rail-section">
-          <div className="rail-heading">
-            <h2>{t.suggestedProject}</h2>
-            <Link to="/projects">{t.explore}</Link>
-          </div>
-          <p>
-            <strong>{localizeProject(mockProjects[0], t).title}</strong>
-          </p>
-          <div className="chip-row">
-            {mockProjects[0].neededRoles.slice(0, 2).map((role) => (
-              <Chip key={role}>{localizeRoleLabel(role, t)}</Chip>
-            ))}
-          </div>
-        </section>
-      )}
+
     </div>
   );
 }
@@ -4977,15 +4954,12 @@ function DiscoverPage() {
 
     if (horizontal > 90 && horizontal > vertical) {
       if (drag.x > 0) {
-        handleAction("interest");
-      } else {
         handleAction("pass");
+      } else {
+        rewindLast();
+        setRewindAnim(true);
+        window.setTimeout(() => setRewindAnim(false), 450);
       }
-      return;
-    }
-
-    if (drag.y < -90 && vertical > horizontal) {
-      handleAction("save");
       return;
     }
 
@@ -5976,9 +5950,15 @@ export function BeelineIntro() {
 }
 
 function ChatPage() {
-  const { matches } = useSymbio();
+  const { matches, user, fetchDiscoverAndMatches } = useSymbio();
   const t = useTranslations();
   const { matchId } = useParams();
+
+  useEffect(() => {
+    if (user?.id) {
+      fetchDiscoverAndMatches(user.id);
+    }
+  }, [user?.id, fetchDiscoverAndMatches]);
   const match = matches.find((item) => item.id === matchId);
   const candidate = match?.isGroup
     ? ({
@@ -6135,7 +6115,7 @@ function findCandidateFromNotification(notification: NotificationItem) {
 }
 
 function NotificationsPage() {
-  const { notifications, markNotificationRead, markAllNotificationsRead, respondToMatchRequest, language } = useSymbio();
+  const { notifications, markNotificationRead, markAllNotificationsRead, respondToMatchRequest, language, interestedIds, passedIds } = useSymbio();
   const unreadCount = notifications.filter((notification) => !notification.read).length;
   const [selectedNotification, setSelectedNotification] = useState<NotificationItem | null>(null);
   const [detailProfile, setDetailProfile] = useState<CandidateProfile | null>(null);
@@ -6186,7 +6166,16 @@ function NotificationsPage() {
                 <div className="notification-request-actions" onClick={(event) => event.stopPropagation()}>
                   {(() => {
                     const candidate = findCandidateFromNotification(notification);
-                    return candidate ? (
+                    if (!candidate) return null;
+                    
+                    if (interestedIds.includes(candidate.id)) {
+                      return <span className="status-text approved">{t.approved}</span>;
+                    }
+                    if (passedIds.includes(candidate.id)) {
+                      return <span className="status-text rejected">{t.rejected}</span>;
+                    }
+                    
+                    return (
                       <>
                         <Button
                           variant="primary"
@@ -6203,7 +6192,7 @@ function NotificationsPage() {
                           {t.reject}
                         </Button>
                       </>
-                    ) : null;
+                    );
                   })()}
                 </div>
               ) : null}
@@ -6243,7 +6232,16 @@ function NotificationsPage() {
               {selectedNotification.type === "match_request" && (
                 (() => {
                   const candidate = findCandidateFromNotification(selectedNotification);
-                  return candidate ? (
+                  if (!candidate) return null;
+                  
+                  if (interestedIds.includes(candidate.id)) {
+                    return <span className="status-text approved">{t.approved}</span>;
+                  }
+                  if (passedIds.includes(candidate.id)) {
+                    return <span className="status-text rejected">{t.rejected}</span>;
+                  }
+
+                  return (
                     <>
                       <Button
                         variant="primary"
@@ -6266,7 +6264,7 @@ function NotificationsPage() {
                         {t.reject}
                       </Button>
                     </>
-                  ) : null;
+                  );
                 })()
               )}
               <Button variant="secondary" onClick={() => setSelectedNotification(null)}>
@@ -6285,82 +6283,7 @@ function NotificationsPage() {
   );
 }
 
-function ProjectsPage() {
-  const t = useTranslations();
-  const [selectedProject, setSelectedProject] = useState<typeof mockProjects[number] | null>(null);
-  return (
-    <div className="page-stack page-transition">
-      <PageHeader
-        eyebrow={t.projectsEyebrow}
-        title={t.projectsDesc}
-      />
-      <div className="project-grid">
-        {mockProjects.map((project) => {
-          const displayedProject = localizeProject(project, t);
-          return (
-          <article className="project-card" key={project.id}>
-            <span className="project-status">{displayedProject.status}</span>
-            <h2>{displayedProject.title}</h2>
-            <p>{displayedProject.summary}</p>
-            <div>
-              <strong>{t.neededRoles}</strong>
-              <div className="chip-row">
-                {project.neededRoles.map((role) => (
-                  <Chip key={role}>{localizeRoleLabel(role, t)}</Chip>
-                ))}
-              </div>
-            </div>
-            <div>
-              <strong>{t.skills}</strong>
-              <div className="chip-row">
-                {project.skills.map((skillName) => (
-                  <Chip key={skillName} tone="soft">
-                    {skillName}
-                  </Chip>
-                ))}
-              </div>
-            </div>
-            <div className="project-footer">
-              <span>{displayedProject.deadline}</span>
-              <Button variant="secondary" onClick={() => setSelectedProject(project)}>{t.viewProject}</Button>
-            </div>
-          </article>
-          );
-        })}
-      </div>
-      {selectedProject ? createPortal(
-        <div className="overlay" role="presentation" onClick={() => setSelectedProject(null)}>
-          <div className="project-detail-modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h2>{localizeProject(selectedProject, t).title}</h2>
-              <button type="button" onClick={() => setSelectedProject(null)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} /></button>
-            </div>
-            <span className="chip">{localizeProject(selectedProject, t).status}</span>
-            <p>{localizeProject(selectedProject, t).summary}</p>
-            <div>
-              <strong>{t.neededRoles}</strong>
-              <div className="chip-row" style={{ marginTop: 6 }}>
-                {selectedProject.neededRoles.map((role) => (
-                  <Chip key={role}>{localizeRoleLabel(role, t)}</Chip>
-                ))}
-              </div>
-            </div>
-            <div>
-              <strong>{t.skills}</strong>
-              <div className="chip-row" style={{ marginTop: 6 }}>
-                {selectedProject.skills.map((skillName) => (
-                  <Chip key={skillName} tone="soft">{skillName}</Chip>
-                ))}
-              </div>
-            </div>
-            <p style={{ color: 'var(--muted)', fontSize: '0.88rem' }}>{localizeProject(selectedProject, t).deadline}</p>
-          </div>
-        </div>,
-        document.body
-      ) : null}
-    </div>
-  );
-}
+
 
 function ChatWindow({
   match,
@@ -9037,11 +8960,8 @@ function getActionHint(x: number, y: number) {
   if (horizontal < 50 && vertical < 50) {
     return "";
   }
-  if (vertical > horizontal && y < -50) {
-    return "Save";
-  }
   if (horizontal > vertical && x > 50) {
-    return "Interested";
+    return "Pass";
   }
   if (horizontal > vertical && x < -50) {
     return "Rewind";
