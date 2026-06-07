@@ -6162,52 +6162,51 @@ export function CandidateDetailSheet({
         aria-label={`${profile.name} profile details`}
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="sheet-profile-hero">
-          {/* Cover background using candidate's accent class/color */}
-          <div className={`sheet-profile-cover ${profile.accent || "accent-indigo"}`} />
-          
+        <div className="sheet-profile-header-new">
           <button 
             type="button" 
-            className="sheet-close-btn" 
+            className="sheet-close-btn-new" 
             aria-label={t.close} 
             onClick={onClose}
           >
-            <X size={18} />
+            <X size={20} />
           </button>
 
-          <div className="sheet-profile-header-content">
-            <div className="sheet-avatar-container">
+          <div className="sheet-profile-main-row">
+            <div className="sheet-avatar-wrap-new">
               <Avatar profile={profile} size="xl" />
+              <div className="sheet-status-badge-wrap">
+                <span className={`status-dot-new ${profile.availability}`} />
+                <small>{profile.statusLabel || (profile.availability === "available" ? (language === "id" ? "Tersedia" : "Available") : profile.availability)}</small>
+              </div>
             </div>
             
-            <div className="sheet-profile-title-info">
+            <div className="sheet-info-block-new">
               <h2>{profile.name}</h2>
-              <p className="sheet-profile-role">{localizeRoleLabel(profile.role, t)} · {profile.mainSkill}</p>
-              <div style={{ marginTop: '8px', display: 'flex' }}>
-                <AvailabilityBadge availability={profile.availability} label={profile.statusLabel} />
+              <p className="sheet-role-new">{localizeRoleLabel(profile.role, t)}</p>
+              <p className="sheet-skill-new">{profile.mainSkill}</p>
+
+              <div className="sheet-actions-new">
+                <button
+                  type="button"
+                  className={`sheet-btn-new follow-btn-new ${isFollowed ? "followed" : ""}`}
+                  onClick={handleFollow}
+                  title={isFollowed ? "Mutual Interest / Followed" : "Follow / Show Interest"}
+                >
+                  <Heart size={15} fill={isFollowed ? "var(--danger)" : "none"} stroke={isFollowed ? "var(--danger)" : "currentColor"} />
+                  <span>{isFollowed ? (language === "id" ? "Mengikuti" : "Followed") : (language === "id" ? "Ikuti" : "Follow")}</span>
+                </button>
+                <button
+                  type="button"
+                  className="sheet-btn-new chat-btn-new"
+                  onClick={handleChat}
+                >
+                  <MessageCircle size={15} />
+                  <span>{language === "id" ? "Obrolan" : "Chat"}</span>
+                </button>
               </div>
             </div>
           </div>
-        </div>
-
-        <div className="sheet-profile-actions">
-          <button
-            type="button"
-            className={`sheet-action-btn follow-btn ${isFollowed ? "followed" : ""}`}
-            onClick={handleFollow}
-            title={isFollowed ? "Mutual Interest / Followed" : "Follow / Show Interest"}
-          >
-            <Heart size={16} fill={isFollowed ? "var(--danger)" : "none"} stroke={isFollowed ? "var(--danger)" : "currentColor"} />
-            <span>{isFollowed ? (language === "id" ? "Mengikuti" : "Followed") : (language === "id" ? "Ikuti" : "Follow")}</span>
-          </button>
-          <button
-            type="button"
-            className="sheet-action-btn chat-btn"
-            onClick={handleChat}
-          >
-            <MessageCircle size={16} />
-            <span>{language === "id" ? "Obrolan" : "Chat"}</span>
-          </button>
         </div>
 
         <div className="detail-content">
