@@ -3018,7 +3018,7 @@ function HeroCardCarousel() {
 }
 
 function AppShell() {
-  const { profile, notifications, theme, setTheme } = useSymbio();
+  const { profile, notifications, theme, setTheme, language } = useSymbio();
   const location = useLocation();
   const showFilters = location.pathname === "/discover";
   const isChatRoute = location.pathname.startsWith("/chat/");
@@ -3029,6 +3029,18 @@ function AppShell() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [logoutOpen, setLogoutOpen] = useState(false);
   const [activeFloatingPanel, setActiveFloatingPanel] = useState<"ai" | "chat" | null>(null);
+  
+  const [mobileSearchQuery, setMobileSearchQuery] = useState("");
+  const [searchDetailProfile, setSearchDetailProfile] = useState<CandidateProfile | null>(null);
+  const t = useTranslations();
+
+  const searchResults = useMemo(() => {
+    if (!mobileSearchQuery.trim()) return [];
+    const allProfiles = candidateLookup.size > 0 ? Array.from(candidateLookup.values()) : candidates;
+    return allProfiles.filter((c) =>
+      c.name.toLowerCase().includes(mobileSearchQuery.toLowerCase())
+    );
+  }, [mobileSearchQuery]);
 
   const handleMenuClick = () => {
     if (window.matchMedia("(min-width: 768px)").matches) {
@@ -3067,6 +3079,53 @@ function AppShell() {
                 <X size={20} />
               </button>
             </div>
+
+            {/* Mobile Drawer Search Component */}
+            <div className="mobile-drawer-search">
+              <div className="search-input-wrapper">
+                <Search size={16} className="search-icon" />
+                <input
+                  type="text"
+                  placeholder={language === "id" ? "Cari nama..." : "Search name..."}
+                  value={mobileSearchQuery}
+                  onChange={(e) => setMobileSearchQuery(e.target.value)}
+                />
+                {mobileSearchQuery && (
+                  <button className="clear-search-btn" onClick={() => setMobileSearchQuery("")}>
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+
+              {mobileSearchQuery.trim() && (
+                <div className="mobile-drawer-search-results">
+                  {searchResults.length > 0 ? (
+                    searchResults.map((candidate) => (
+                      <div
+                        key={candidate.id}
+                        className="search-result-row"
+                        onClick={() => {
+                          setSearchDetailProfile(candidate);
+                          setMobileDrawerOpen(false);
+                          setMobileSearchQuery("");
+                        }}
+                      >
+                        <Avatar profile={candidate} size="xs" />
+                        <div className="search-result-info">
+                          <strong>{candidate.name}</strong>
+                          <small>{localizeRoleLabel(candidate.role, t)}</small>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="search-no-results">
+                      {language === "id" ? "Tidak ada hasil ditemukan" : "No results found"}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
             <MiniProfile profile={profile} />
             <SidebarNav
               onLinkClick={() => setMobileDrawerOpen(false)}
@@ -3120,6 +3179,7 @@ function AppShell() {
 
       {settingsOpen ? <SettingsDrawer onClose={() => setSettingsOpen(false)} onLogoutRequest={() => setLogoutOpen(true)} /> : null}
       {logoutOpen ? <LogoutConfirmModal onClose={() => setLogoutOpen(false)} /> : null}
+      {searchDetailProfile ? <CandidateDetailSheet profile={searchDetailProfile} onClose={() => setSearchDetailProfile(null)} /> : null}
     </div>
   );
 }
@@ -3613,7 +3673,7 @@ function FollowChatBubble({ isOpen, onToggle }: { isOpen: boolean; onToggle: (op
 }
 
 function AiAssistantBubble({ isOpen, onToggle }: { isOpen: boolean; onToggle: (open: boolean) => void }) {
-  const { language } = useSymbio();
+  const { language, matches, setMatches, setChats, interestedIds, actOnCandidate } = useSymbio();
   const t = useTranslations();
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
@@ -3621,6 +3681,30 @@ function AiAssistantBubble({ isOpen, onToggle }: { isOpen: boolean; onToggle: (o
   const [results, setResults] = useState<CandidateProfile[]>([]);
   const [detailProfile, setDetailProfile] = useState<CandidateProfile | null>(null);
   const responseRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
+
+  const allProfiles = candidateLookup.size > 0 ? Array.from(candidateLookup.values()) : candidates;
+
+  const startChat = (candidate: CandidateProfile) => {
+    let existingMatch = matches.find((m) => m.candidateId === candidate.id);
+    if (!existingMatch) {
+      existingMatch = createMatchFor(candidate);
+      setMatches((prev) => [existingMatch!, ...prev]);
+      setChats((prev) => ({
+        ...prev,
+        [existingMatch!.id]: [
+          {
+            id: `ai-init-${candidate.id}`,
+            sender: "them",
+            text: language === "id" ? `Halo! Saya ${candidate.name}. Senang bertemu dengan Anda. Mari kita mulai kolaborasi.` : `Hi there! I'm ${candidate.name}. Nice to meet you. Let's start collaborating.`,
+            timestamp: "Just now"
+          }
+        ]
+      }));
+    }
+    onToggle(false); // Close AI panel
+    navigate(`/chat/${existingMatch.id}`);
+  };
 
   const renderMessage = (text: string) => {
     const parts = text.split(/(\*\*.*?\*\*|\*.*?\*)/g);
@@ -3778,11 +3862,57 @@ ${allProfiles.map((candidate) => {
 
           <div className="ai-assistant-response" ref={responseRef}>
             <div className="ai-chat-history">
-              {history.map((msg, i) => (
-                <div key={i} className={`ai-chat-bubble ${msg.role === "user" ? "user" : "assistant"}`}>
-                  {renderMessage(msg.message)}
-                </div>
-              ))}
+              {history.map((msg, i) => {
+                const isAssistant = msg.role === "assistant";
+                const mentionedCandidates = isAssistant 
+                  ? allProfiles.filter(c => msg.message.toLowerCase().includes(c.name.toLowerCase()))
+                  : [];
+
+                return (
+                  <div key={i} className={`ai-chat-bubble-wrapper ${isAssistant ? "assistant" : "user"}`}>
+                    <div className={`ai-chat-bubble ${msg.role === "user" ? "user" : "assistant"}`}>
+                      {renderMessage(msg.message)}
+                    </div>
+                    {mentionedCandidates.length > 0 && (
+                      <div className="ai-mentioned-cards">
+                        {mentionedCandidates.map(candidate => {
+                          const isFollowed = interestedIds.includes(candidate.id) || matches.some(m => m.candidateId === candidate.id);
+                          return (
+                            <div className="ai-mentioned-card" key={candidate.id}>
+                              <div className="ai-mentioned-card-info" onClick={() => setDetailProfile(candidate)}>
+                                <Avatar profile={candidate} size="xs" />
+                                <div className="info-text">
+                                  <strong>{candidate.name}</strong>
+                                  <small>{localizeRoleLabel(candidate.role, t)} · {candidate.mainSkill}</small>
+                                </div>
+                              </div>
+                              <div className="ai-mentioned-card-actions">
+                                <button
+                                  type="button"
+                                  className={`ai-card-btn follow-btn ${isFollowed ? "followed" : ""}`}
+                                  onClick={() => actOnCandidate(candidate, "interest")}
+                                  title={isFollowed ? "Mutual Interest / Followed" : "Follow / Show Interest"}
+                                >
+                                  <Heart size={13} fill={isFollowed ? "var(--danger)" : "none"} stroke={isFollowed ? "var(--danger)" : "currentColor"} />
+                                  <span>{isFollowed ? (language === "id" ? "Mengikuti" : "Followed") : (language === "id" ? "Ikuti" : "Follow")}</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  className="ai-card-btn chat-btn"
+                                  onClick={() => startChat(candidate)}
+                                >
+                                  <MessageCircle size={13} />
+                                  <span>{language === "id" ? "Obrolan" : "Chat"}</span>
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
               {loading ? (
                 <div className="ai-loading-state" style={{ alignSelf: "flex-start" }}>
                   <span className="spinner" />
