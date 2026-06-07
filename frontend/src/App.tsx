@@ -4310,9 +4310,28 @@ function FollowChatBubble({ isOpen, onToggle }: { isOpen: boolean; onToggle: (op
   const { matches } = useSymbio();
   const t = useTranslations();
   const chatItems = matches
-    .map((match) => ({ match, candidate: getCandidate(match.candidateId) }))
-    .filter((item): item is { match: MatchRecord; candidate: CandidateProfile } => Boolean(item.candidate))
-    .slice(0, 4);
+    .map((match) => {
+      if (match.isGroup) {
+        return {
+          match,
+          isGroup: true,
+          name: match.title || t.groupChat,
+          candidate: null,
+          latestMessage: match.latestMessage || ""
+        };
+      }
+      const candidate = getCandidate(match.candidateId);
+      if (!candidate) return null;
+      return {
+        match,
+        isGroup: false,
+        name: candidate.name,
+        candidate,
+        latestMessage: localizeMatchMessage(match.latestMessage, t as any)
+      };
+    })
+    .filter((item): item is NonNullable<typeof item> => Boolean(item))
+    .slice(0, 10);
 
   const totalUnread = matches.reduce((sum, m) => sum + m.unread, 0);
 
@@ -4325,14 +4344,20 @@ function FollowChatBubble({ isOpen, onToggle }: { isOpen: boolean; onToggle: (op
             <button className="text-link" onClick={() => onToggle(false)}>{t.closePanel}</button>
           </div>
           <div className="compact-list">
-            {chatItems.length ? chatItems.map(({ match, candidate }) => (
-              <Link className="compact-row" to={`/chat/${match.id}`} key={match.id} onClick={() => onToggle(false)}>
-                <Avatar profile={candidate} size="xs" />
+            {chatItems.length ? chatItems.map((item) => (
+              <Link className="compact-row" to={`/chat/${item.match.id}`} key={item.match.id} onClick={() => onToggle(false)}>
+                {item.isGroup ? (
+                  <span className="avatar avatar-xs group-avatar-xs" style={{ display: 'grid', placeItems: 'center', background: 'var(--primary-soft)', color: 'var(--primary-strong)', borderRadius: '50%', border: '1px solid var(--border)' }}>
+                    <Users size={14} />
+                  </span>
+                ) : (
+                  <Avatar profile={item.candidate!} size="xs" />
+                )}
                 <span>
-                  <strong>{candidate.name}</strong>
-                  <small>{localizeMatchMessage(match.latestMessage, t)}</small>
+                  <strong>{item.name}</strong>
+                  <small>{item.latestMessage}</small>
                 </span>
-                {match.unread > 0 ? <em>{match.unread}</em> : null}
+                {item.match.unread > 0 ? <em>{item.match.unread}</em> : null}
               </Link>
             )) : (
               <p className="muted-text">{t.noChatUsers}</p>

@@ -8565,6 +8565,19 @@ body {
   white-space: nowrap;
 }
 
+@media (min-width: 768px) {
+  .matches-header-row {
+    position: relative;
+    display: block;
+  }
+  .matches-header-row .matches-group-button {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    z-index: 10;
+  }
+}
+
 .group-avatar {
   position: absolute;
   top: 12px;

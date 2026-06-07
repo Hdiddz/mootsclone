@@ -32,7 +32,7 @@ export default function MatchesPage() {
   }, [user?.id, fetchDiscoverAndMatches]);
 
   const approvedMatches = matches.filter((match) =>
-    match.isGroup || (
+    !match.isGroup && (
       (interestedIds || []).includes(match.candidateId) &&
       (incomingInterests || []).includes(match.candidateId)
     )
