@@ -5800,7 +5800,7 @@ function ChatWindow({
   candidate: CandidateProfile;
   embedded?: boolean;
 }) {
-  const { chats, sendMessage, setChats, setMatches, addToast } = useSymbio();
+  const { chats, sendMessage, setChats, setMatches, addToast, interestedIds, user, actOnCandidate, language } = useSymbio();
   const t = useTranslations();
   const [message, setMessage] = useState("");
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
@@ -5898,19 +5898,65 @@ function ChatWindow({
     setReplyTo(null);
   };
 
+  const isFollowed = interestedIds.includes(candidate.id) || (!match.id.startsWith("match-") && !match.id.startsWith("match_"));
+
+  const handleFollowBanner = async () => {
+    if (user?.id) {
+      try {
+        await supabase.rpc("simulate_mutual_match", {
+          user_id: user.id,
+          candidate_id: candidate.id
+        });
+        await supabase
+          .from("swipes")
+          .upsert({
+            swiper_id: candidate.id,
+            swiped_id: user.id,
+            action: "interest"
+          });
+      } catch (err) {
+        console.warn("Error simulating mutual match on follow from chat banner:", err);
+      }
+    }
+    actOnCandidate(candidate, "interest");
+    addToast(
+      language === "id" ? "Berhasil Mengikuti" : "Followed successfully",
+      language === "id" ? `Kamu sekarang mengikuti ${candidate.name}.` : `You are now following ${candidate.name}.`
+    );
+  };
+
   return (
     <section className={`chat-window ${embedded ? "embedded" : ""}`}>
-      <header className="chat-header">
-        <Avatar profile={candidate} size="sm" />
-        <div>
-          <h2>{candidate.name}</h2>
-          <p>
-            <span className={candidate.online ? "online-dot" : "offline-dot"} />
-            {candidate.online ? t.onlineNow : t.offline} · {candidate.mainSkill}
-          </p>
-        </div>
-        <button className="button button-secondary" style={{ marginLeft: 'auto' }} onClick={() => setShowProfile(true)}>{t.viewProfile}</button>
-      </header>
+      <div className="chat-top-bar" style={{ display: 'flex', flexDirection: 'column' }}>
+        <header className="chat-header">
+          <Avatar profile={candidate} size="sm" />
+          <div>
+            <h2>{candidate.name}</h2>
+            <p>
+              <span className={candidate.online ? "online-dot" : "offline-dot"} />
+              {candidate.online ? t.onlineNow : t.offline} · {candidate.mainSkill}
+            </p>
+          </div>
+          <button className="button button-secondary" style={{ marginLeft: 'auto' }} onClick={() => setShowProfile(true)}>{t.viewProfile}</button>
+        </header>
+
+        {!isFollowed && (
+          <div className="chat-not-followed-banner">
+            <div className="banner-content">
+              <Heart size={16} className="banner-icon" />
+              <span>
+                {language === "id"
+                  ? `Kamu belum mengikuti ${candidate.name}. Ikuti untuk menambahkan ke daftar kecocokan.`
+                  : `You are not following ${candidate.name} yet. Follow them to keep in touch.`}
+              </span>
+            </div>
+            <button className="button button-primary banner-follow-btn" onClick={handleFollowBanner}>
+              <Heart size={14} fill="white" />
+              <span>{language === "id" ? "Ikuti" : "Follow"}</span>
+            </button>
+          </div>
+        )}
+      </div>
 
       <div className="message-list" aria-label="Chat messages" ref={listRef} onScroll={handleScroll} style={{ position: 'relative' }}>
         {messages.length ? (

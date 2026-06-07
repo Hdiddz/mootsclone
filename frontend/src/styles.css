@@ -8408,4 +8408,56 @@ body {
 }
 
 
+/* Chat Not Followed Banner */
+.chat-not-followed-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--surface-container-low);
+  border-bottom: 1px solid var(--border);
+  font-size: 0.88rem;
+  color: var(--on-surface-variant);
+  animation: slideDown 300ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
 
+@keyframes slideDown {
+  from {
+    transform: translateY(-10px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.chat-not-followed-banner .banner-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  line-height: 1.4;
+}
+
+.chat-not-followed-banner .banner-icon {
+  color: var(--warning);
+  flex-shrink: 0;
+}
+
+.chat-not-followed-banner .banner-follow-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  height: auto;
+  border-radius: 20px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.chat-not-followed-banner .banner-follow-btn svg {
+  flex-shrink: 0;
+}
