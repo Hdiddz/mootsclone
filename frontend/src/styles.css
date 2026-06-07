@@ -8365,4 +8365,46 @@ body {
   }
 }
 
+/* Collapsed Search Component styling */
+.desktop-sidebar-search-collapsed {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 8px 0 12px 0;
+  width: 100%;
+  border-bottom: 1px solid var(--border);
+}
+
+.search-collapsed-btn {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 180ms cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: var(--panel-shadow);
+}
+
+.search-collapsed-btn:hover {
+  background: var(--primary-soft);
+  border-color: var(--primary);
+  color: var(--ink);
+  transform: scale(1.05);
+}
+
+:root.dark .search-collapsed-btn {
+  background: var(--surface-container-low);
+}
+
+:root.dark .search-collapsed-btn:hover {
+  background: var(--primary-soft);
+  border-color: var(--primary);
+}
+
+
 

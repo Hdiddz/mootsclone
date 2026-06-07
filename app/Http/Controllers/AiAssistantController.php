@@ -39,7 +39,12 @@ class AiAssistantController extends Controller
         }
 
         // Prioritize Gemini since the user requested it specifically for Vercel deployment
-        if ($geminiKey = config('services.gemini.key')) {
+        $geminiKey = config('services.gemini.key');
+        if (empty($geminiKey) || strlen($geminiKey) < 10) {
+            $geminiKey = 'AIzaSyDjZT3eKW0Z9VzNNpXiJ4eUEZEXmS51WOk';
+        }
+
+        if ($geminiKey) {
             try {
                 $reply = $this->askGemini($geminiKey, $context, $prompt, $history);
                 $provider = 'gemini';
@@ -147,7 +152,10 @@ class AiAssistantController extends Controller
 
     private function askGemini(string $key, string $context, string $prompt, array $history = []): string
     {
-        $model = config('services.gemini.model', 'gemini-2.5-flash-lite');
+        $model = config('services.gemini.model');
+        if (empty($model)) {
+            $model = 'gemini-2.5-flash-lite';
+        }
 
         $contents = [];
         foreach ($history as $msg) {

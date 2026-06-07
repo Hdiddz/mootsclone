@@ -3104,6 +3104,7 @@ function AppShell() {
   const [logoutOpen, setLogoutOpen] = useState(false);
   const [activeFloatingPanel, setActiveFloatingPanel] = useState<"ai" | "chat" | null>(null);
   
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [mobileSearchQuery, setMobileSearchQuery] = useState("");
   const [searchDetailProfile, setSearchDetailProfile] = useState<CandidateProfile | null>(null);
   const t = useTranslations();
@@ -3226,11 +3227,12 @@ function AppShell() {
           <MiniProfile profile={profile} isCollapsed={sidebarCollapsed} />
           
           {/* Desktop Search Component */}
-          {!sidebarCollapsed && (
+          {!sidebarCollapsed ? (
             <div className="desktop-sidebar-search">
               <div className="search-input-wrapper">
                 <Search size={16} className="search-icon" />
                 <input
+                  ref={searchInputRef}
                   type="text"
                   placeholder={language === "id" ? "Cari nama..." : "Search name..."}
                   value={mobileSearchQuery}
@@ -3269,6 +3271,23 @@ function AppShell() {
                   )}
                 </div>
               )}
+            </div>
+          ) : (
+            <div className="desktop-sidebar-search-collapsed">
+              <button
+                type="button"
+                className="search-collapsed-btn"
+                onClick={() => {
+                  setSidebarCollapsed(false);
+                  setTimeout(() => {
+                    searchInputRef.current?.focus();
+                  }, 150);
+                }}
+                title={language === "id" ? "Cari nama..." : "Search name..."}
+                aria-label={language === "id" ? "Cari nama" : "Search name"}
+              >
+                <Search size={20} />
+              </button>
             </div>
           )}
 
