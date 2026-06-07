@@ -1374,6 +1374,9 @@ function App() {
   const [showSwiped, setShowSwiped] = useState(false);
   const [authReady, setAuthReady] = useState(false);
   const authTokenRef = useRef<string | null>(null);
+  const profileRef = useRef<CandidateProfile>(profile);
+  profileRef.current = profile;
+  const processedSessionRef = useRef<{ userId: string | null }>({ userId: null });
 
   useEffect(() => {
     setShowSwiped(false);
@@ -1453,11 +1456,27 @@ function App() {
   }, [user?.id]);
 
   const loadUserProfile = useCallback(async (userId: string) => {
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", userId)
-      .single();
+    let attempts = 3;
+    let data = null;
+    let error = null;
+
+    while (attempts > 0) {
+      const res = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", userId)
+        .single();
+      
+      if (res.data) {
+        data = res.data;
+        break;
+      }
+      error = res.error;
+      attempts--;
+      if (attempts > 0) {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      }
+    }
 
     if (data) {
       const formattedProfile: CandidateProfile = {
@@ -1486,6 +1505,7 @@ function App() {
         mutualInterest: data.mutual_interest !== false
       };
       setProfileState(formattedProfile);
+      profileRef.current = formattedProfile;
       return formattedProfile;
     }
     return null;
@@ -1561,7 +1581,7 @@ function App() {
         const otherId = m.user_a_id === userId ? m.user_b_id : m.user_a_id;
         const otherUser = candidateLookup.get(otherId);
         
-        const mySkills = profile?.skills?.map((s: any) => s.name) || [];
+        const mySkills = profileRef.current?.skills?.map((s: any) => s.name) || [];
         const otherSkills = otherUser?.skills?.map((s: any) => s.name) || [];
         const overlap = otherSkills.filter((s: string) => mySkills.includes(s));
 
@@ -1632,12 +1652,30 @@ function App() {
         }))
       );
     }
-  }, [profile?.skills, setPassedIds, setInterestedIds, setSavedIds, setDbCandidates, setMatches, setChats, setNotifications, fetchAllProfiles]);
+  }, [setPassedIds, setInterestedIds, setSavedIds, setDbCandidates, setMatches, setChats, setNotifications, fetchAllProfiles]);
+
+  // Create stable refs for callbacks to avoid re-subscribing on auth state change
+  const loadUserProfileRef = useRef(loadUserProfile);
+  loadUserProfileRef.current = loadUserProfile;
+
+  const fetchDiscoverAndMatchesRef = useRef(fetchDiscoverAndMatches);
+  fetchDiscoverAndMatchesRef.current = fetchDiscoverAndMatches;
+
+  const navigateRef = useRef(navigate);
+  navigateRef.current = navigate;
 
   useEffect(() => {
     let mounted = true;
 
     const applySession = async (session: any, redirectSignedOut = true) => {
+      const userId = session?.user?.id || null;
+
+      // Deduplicate session executions
+      if (processedSessionRef.current.userId === userId) {
+        return;
+      }
+      processedSessionRef.current = { userId };
+
       if (session?.user) {
         const u = {
           id: session.user.id,
@@ -1647,18 +1685,18 @@ function App() {
         if (!mounted) return;
         authTokenRef.current = session.access_token ?? null;
         setUser(u);
-        const p = await loadUserProfile(session.user.id);
-        await fetchDiscoverAndMatches(session.user.id);
+        const p = await loadUserProfileRef.current(session.user.id);
+        await fetchDiscoverAndMatchesRef.current(session.user.id);
         if (!mounted) return;
 
         if (!p || !p.mainSkill || !p.campus) {
           if (window.location.pathname !== "/onboarding") {
-            navigate("/onboarding", { replace: true });
+            navigateRef.current("/onboarding", { replace: true });
           }
         } else {
           const path = window.location.pathname;
           if (path === "/" || path === "/login" || path === "/signup") {
-            navigate("/discover", { replace: true });
+            navigateRef.current("/discover", { replace: true });
           }
         }
       } else {
@@ -1674,7 +1712,7 @@ function App() {
 
         const path = window.location.pathname;
         if (redirectSignedOut && path !== "/login" && path !== "/signup" && path !== "/" && path !== "/terms" && path !== "/privacy") {
-          navigate("/login", { replace: true });
+          navigateRef.current("/login", { replace: true });
         }
       }
     };
@@ -1707,7 +1745,7 @@ function App() {
       mounted = false;
       subscription.unsubscribe();
     };
-  }, [fetchDiscoverAndMatches, loadUserProfile, navigate, setChats, setMatches, setNotifications]);
+  }, []);
 
   const setProfile = useCallback(
     async (updater: SetStateAction<CandidateProfile>) => {
