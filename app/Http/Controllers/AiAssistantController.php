@@ -142,7 +142,7 @@ class AiAssistantController extends Controller
                 'model' => config('services.openrouter.model', 'google/gemini-2.5-flash'),
                 'messages' => $messages,
                 'temperature' => 0.55,
-                'max_tokens' => 260,
+                'max_tokens' => 800,
             ])
             ->throw()
             ->json();
@@ -197,7 +197,7 @@ class AiAssistantController extends Controller
                         'contents' => $contents,
                         'generationConfig' => [
                             'temperature' => 0.55,
-                            'maxOutputTokens' => 260,
+                            'maxOutputTokens' => 800,
                         ],
                     ])
                     ->throw()
