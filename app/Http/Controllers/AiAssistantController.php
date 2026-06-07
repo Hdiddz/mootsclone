@@ -157,41 +157,62 @@ class AiAssistantController extends Controller
             $model = 'gemini-2.5-flash-lite';
         }
 
-        $contents = [];
-        foreach ($history as $msg) {
-            $contents[] = [
-                'role' => $msg['role'] === 'assistant' ? 'model' : 'user',
-                'parts' => [
-                    ['text' => $msg['content']]
-                ]
-            ];
+        // Robust model candidates to try sequentially in case of API errors or unsupported versions
+        $attempts = [$model];
+        foreach (['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-2.0-flash'] as $fallback) {
+            if ($fallback !== $model) {
+                $attempts[] = $fallback;
+            }
         }
-        $contents[] = [
-            'role' => 'user',
-            'parts' => [
-                ['text' => $prompt]
-            ]
-        ];
 
-        $response = Http::timeout(30)
-            ->acceptJson()
-            ->withQueryParameters(['key' => $key])
-            ->post("https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent", [
-                'systemInstruction' => [
+        $lastException = null;
+
+        foreach ($attempts as $currentModel) {
+            try {
+                $contents = [];
+                foreach ($history as $msg) {
+                    $contents[] = [
+                        'role' => $msg['role'] === 'assistant' ? 'model' : 'user',
+                        'parts' => [
+                            ['text' => $msg['content']]
+                        ]
+                    ];
+                }
+                $contents[] = [
+                    'role' => 'user',
                     'parts' => [
-                        ['text' => $context]
+                        ['text' => $prompt]
                     ]
-                ],
-                'contents' => $contents,
-                'generationConfig' => [
-                    'temperature' => 0.55,
-                    'maxOutputTokens' => 260,
-                ],
-            ])
-            ->throw()
-            ->json();
+                ];
 
-        return trim($response['candidates'][0]['content']['parts'][0]['text'] ?? 'I could not generate a suggestion right now.');
+                $response = Http::timeout(25)
+                    ->acceptJson()
+                    ->withQueryParameters(['key' => $key])
+                    ->post("https://generativelanguage.googleapis.com/v1beta/models/{$currentModel}:generateContent", [
+                        'systemInstruction' => [
+                            'parts' => [
+                                ['text' => $context]
+                            ]
+                        ],
+                        'contents' => $contents,
+                        'generationConfig' => [
+                            'temperature' => 0.55,
+                            'maxOutputTokens' => 260,
+                        ],
+                    ])
+                    ->throw()
+                    ->json();
+
+                return trim($response['candidates'][0]['content']['parts'][0]['text'] ?? 'I could not generate a suggestion right now.');
+            } catch (\Throwable $exception) {
+                Log::warning("Gemini AI request failed for model {$currentModel}, trying next model in list.", [
+                    'error' => $exception->getMessage()
+                ]);
+                $lastException = $exception;
+            }
+        }
+
+        throw $lastException ?? new \Exception('All Gemini models failed.');
     }
 
     private function buildContext(array $candidate, string $extraContext): string
@@ -364,7 +385,7 @@ CONTEXT);
 
     private function handleAdviceQuestion(string $promptLower, bool $isIndo): ?string
     {
-        $adviceIndicators = ['tips', 'cara', 'gimana', 'bagaimana', 'how to', 'how do', 'how can', 'tutorial', 'belajar', 'learn', 'improve', 'meningkatkan', 'biar jago', 'supaya jago', 'agar jago', 'biar bisa', 'advice', 'saran', 'best way', 'cara terbaik', 'langkah', 'steps', 'guide', 'panduan', 'what is', 'apa itu', 'kenapa', 'why', 'explain', 'jelaskan', 'gmn', 'gmana'];
+        $adviceIndicators = ['tips', 'cara', 'gimana', 'bagaimana', 'how to', 'how do', 'how can', 'tutorial', 'belajar', 'learn', 'improve', 'meningkatkan', 'biar jago', 'supaya jago', 'agar jago', 'biar bisa', 'advice', 'saran', 'best way', 'cara terbaik', 'langkah', 'steps', 'guide', 'panduan', 'gmn', 'gmana'];
         $isAdvice = false;
         foreach ($adviceIndicators as $indicator) {
             if (str_contains($promptLower, $indicator)) {

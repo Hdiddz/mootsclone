@@ -11,6 +11,7 @@ import {
   Info,
   ChevronDown,
   Clock,
+  Compass,
   Copy,
   Edit,
   Eye,
@@ -195,7 +196,7 @@ function isProfileOnline(row: any) {
 const candidateLookup = new Map<string, CandidateProfile>();
 
 const navItems = [
-  { to: "/discover", label: "Discover", icon: Search },
+  { to: "/discover", label: "Discover", icon: Compass },
   { to: "/matches", label: "Matches", icon: Users },
   { to: "/saved", label: "Saved", icon: User },
   { to: "/projects", label: "Projects", icon: Briefcase },

@@ -1547,7 +1547,7 @@ img.avatar {
 .overlay {
   position: fixed;
   inset: 0;
-  z-index: 200;
+  z-index: 2000 !important;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -4604,6 +4604,7 @@ img.avatar {
   align-items: center;
   justify-content: center;
   padding: 18px;
+  z-index: 10000 !important;
 }
 
 .confirm-modal,
