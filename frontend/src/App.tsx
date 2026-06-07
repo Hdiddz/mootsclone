@@ -1680,16 +1680,26 @@ function App() {
     };
 
     supabase.auth.getSession().then(async ({ data: { session } }) => {
-      await applySession(session, false);
-      if (mounted) {
-        setAuthReady(true);
+      try {
+        await applySession(session, false);
+      } catch (err) {
+        console.error("Session init error:", err);
+      } finally {
+        if (mounted) {
+          setAuthReady(true);
+        }
       }
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      await applySession(session);
-      if (mounted) {
-        setAuthReady(true);
+      try {
+        await applySession(session);
+      } catch (err) {
+        console.error("Auth change error:", err);
+      } finally {
+        if (mounted) {
+          setAuthReady(true);
+        }
       }
     });
 
