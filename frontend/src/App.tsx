@@ -2824,7 +2824,10 @@ function App() {
           const newMsg = payload.new;
           setMatches((currentMatches) => {
             const matchIndex = currentMatches.findIndex((m) => m.id === newMsg.match_id);
-            if (matchIndex === -1) return currentMatches;
+            if (matchIndex === -1) {
+              fetchDiscoverAndMatches(user.id);
+              return currentMatches;
+            }
 
             const isFromThem = newMsg.sender_id !== user.id;
 
@@ -2870,7 +2873,10 @@ function App() {
           const newMsg = payload.new;
           setMatches((currentMatches) => {
             const groupMatch = currentMatches.find((m) => m.id === newMsg.group_id && m.isGroup);
-            if (!groupMatch) return currentMatches;
+            if (!groupMatch) {
+              fetchDiscoverAndMatches(user.id);
+              return currentMatches;
+            }
 
             const isFromThem = newMsg.sender_id !== user.id;
             const senderProfile = candidateLookup.get(newMsg.sender_id);
@@ -2912,11 +2918,12 @@ function App() {
         {
           event: "INSERT",
           schema: "public",
-          table: "chat_group_members",
-          filter: `user_id=eq.${user.id}`
+          table: "chat_group_members"
         },
-        () => {
-          fetchDiscoverAndMatches(user.id);
+        (payload) => {
+          if (payload.new && payload.new.user_id === user.id) {
+            fetchDiscoverAndMatches(user.id);
+          }
         }
       )
       .on(
