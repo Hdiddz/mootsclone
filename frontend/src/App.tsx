@@ -3721,7 +3721,7 @@ function FollowChatBubble({ isOpen, onToggle }: { isOpen: boolean; onToggle: (op
 }
 
 function AiAssistantBubble({ isOpen, onToggle }: { isOpen: boolean; onToggle: (open: boolean) => void }) {
-  const { language, matches, setMatches, setChats, interestedIds, actOnCandidate } = useSymbio();
+  const { language, matches, setMatches, setChats, interestedIds, actOnCandidate, user } = useSymbio();
   const t = useTranslations();
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
@@ -3752,6 +3752,31 @@ function AiAssistantBubble({ isOpen, onToggle }: { isOpen: boolean; onToggle: (o
     }
     onToggle(false); // Close AI panel
     navigate(`/chat/${existingMatch.id}`);
+  };
+
+  const handleFollow = async (candidate: CandidateProfile) => {
+    const isFollowed = interestedIds.includes(candidate.id) || matches.some(m => m.candidateId === candidate.id);
+    if (isFollowed) return;
+
+    if (user?.id) {
+      try {
+        // Force a mutual match on follow
+        await supabase.rpc("simulate_mutual_match", {
+          user_id: user.id,
+          candidate_id: candidate.id
+        });
+        await supabase
+          .from("swipes")
+          .upsert({
+            swiper_id: candidate.id,
+            swiped_id: user.id,
+            action: "interest"
+          });
+      } catch (err) {
+        console.warn("Error simulating mutual match on follow:", err);
+      }
+    }
+    await actOnCandidate(candidate, "interest");
   };
 
   const renderMessage = (text: string) => {
@@ -3938,7 +3963,7 @@ ${allProfiles.map((candidate) => {
                                 <button
                                   type="button"
                                   className={`ai-card-btn follow-btn ${isFollowed ? "followed" : ""}`}
-                                  onClick={() => actOnCandidate(candidate, "interest")}
+                                  onClick={() => handleFollow(candidate)}
                                   title={isFollowed ? "Mutual Interest / Followed" : "Follow / Show Interest"}
                                 >
                                   <Heart size={13} fill={isFollowed ? "var(--danger)" : "none"} stroke={isFollowed ? "var(--danger)" : "currentColor"} />
@@ -7850,7 +7875,22 @@ function findBestSuggestion(suggestion: { mainSkill?: string; skills?: string[];
 
 function findCandidatesForQuery(query: string) {
   const normalized = query.toLowerCase();
-  const tokens = normalized.split(/[^a-z0-9+#.]+/).filter(Boolean);
+  const stopWords = new Set([
+    // Indonesian
+    "yang", "dan", "di", "untuk", "dari", "dengan", "ini", "itu", "ke", "adalah", "bisa", "orang", 
+    "cari", "jago", "ada", "saya", "kamu", "dia", "mereka", "kita", "kami", "akan", "telah", 
+    "sudah", "oleh", "pada", "juga", "sebagai", "atau", "tetapi", "karena", "jika", "kalau", "buat", "mencari",
+    // English
+    "i", "need", "a", "an", "the", "and", "or", "but", "if", "because", "as", "until", "while", 
+    "of", "at", "by", "for", "with", "about", "against", "between", "into", "through", "during", 
+    "before", "after", "above", "below", "to", "from", "up", "down", "in", "out", "on", "off", 
+    "over", "under", "again", "further", "then", "once", "here", "there", "when", "where", "why", 
+    "how", "all", "any", "both", "each", "few", "more", "most", "other", "some", "such", "no", 
+    "nor", "not", "only", "own", "same", "so", "than", "too", "very", "can", "will", "just", 
+    "should", "now", "who", "whom", "this", "that", "these", "those", "am", "is", "are", "was", 
+    "were", "be", "been", "being", "have", "has", "had", "having", "do", "does", "did", "doing", "someone", "help"
+  ]);
+  const tokens = normalized.split(/[^a-z0-9+#.]+/).filter((t) => t && !stopWords.has(t));
 
   const allProfiles = candidateLookup.size > 0 ? Array.from(candidateLookup.values()) : candidates;
 
