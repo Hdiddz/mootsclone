@@ -4,6 +4,9 @@
 -- Drop existing tables from Laravel migration to avoid uuid vs bigint type conflicts
 drop table if exists public.ai_conversations cascade;
 drop table if exists public.notifications cascade;
+drop table if exists public.group_messages cascade;
+drop table if exists public.chat_group_members cascade;
+drop table if exists public.chat_groups cascade;
 drop table if exists public.messages cascade;
 drop table if exists public.matches cascade;
 drop table if exists public.swipes cascade;
@@ -99,6 +102,10 @@ create policy "Allow users to view their own swipes"
   on public.swipes for select 
   using (auth.uid() = swiper_id);
 
+create policy "Allow users to view incoming swipes"
+  on public.swipes for select
+  using (auth.uid() = swiped_id);
+
 create policy "Allow users to insert their own swipes" 
   on public.swipes for insert 
   with check (auth.uid() = swiper_id);
@@ -170,7 +177,97 @@ create policy "Allow users to insert messages in their matches"
   );
 
 
--- 5. NOTIFICATIONS TABLE
+-- 5. GROUP CHAT TABLES
+create table public.chat_groups (
+  id uuid default gen_random_uuid() primary key,
+  title text not null,
+  created_by uuid references public.profiles(id) on delete cascade not null,
+  created_at timestamptz default now() not null
+);
+
+create table public.chat_group_members (
+  group_id uuid references public.chat_groups(id) on delete cascade not null,
+  user_id uuid references public.profiles(id) on delete cascade not null,
+  created_at timestamptz default now() not null,
+  primary key (group_id, user_id)
+);
+
+create table public.group_messages (
+  id uuid default gen_random_uuid() primary key,
+  group_id uuid references public.chat_groups(id) on delete cascade not null,
+  sender_id uuid references public.profiles(id) on delete cascade not null,
+  text text not null,
+  created_at timestamptz default now() not null
+);
+
+alter table public.chat_groups enable row level security;
+alter table public.chat_group_members enable row level security;
+alter table public.group_messages enable row level security;
+
+create policy "Allow creators to create groups"
+  on public.chat_groups for insert
+  with check (auth.uid() = created_by);
+
+create policy "Allow members to select their groups"
+  on public.chat_groups for select
+  using (
+    auth.uid() = created_by
+    or exists (
+      select 1 from public.chat_group_members gm
+      where gm.group_id = chat_groups.id
+        and gm.user_id = auth.uid()
+    )
+  );
+
+create policy "Allow members to select group membership"
+  on public.chat_group_members for select
+  using (
+    exists (
+      select 1 from public.chat_group_members gm
+      where gm.group_id = chat_group_members.group_id
+        and gm.user_id = auth.uid()
+    )
+    or exists (
+      select 1 from public.chat_groups g
+      where g.id = chat_group_members.group_id
+        and g.created_by = auth.uid()
+    )
+  );
+
+create policy "Allow creators to add group members"
+  on public.chat_group_members for insert
+  with check (
+    auth.uid() = user_id
+    or exists (
+      select 1 from public.chat_groups g
+      where g.id = chat_group_members.group_id
+        and g.created_by = auth.uid()
+    )
+  );
+
+create policy "Allow members to select group messages"
+  on public.group_messages for select
+  using (
+    exists (
+      select 1 from public.chat_group_members gm
+      where gm.group_id = group_messages.group_id
+        and gm.user_id = auth.uid()
+    )
+  );
+
+create policy "Allow members to insert group messages"
+  on public.group_messages for insert
+  with check (
+    auth.uid() = sender_id
+    and exists (
+      select 1 from public.chat_group_members gm
+      where gm.group_id = group_messages.group_id
+        and gm.user_id = auth.uid()
+    )
+  );
+
+
+-- 6. NOTIFICATIONS TABLE
 create table public.notifications (
   id uuid default gen_random_uuid() primary key,
   user_id uuid references public.profiles(id) on delete cascade not null,
@@ -198,7 +295,7 @@ create policy "Allow users to delete their own notifications"
   using (auth.uid() = user_id);
 
 
--- 6. AI CONVERSATIONS TABLE
+-- 7. AI CONVERSATIONS TABLE
 create table public.ai_conversations (
   id uuid default gen_random_uuid() primary key,
   user_id uuid references public.profiles(id) on delete cascade not null,
@@ -224,7 +321,7 @@ create policy "Allow users to delete their own ai_conversations"
   using (auth.uid() = user_id);
 
 
--- 7. MUTUAL MATCH TRIGGER FUNCTION
+-- 8. MUTUAL MATCH TRIGGER FUNCTION
 create or replace function public.check_mutual_match()
 returns trigger as $$
 declare
@@ -244,6 +341,10 @@ begin
         and action = 'interest'
     ) into is_mutual;
 
+    -- Get names for notifications
+    select name into swiper_name from public.profiles where id = new.swiper_id;
+    select name into swiped_name from public.profiles where id = new.swiped_id;
+
     if is_mutual then
       user_a := least(new.swiper_id, new.swiped_id);
       user_b := greatest(new.swiper_id, new.swiped_id);
@@ -260,15 +361,26 @@ begin
         where user_a_id = user_a and user_b_id = user_b;
       end if;
 
-      -- Get names for notifications
-      select name into swiper_name from public.profiles where id = new.swiper_id;
-      select name into swiped_name from public.profiles where id = new.swiped_id;
-
       -- Create notifications for both users
       insert into public.notifications (user_id, type, title, body, read)
       values 
         (new.swiper_id, 'match', 'New Match!', 'You matched with ' || coalesce(swiped_name, 'someone') || '!', false),
         (new.swiped_id, 'match', 'New Match!', 'You matched with ' || coalesce(swiper_name, 'someone') || '!', false);
+    else
+      insert into public.notifications (user_id, type, title, body, read)
+      select
+        new.swiped_id,
+        'match_request',
+        'Someone wants to match with you',
+        coalesce(swiper_name, 'Someone') || ' wants to match with you. Approve to open a chat.',
+        false
+      where not exists (
+        select 1 from public.notifications
+        where user_id = new.swiped_id
+          and type = 'match_request'
+          and read = false
+          and body ilike '%' || coalesce(swiper_name, '') || '%'
+      );
     end if;
   end if;
   return new;
@@ -282,16 +394,19 @@ create trigger on_swipe_created
   for each row execute function public.check_mutual_match();
 
 
--- 8. REALTIME SETUP
+-- 9. REALTIME SETUP
 -- Add the tables to the supabase_realtime publication
 alter publication supabase_realtime add table public.matches;
 alter publication supabase_realtime add table public.messages;
+alter publication supabase_realtime add table public.chat_groups;
+alter publication supabase_realtime add table public.chat_group_members;
+alter publication supabase_realtime add table public.group_messages;
 alter publication supabase_realtime add table public.notifications;
 alter publication supabase_realtime add table public.profiles;
 alter publication supabase_realtime add table public.ai_conversations;
 
 
--- 9. SIMULATE MUTUAL MATCH RPC
+-- 10. SIMULATE MUTUAL MATCH RPC
 create or replace function public.simulate_mutual_match(user_id uuid, candidate_id uuid)
 returns void as $$
 begin
@@ -301,3 +416,30 @@ begin
 end;
 $$ language plpgsql security definer;
 
+create or replace function public.create_match_request(requester_id uuid, target_id uuid)
+returns void as $$
+declare
+  requester_name text;
+begin
+  if auth.uid() <> requester_id then
+    raise exception 'Only the requester can create this request';
+  end if;
+
+  select name into requester_name from public.profiles where id = requester_id;
+
+  insert into public.notifications (user_id, type, title, body, read)
+  select
+    target_id,
+    'match_request',
+    'Someone wants to match with you',
+    coalesce(requester_name, 'Someone') || ' wants to match with you. Approve to open a chat.',
+    false
+  where not exists (
+    select 1 from public.notifications
+    where user_id = target_id
+      and type = 'match_request'
+      and read = false
+      and body ilike '%' || coalesce(requester_name, '') || '%'
+  );
+end;
+$$ language plpgsql security definer;

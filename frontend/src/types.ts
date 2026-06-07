@@ -6,6 +6,7 @@ export type SwipeAction = "pass" | "interest" | "save";
 
 export type NotificationType =
   | "match"
+  | "match_request"
   | "message"
   | "saved"
   | "project"
@@ -67,6 +68,9 @@ export interface MatchRecord {
   latestMessage: string;
   unread: number;
   summary: string[];
+  isGroup?: boolean;
+  title?: string;
+  memberIds?: string[];
 }
 
 export interface ChatMessage {
@@ -74,6 +78,7 @@ export interface ChatMessage {
   sender: "me" | "them";
   text: string;
   timestamp: string;
+  senderName?: string;
 }
 
 export interface NotificationItem {

@@ -146,6 +146,8 @@ type SymbioStore = {
   markNotificationRead: (notificationId: string) => void;
   markAllNotificationsRead: () => void;
   sendMessage: (matchId: string, text: string) => void;
+  respondToMatchRequest: (notification: NotificationItem, candidate: CandidateProfile, approved: boolean) => void;
+  createGroupChat: (title: string, memberIds: string[]) => Promise<string>;
   addToast: (title: string, body: string, type?: "success" | "error" | "warning" | "info") => void;
   user: { id?: string; name: string; email: string; role?: string } | null;
   isAuthenticated: boolean;
@@ -270,6 +272,17 @@ const translations = {
     bio: "About Me",
     markAllRead: "Mark all read",
     markRead: "Mark read",
+    approve: "Approve",
+    reject: "Reject",
+    matchRequestType: "Match Request",
+    matchRequestTitle: "Someone wants to match with you",
+    matchRequestBody: "wants to match with you. Approve to open a chat.",
+    matchRequestSentTitle: "Request sent",
+    matchRequestSentBody: "They will receive your match request and can approve it.",
+    matchRequestApprovedTitle: "Match approved",
+    matchRequestApprovedBody: "You can now start chatting.",
+    matchRequestRejectedTitle: "Request declined",
+    matchRequestRejectedBody: "The request was declined.",
     savedDesc: "Bookmarked collaborators for later review.",
     noSavedTitle: "No saved profiles yet",
     noSavedBody: "Use the bookmark action in Discover to collect promising teammates.",
@@ -322,6 +335,15 @@ const translations = {
     sendMessageBtn: "Send message",
     chatFollowed: "Chat Followed",
     noChatUsers: "No users to chat with yet.",
+    newGroup: "New group",
+    groupChat: "Group chat",
+    groupName: "Group name",
+    groupMembers: "Group members",
+    createGroup: "Create group",
+    groupNamePlaceholder: "Project squad",
+    groupMemberRequired: "Pick at least two members.",
+    groupCreatedTitle: "Group created",
+    groupCreatedBody: "Your group chat is ready.",
     closePanel: "Close",
     home: "Home",
     logoutTitle: "Are you sure you want to log out?",
@@ -500,7 +522,24 @@ const translations = {
     profileReadyBody: "Your mock profile is saved for the demo.",
     back: "Back",
     continue: "Continue",
+    skip: "Skip",
     enterDiscover: "Enter Discover",
+    tourSkip: "Skip guide",
+    tourNext: "Next",
+    tourDone: "Done",
+    tourStep: "Guide",
+    tourDiscoverTitle: "Discover cards",
+    tourDiscoverBody: "Swipe cards to review potential collaborators by role, skill, and availability.",
+    tourInterestTitle: "Show interest",
+    tourInterestBody: "Use this to send a match request. The other user can approve or decline it.",
+    tourSaveTitle: "Save profiles",
+    tourSaveBody: "Bookmark candidates you want to review later without sending a request.",
+    tourMatchesTitle: "Matches and groups",
+    tourMatchesBody: "Approved requests appear here, and you can create group chats from your matches.",
+    tourAiTitle: "AI assistant",
+    tourAiBody: "Ask for teammate suggestions, role fit, or project collaboration ideas.",
+    tourAlertsTitle: "Notifications",
+    tourAlertsBody: "Match requests, approvals, and chat updates appear here.",
     liveCardPreview: "Live card preview",
     stepIdentity: "Identity",
     stepCampus: "Campus",
@@ -638,6 +677,17 @@ const translations = {
     bio: "Tentang Saya",
     markAllRead: "Tandai semua dibaca",
     markRead: "Tandai dibaca",
+    approve: "Setujui",
+    reject: "Tolak",
+    matchRequestType: "Permintaan Kecocokan",
+    matchRequestTitle: "Ada yang ingin match dengan Anda",
+    matchRequestBody: "ingin match dengan Anda. Setujui untuk membuka obrolan.",
+    matchRequestSentTitle: "Permintaan dikirim",
+    matchRequestSentBody: "Pengguna tersebut akan menerima permintaan match Anda dan dapat menyetujuinya.",
+    matchRequestApprovedTitle: "Match disetujui",
+    matchRequestApprovedBody: "Anda sekarang bisa mulai mengobrol.",
+    matchRequestRejectedTitle: "Permintaan ditolak",
+    matchRequestRejectedBody: "Permintaan tersebut sudah ditolak.",
     savedDesc: "Kolaborator yang disimpan untuk ditinjau nanti.",
     noSavedTitle: "Belum ada profil disimpan",
     noSavedBody: "Gunakan tindakan bookmark di Temukan untuk mengumpulkan rekan tim potensial.",
@@ -690,6 +740,15 @@ const translations = {
     sendMessageBtn: "Kirim pesan",
     chatFollowed: "Obrolan Diikuti",
     noChatUsers: "Belum ada pengguna yang bisa diajak mengobrol.",
+    newGroup: "Grup baru",
+    groupChat: "Obrolan grup",
+    groupName: "Nama grup",
+    groupMembers: "Anggota grup",
+    createGroup: "Buat grup",
+    groupNamePlaceholder: "Tim proyek",
+    groupMemberRequired: "Pilih minimal dua anggota.",
+    groupCreatedTitle: "Grup dibuat",
+    groupCreatedBody: "Obrolan grup Anda sudah siap.",
     closePanel: "Tutup",
     home: "Beranda",
     logoutTitle: "Yakin ingin keluar?",
@@ -868,7 +927,24 @@ const translations = {
     profileReadyBody: "Profil demo Anda sudah disimpan.",
     back: "Kembali",
     continue: "Lanjut",
+    skip: "Lewati",
     enterDiscover: "Masuk Temukan",
+    tourSkip: "Lewati panduan",
+    tourNext: "Lanjut",
+    tourDone: "Selesai",
+    tourStep: "Panduan",
+    tourDiscoverTitle: "Kartu discover",
+    tourDiscoverBody: "Geser kartu untuk meninjau calon kolaborator berdasarkan peran, skill, dan ketersediaan.",
+    tourInterestTitle: "Tunjukkan minat",
+    tourInterestBody: "Gunakan ini untuk mengirim permintaan match. Pengguna lain bisa menyetujui atau menolaknya.",
+    tourSaveTitle: "Simpan profil",
+    tourSaveBody: "Bookmark kandidat yang ingin Anda tinjau lagi tanpa mengirim permintaan.",
+    tourMatchesTitle: "Match dan grup",
+    tourMatchesBody: "Request yang disetujui muncul di sini, dan Anda bisa membuat obrolan grup dari daftar match.",
+    tourAiTitle: "Asisten AI",
+    tourAiBody: "Minta saran rekan tim, kecocokan peran, atau ide kolaborasi proyek.",
+    tourAlertsTitle: "Notifikasi",
+    tourAlertsBody: "Permintaan match, persetujuan, dan update chat muncul di sini.",
     liveCardPreview: "Pratinjau kartu langsung",
     stepIdentity: "Identitas",
     stepCampus: "Kampus",
@@ -1582,8 +1658,12 @@ function App() {
       .select("*")
       .or(`user_a_id.eq.${userId},user_b_id.eq.${userId}`);
 
+    const mappedMatches: MatchRecord[] = [];
+    const groupMatches: MatchRecord[] = [];
+    const nextChats: Record<string, ChatMessage[]> = {};
+
     if (matchesData) {
-      const mappedMatches = matchesData.map((m: any) => {
+      mappedMatches.push(...matchesData.map((m: any) => {
         const otherId = m.user_a_id === userId ? m.user_b_id : m.user_a_id;
         const otherUser = candidateLookup.get(otherId);
         
@@ -1603,7 +1683,7 @@ function App() {
             overlap.length > 0 ? `Both profiles mention ${overlap.join(", ")}.` : ""
           ].filter(Boolean)
         };
-      });
+      }));
 
       const matchIds = mappedMatches.map((m) => m.id);
       if (matchIds.length > 0) {
@@ -1614,7 +1694,6 @@ function App() {
           .order("created_at", { ascending: true });
 
         if (messagesData) {
-          const chatRecords: Record<string, ChatMessage[]> = {};
           const latestMsgs: Record<string, string> = {};
 
           messagesData.forEach((msg: any) => {
@@ -1624,21 +1703,107 @@ function App() {
               text: msg.text,
               timestamp: new Date(msg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
             };
-            if (!chatRecords[msg.match_id]) {
-              chatRecords[msg.match_id] = [];
+            if (!nextChats[msg.match_id]) {
+              nextChats[msg.match_id] = [];
             }
-            chatRecords[msg.match_id].push(chatMsg);
+            nextChats[msg.match_id].push(chatMsg);
             latestMsgs[msg.match_id] = msg.text;
           });
 
-          setChats(chatRecords);
           mappedMatches.forEach((m) => {
             m.latestMessage = latestMsgs[m.id] || "";
           });
         }
       }
-      setMatches(mappedMatches);
     }
+
+    try {
+      const { data: myGroupRows, error: groupRowsError } = await supabase
+        .from("chat_group_members")
+        .select("group_id")
+        .eq("user_id", userId);
+
+      if (!groupRowsError && myGroupRows?.length) {
+        const groupIds = Array.from(new Set(myGroupRows.map((row: any) => row.group_id).filter(Boolean)));
+
+        const [{ data: groupsData }, { data: groupMembersData }, { data: groupMessagesData }] = await Promise.all([
+          supabase
+            .from("chat_groups")
+            .select("*")
+            .in("id", groupIds)
+            .order("created_at", { ascending: false }),
+          supabase
+            .from("chat_group_members")
+            .select("group_id, user_id")
+            .in("group_id", groupIds),
+          supabase
+            .from("group_messages")
+            .select("*")
+            .in("group_id", groupIds)
+            .order("created_at", { ascending: true })
+        ]);
+
+        const membersByGroup = (groupMembersData || []).reduce<Record<string, string[]>>((acc, row: any) => {
+          acc[row.group_id] = acc[row.group_id] || [];
+          acc[row.group_id].push(row.user_id);
+          return acc;
+        }, {});
+
+        const latestGroupMsgs: Record<string, string> = {};
+        (groupMessagesData || []).forEach((msg: any) => {
+          const senderProfile = candidateLookup.get(msg.sender_id);
+          const chatMsg: ChatMessage = {
+            id: msg.id,
+            sender: msg.sender_id === userId ? "me" : "them",
+            senderName: msg.sender_id === userId ? undefined : senderProfile?.name || "Member",
+            text: msg.text,
+            timestamp: new Date(msg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+          };
+          if (!nextChats[msg.group_id]) {
+            nextChats[msg.group_id] = [];
+          }
+          nextChats[msg.group_id].push(chatMsg);
+          latestGroupMsgs[msg.group_id] = msg.text;
+        });
+
+        groupMatches.push(...(groupsData || []).map((group: any) => {
+          const memberIds = membersByGroup[group.id] || [];
+          const memberNames = memberIds
+            .map((memberId) => candidateLookup.get(memberId)?.name || (memberId === userId ? profileRef.current?.name : ""))
+            .filter(Boolean);
+
+          return {
+            id: group.id,
+            candidateId: memberIds.find((memberId) => memberId !== userId) || userId,
+            createdAt: new Date(group.created_at).toLocaleDateString(),
+            skillOverlap: [],
+            latestMessage: latestGroupMsgs[group.id] || "",
+            unread: 0,
+            summary: memberNames,
+            isGroup: true,
+            title: group.title,
+            memberIds
+          };
+        }));
+      } else if (groupRowsError && groupRowsError.code !== "42P01") {
+        console.warn("Could not load group chats:", groupRowsError);
+      }
+    } catch (err) {
+      console.warn("Group chat tables are not available yet:", err);
+    }
+
+    setChats((current) => {
+      const localGroupChats = Object.fromEntries(
+        Object.entries(current).filter(([chatId]) => chatId.startsWith("group-"))
+      );
+      return { ...localGroupChats, ...nextChats };
+    });
+
+    setMatches((current) => [
+      ...current.filter((match) => match.isGroup && match.id.startsWith("group-")),
+      ...groupMatches,
+      ...mappedMatches
+    ]);
 
     const { data: notificationsData } = await supabase
       .from("notifications")
@@ -1967,24 +2132,6 @@ function App() {
 
       if (user?.id) {
         try {
-          if (action === "interest" && candidate.mutualInterest) {
-            // First, call simulate_mutual_match RPC function to bypass RLS
-            const { error: rpcError } = await supabase.rpc("simulate_mutual_match", {
-              user_id: user.id,
-              candidate_id: candidate.id
-            });
-            if (rpcError) {
-              console.warn("simulate_mutual_match RPC failed, falling back to client upsert:", rpcError);
-              await supabase
-                .from("swipes")
-                .upsert({
-                  swiper_id: candidate.id,
-                  swiped_id: user.id,
-                  action: "interest"
-                });
-            }
-          }
-
           const { error } = await supabase
             .from("swipes")
             .upsert({
@@ -1994,6 +2141,39 @@ function App() {
             });
           if (error) throw error;
 
+          if (action === "interest") {
+            const requesterName = profileRef.current?.name || user.name || user.email;
+            const requestBody =
+              language === "id"
+                ? `${requesterName} ${translations.id.matchRequestBody}`
+                : `${requesterName} ${translations.en.matchRequestBody}`;
+
+            const { error: rpcError } = await supabase.rpc("create_match_request", {
+              requester_id: user.id,
+              target_id: candidate.id
+            });
+
+            if (rpcError) {
+              const { error: insertError } = await supabase.from("notifications").insert({
+                user_id: candidate.id,
+                type: "match_request",
+                title: language === "id" ? translations.id.matchRequestTitle : translations.en.matchRequestTitle,
+                body: requestBody,
+                read: false
+              });
+
+              if (insertError) {
+                console.warn("Could not create remote match request notification:", insertError);
+              }
+            }
+
+            addToast(
+              language === "id" ? translations.id.matchRequestSentTitle : translations.en.matchRequestSentTitle,
+              language === "id" ? translations.id.matchRequestSentBody : translations.en.matchRequestSentBody,
+              "success"
+            );
+          }
+
           // Refresh state from database
           await fetchDiscoverAndMatches(user.id);
         } catch (err) {
@@ -2001,7 +2181,7 @@ function App() {
         }
       }
     },
-    [user?.id, setPassedIds, setSavedIds, setInterestedIds, setPreviousActions, fetchDiscoverAndMatches]
+    [addToast, fetchDiscoverAndMatches, language, setInterestedIds, setPassedIds, setPreviousActions, setSavedIds, user]
   );
 
   const rewindLast = useCallback(async () => {
@@ -2213,6 +2393,168 @@ function App() {
     }
   }, [user?.id, setNotifications]);
 
+  const respondToMatchRequest = useCallback(
+    async (notification: NotificationItem, candidate: CandidateProfile, approved: boolean) => {
+      if (!user?.id) return;
+
+      try {
+        if (approved) {
+          const { error } = await supabase
+            .from("swipes")
+            .upsert({
+              swiper_id: user.id,
+              swiped_id: candidate.id,
+              action: "interest"
+            });
+          if (error) throw error;
+
+          addToast(
+            language === "id" ? translations.id.matchRequestApprovedTitle : translations.en.matchRequestApprovedTitle,
+            language === "id" ? translations.id.matchRequestApprovedBody : translations.en.matchRequestApprovedBody,
+            "success"
+          );
+        } else {
+          const { error } = await supabase
+            .from("swipes")
+            .upsert({
+              swiper_id: user.id,
+              swiped_id: candidate.id,
+              action: "pass"
+            });
+          if (error) throw error;
+
+          addToast(
+            language === "id" ? translations.id.matchRequestRejectedTitle : translations.en.matchRequestRejectedTitle,
+            language === "id" ? translations.id.matchRequestRejectedBody : translations.en.matchRequestRejectedBody,
+            "info"
+          );
+        }
+
+        await supabase
+          .from("notifications")
+          .update({ read: true })
+          .eq("id", notification.id);
+
+        setNotifications((current) =>
+          current.map((item) => (item.id === notification.id ? { ...item, read: true } : item))
+        );
+        await fetchDiscoverAndMatches(user.id);
+      } catch (err) {
+        console.error("Error responding to match request:", err);
+        addToast(
+          language === "id" ? "Gagal memproses request" : "Request failed",
+          language === "id" ? "Silakan coba lagi beberapa saat lagi." : "Please try again in a moment.",
+          "error"
+        );
+      }
+    },
+    [addToast, fetchDiscoverAndMatches, language, setNotifications, user?.id]
+  );
+
+  const createGroupChat = useCallback(
+    async (title: string, memberIds: string[]) => {
+      const cleanMemberIds = Array.from(new Set(memberIds)).filter(Boolean);
+      const groupTitle =
+        title.trim() ||
+        cleanMemberIds
+          .map((memberId) => getCandidate(memberId)?.name?.split(" ")[0])
+          .filter(Boolean)
+          .join(", ") ||
+        (language === "id" ? "Grup baru" : "New group");
+
+      if (user?.id) {
+        try {
+          const { data: groupData, error: groupError } = await supabase
+            .from("chat_groups")
+            .insert({
+              title: groupTitle,
+              created_by: user.id
+            })
+            .select("id, created_at")
+            .single();
+          if (groupError) throw groupError;
+
+          const dbGroupId = groupData.id;
+          const allMemberIds = Array.from(new Set([user.id, ...cleanMemberIds]));
+          const { error: memberError } = await supabase
+            .from("chat_group_members")
+            .insert(allMemberIds.map((memberId) => ({ group_id: dbGroupId, user_id: memberId })));
+          if (memberError) throw memberError;
+
+          const groupMatch: MatchRecord = {
+            id: dbGroupId,
+            candidateId: cleanMemberIds[0] || user.id,
+            createdAt: new Date(groupData.created_at).toLocaleDateString(),
+            skillOverlap: [],
+            latestMessage: "",
+            unread: 0,
+            summary: allMemberIds
+              .map((memberId) => getCandidate(memberId)?.name || (memberId === user.id ? profileRef.current?.name : ""))
+              .filter((name): name is string => Boolean(name)),
+            isGroup: true,
+            title: groupTitle,
+            memberIds: allMemberIds
+          };
+
+          setMatches((current) => [groupMatch, ...current.filter((match) => match.id !== dbGroupId)]);
+          setChats((current) => ({ ...current, [dbGroupId]: current[dbGroupId] ?? [] }));
+
+          addToast(
+            language === "id" ? translations.id.groupCreatedTitle : translations.en.groupCreatedTitle,
+            language === "id" ? translations.id.groupCreatedBody : translations.en.groupCreatedBody,
+            "success"
+          );
+
+          return dbGroupId;
+        } catch (err) {
+          console.warn("Falling back to local group chat:", err);
+        }
+      }
+
+      const id = `group-${Date.now()}`;
+      const groupMatch: MatchRecord = {
+        id,
+        candidateId: cleanMemberIds[0] || "group",
+        createdAt: new Date().toLocaleDateString(),
+        skillOverlap: [],
+        latestMessage: "",
+        unread: 0,
+        summary: cleanMemberIds
+          .map((memberId) => getCandidate(memberId)?.name)
+          .filter((name): name is string => Boolean(name)),
+        isGroup: true,
+        title: groupTitle,
+        memberIds: cleanMemberIds
+      };
+
+      setMatches((current) => [groupMatch, ...current]);
+      setChats((current) => ({
+        ...current,
+        [id]: [
+          {
+            id: `group-init-${Date.now()}`,
+            sender: "them",
+            senderName: "Moots",
+            text:
+              language === "id"
+                ? `Grup "${groupTitle}" dibuat. Mulai diskusi kolaborasi di sini.`
+                : `Group "${groupTitle}" was created. Start your collaboration discussion here.`,
+            timestamp: "Just now"
+          }
+        ]
+      }));
+
+      addToast(
+        language === "id" ? translations.id.groupCreatedTitle : translations.en.groupCreatedTitle,
+        language === "id" ? translations.id.groupCreatedBody : translations.en.groupCreatedBody,
+        "success"
+      );
+
+      return id;
+    },
+    [addToast, language, setChats, setMatches, user?.id]
+  );
+
   const sendMessage = useCallback(
     async (matchId: string, text: string) => {
       const cleanText = text.trim();
@@ -2238,74 +2580,66 @@ function App() {
         )
       );
 
+      const targetMatch = matches.find((match) => match.id === matchId);
+      if (targetMatch?.isGroup) {
+        if (matchId.startsWith("group-")) {
+          return;
+        }
+
+        try {
+          const { data, error } = await supabase
+            .from("group_messages")
+            .insert({
+              group_id: matchId,
+              sender_id: user.id,
+              text: cleanText
+            })
+            .select("id, text, created_at")
+            .single();
+          if (error) throw error;
+
+          if (data) {
+            const persistedMessage: ChatMessage = {
+              id: data.id,
+              sender: "me",
+              text: data.text,
+              timestamp: new Date(data.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+            };
+
+            setChats((current) => {
+              const nextMessages = (current[matchId] ?? []).filter((message) => message.id !== tempId);
+              if (nextMessages.some((message) => message.id === data.id)) {
+                return { ...current, [matchId]: nextMessages };
+              }
+              return { ...current, [matchId]: [...nextMessages, persistedMessage] };
+            });
+          }
+        } catch (err) {
+          setChats((current) => {
+            const next = { ...current };
+            if (next[matchId]) {
+              next[matchId] = next[matchId].filter((chatMessage) => chatMessage.id !== tempId);
+            }
+            return next;
+          });
+          console.error("Error sending group message to Supabase:", err);
+          addToast(
+            language === "id" ? "Pesan grup gagal terkirim" : "Group message failed",
+            language === "id"
+              ? "Backend belum berhasil menyimpan pesan grup Anda."
+              : "The backend could not persist your group message.",
+            "error"
+          );
+        }
+        return;
+      }
+
+      if (matchId.startsWith("group-") || matchId.startsWith("match-") || matchId.startsWith("match_")) {
+        return;
+      }
+
       try {
         let dbMatchId = matchId;
-
-        // If the matchId is a mock ID (starts with match- or match_)
-        if (matchId.startsWith("match-") || matchId.startsWith("match_")) {
-          const candidateId = matchId.replace(/^match[-_]/, "");
-          const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-          if (uuidRegex.test(candidateId)) {
-            const user_a = user.id < candidateId ? user.id : candidateId;
-            const user_b = user.id > candidateId ? user.id : candidateId;
-
-            // Check if match already exists in DB
-            let { data: existingDbMatch } = await supabase
-              .from("matches")
-              .select("id")
-              .eq("user_a_id", user_a)
-              .eq("user_b_id", user_b)
-              .maybeSingle();
-
-            if (!existingDbMatch) {
-              // Simulate mutual match
-              await supabase.rpc("simulate_mutual_match", {
-                user_id: user.id,
-                candidate_id: candidateId
-              });
-              await supabase
-                .from("swipes")
-                .upsert({
-                  swiper_id: user.id,
-                  swiped_id: candidateId,
-                  action: "interest"
-                });
-
-              // Retrieve the new match's real UUID
-              const { data: newDbMatch } = await supabase
-                .from("matches")
-                .select("id")
-                .eq("user_a_id", user_a)
-                .eq("user_b_id", user_b)
-                .single();
-
-              if (newDbMatch) {
-                existingDbMatch = newDbMatch;
-              }
-            }
-
-            if (existingDbMatch) {
-              dbMatchId = existingDbMatch.id;
-
-              // Update state to use the real DB match ID
-              setMatches((current) =>
-                current.map((m) => (m.id === matchId ? { ...m, id: dbMatchId } : m))
-              );
-              setChats((current) => {
-                const next = { ...current };
-                if (next[matchId]) {
-                  next[dbMatchId] = next[matchId];
-                  delete next[matchId];
-                }
-                return next;
-              });
-
-              // Update browser URL silently
-              window.history.replaceState(null, "", `/chat/${dbMatchId}`);
-            }
-          }
-        }
 
         const { data, error } = await supabase
           .from("messages")
@@ -2354,7 +2688,7 @@ function App() {
         );
       }
     },
-    [addToast, language, setChats, setMatches, user?.id]
+    [addToast, language, matches, setChats, setMatches, user?.id]
   );
 
   useEffect(() => {
@@ -2505,6 +2839,66 @@ function App() {
         {
           event: "INSERT",
           schema: "public",
+          table: "group_messages"
+        },
+        (payload) => {
+          const newMsg = payload.new;
+          setMatches((currentMatches) => {
+            const groupMatch = currentMatches.find((m) => m.id === newMsg.group_id && m.isGroup);
+            if (!groupMatch) return currentMatches;
+
+            const isFromThem = newMsg.sender_id !== user.id;
+            const senderProfile = candidateLookup.get(newMsg.sender_id);
+
+            setChats((currentChats) => {
+              const currentMessages = currentChats[newMsg.group_id] ?? [];
+              if (currentMessages.some((msg) => msg.id === newMsg.id)) {
+                return currentChats;
+              }
+
+              const nextMessage: ChatMessage = {
+                id: newMsg.id,
+                sender: isFromThem ? "them" : "me",
+                senderName: isFromThem ? senderProfile?.name || "Member" : undefined,
+                text: newMsg.text,
+                timestamp: new Date(newMsg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+              };
+
+              return {
+                ...currentChats,
+                [newMsg.group_id]: [...currentMessages, nextMessage]
+              };
+            });
+
+            return currentMatches.map((m) =>
+              m.id === newMsg.group_id
+                ? {
+                    ...m,
+                    latestMessage: newMsg.text,
+                    unread: isFromThem ? m.unread + 1 : m.unread
+                  }
+                : m
+            );
+          });
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "chat_group_members",
+          filter: `user_id=eq.${user.id}`
+        },
+        () => {
+          fetchDiscoverAndMatches(user.id);
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
           table: "notifications",
           filter: `user_id=eq.${user.id}`
         },
@@ -2578,7 +2972,7 @@ function App() {
     return () => {
       supabase.removeChannel(realtimeChannel);
     };
-  }, [addToast, language, profile?.skills, setChats, setMatches, setNotifications, user, setDbCandidates]);
+  }, [addToast, fetchDiscoverAndMatches, language, profile?.skills, setChats, setMatches, setNotifications, user, setDbCandidates]);
 
   const value = useMemo<SymbioStore>(
     () => ({
@@ -2605,6 +2999,8 @@ function App() {
       markNotificationRead,
       markAllNotificationsRead,
       sendMessage,
+      respondToMatchRequest,
+      createGroupChat,
       addToast,
       user,
       isAuthenticated,
@@ -2628,6 +3024,7 @@ function App() {
       setChats,
       clearMatches,
       removeMatch,
+      respondToMatchRequest,
       clearFilters,
       filters,
       interestedIds,
@@ -2646,6 +3043,7 @@ function App() {
       setFilters,
       setProfile,
       toasts,
+      createGroupChat,
       user,
       isAuthenticated,
       login,
@@ -3104,6 +3502,10 @@ function AppShell() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [logoutOpen, setLogoutOpen] = useState(false);
   const [activeFloatingPanel, setActiveFloatingPanel] = useState<"ai" | "chat" | null>(null);
+  const [tourOpen, setTourOpen] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("moots.tour.dismissed") !== "true";
+  });
   
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [mobileSearchQuery, setMobileSearchQuery] = useState("");
@@ -3126,6 +3528,23 @@ function AppShell() {
     }
 
     setMobileDrawerOpen((prev) => !prev);
+  };
+
+  const tourSteps = useMemo(
+    () => [
+      { selector: "[data-tour='discover']", title: t.tourDiscoverTitle, body: t.tourDiscoverBody },
+      { selector: "[data-tour='interest']", title: t.tourInterestTitle, body: t.tourInterestBody },
+      { selector: "[data-tour='save']", title: t.tourSaveTitle, body: t.tourSaveBody },
+      { selector: "[data-tour='matches']", title: t.tourMatchesTitle, body: t.tourMatchesBody },
+      { selector: "[data-tour='ai']", title: t.tourAiTitle, body: t.tourAiBody },
+      { selector: "[data-tour='notifications']", title: t.tourAlertsTitle, body: t.tourAlertsBody }
+    ],
+    [t]
+  );
+
+  const dismissTour = () => {
+    window.localStorage.setItem("moots.tour.dismissed", "true");
+    setTourOpen(false);
   };
 
   return (
@@ -3322,7 +3741,78 @@ function AppShell() {
       {settingsOpen ? <SettingsDrawer onClose={() => setSettingsOpen(false)} onLogoutRequest={() => setLogoutOpen(true)} /> : null}
       {logoutOpen ? <LogoutConfirmModal onClose={() => setLogoutOpen(false)} /> : null}
       {searchDetailProfile ? <CandidateDetailSheet profile={searchDetailProfile} onClose={() => setSearchDetailProfile(null)} /> : null}
+      {tourOpen ? <FeatureTour steps={tourSteps} onClose={dismissTour} /> : null}
     </div>
+  );
+}
+
+function FeatureTour({
+  steps,
+  onClose
+}: {
+  steps: Array<{ selector: string; title: string; body: string }>;
+  onClose: () => void;
+}) {
+  const t = useTranslations();
+  const [index, setIndex] = useState(0);
+  const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
+  const step = steps[index];
+
+  useEffect(() => {
+    const updateRect = () => {
+      const element = Array.from(document.querySelectorAll<HTMLElement>(step.selector)).find((candidate) => {
+        const rect = candidate.getBoundingClientRect();
+        const style = window.getComputedStyle(candidate);
+        return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
+      });
+      setTargetRect(element?.getBoundingClientRect() ?? null);
+    };
+
+    updateRect();
+    window.addEventListener("resize", updateRect);
+    window.addEventListener("scroll", updateRect, true);
+    return () => {
+      window.removeEventListener("resize", updateRect);
+      window.removeEventListener("scroll", updateRect, true);
+    };
+  }, [step.selector]);
+
+  const next = () => {
+    if (index === steps.length - 1) {
+      onClose();
+      return;
+    }
+    setIndex((current) => current + 1);
+  };
+
+  return createPortal(
+    <div className="feature-tour-overlay" role="dialog" aria-modal="true">
+      {targetRect ? (
+        <div
+          className="feature-tour-highlight"
+          style={{
+            top: Math.max(8, targetRect.top - 8),
+            left: Math.max(8, targetRect.left - 8),
+            width: targetRect.width + 16,
+            height: targetRect.height + 16
+          }}
+        />
+      ) : null}
+      <section className="feature-tour-card">
+        <span>{t.tourStep} {index + 1}/{steps.length}</span>
+        <h2>{step.title}</h2>
+        <p>{step.body}</p>
+        <div className="feature-tour-actions">
+          <button type="button" className="button button-secondary" onClick={onClose}>
+            {t.tourSkip}
+          </button>
+          <button type="button" className="button button-primary" onClick={next}>
+            {index === steps.length - 1 ? t.tourDone : t.tourNext}
+          </button>
+        </div>
+      </section>
+    </div>,
+    document.body
   );
 }
 
@@ -3356,7 +3846,7 @@ function TopBar({
         >
           {theme === "light" ? <Moon size={20} /> : <Sun size={20} />}
         </button>
-        <Link to="/notifications" className="icon-link" aria-label="Open notifications">
+      <Link to="/notifications" className="icon-link" aria-label="Open notifications" data-tour="notifications">
           <Bell size={20} aria-hidden="true" />
           {unreadCount > 0 ? <span className="count-badge">{unreadCount}</span> : null}
         </Link>
@@ -3405,12 +3895,14 @@ function SidebarNav({
       {navItems.map((item) => {
         const Icon = item.icon;
         const label = getNavLabel(item.to);
+        const tourKey = item.to === "/discover" ? "discover" : item.to === "/matches" ? "matches" : undefined;
         return (
           <NavLink
             key={item.to}
             to={item.to}
             title={isCollapsed ? label : undefined}
             onClick={onLinkClick}
+            data-tour={tourKey}
           >
             <Icon size={18} aria-hidden="true" />
             {!isCollapsed && <span>{label}</span>}
@@ -3901,23 +4393,6 @@ function AiAssistantBubble({ isOpen, onToggle }: { isOpen: boolean; onToggle: (o
       return;
     }
 
-    if (user?.id) {
-      try {
-        await supabase.rpc("simulate_mutual_match", {
-          user_id: user.id,
-          candidate_id: candidate.id
-        });
-        await supabase
-          .from("swipes")
-          .upsert({
-            swiper_id: candidate.id,
-            swiped_id: user.id,
-            action: "interest"
-          });
-      } catch (err) {
-        console.warn("Error simulating mutual match on follow:", err);
-      }
-    }
     actOnCandidate(candidate, "interest");
   };
 
@@ -4183,6 +4658,7 @@ ${allProfiles.map((candidate) => {
       ) : null}
       <button
         className="ai-assistant-button"
+        data-tour="ai"
         type="button"
         aria-label={t.aiAssistantTitle}
         onClick={() => onToggle(!isOpen)}
@@ -4227,8 +4703,9 @@ function BottomNav({ unreadCount }: { unreadCount: number }) {
       {mobileItems.map((item) => {
         const Icon = item.icon;
         const label = getNavLabel(item.to);
+        const tourKey = item.to === "/discover" ? "discover" : item.to === "/matches" ? "matches" : undefined;
         return (
-          <NavLink key={item.to} to={item.to}>
+          <NavLink key={item.to} to={item.to} data-tour={tourKey}>
             <span className="bottom-icon-wrap">
               <Icon size={20} aria-hidden="true" />
               {item.to === "/matches" && unreadCount > 0 ? (
@@ -4436,18 +4913,14 @@ function DiscoverPage() {
 
       let createsMatch = false;
       if (action === "interest") {
-        if (current.mutualInterest) {
-          createsMatch = true;
-        } else {
-          const { data } = await supabase
-            .from("swipes")
-            .select("id")
-            .eq("swiper_id", current.id)
-            .eq("swiped_id", user.id)
-            .eq("action", "interest");
-          
-          createsMatch = !!(data && data.length > 0);
-        }
+        const { data } = await supabase
+          .from("swipes")
+          .select("id")
+          .eq("swiper_id", current.id)
+          .eq("swiped_id", user.id)
+          .eq("action", "interest");
+
+        createsMatch = !!(data && data.length > 0);
       }
 
       actOnCandidate(current, action, createsMatch);
@@ -4792,8 +5265,33 @@ function OnboardingPage() {
     t.stepPreview
   ];
   const errors = validateOnboardingStep(step, draft, t);
+  const canSkip = isOnboardingStepOptional(step);
 
   const [saving, setSaving] = useState(false);
+
+  const completeOnboarding = async () => {
+    setSaving(true);
+    try {
+      await setProfile({ ...draft, id: "me", mutualInterest: false });
+      if (user?.id) {
+        await fetchDiscoverAndMatches(user.id);
+      }
+      addToast(t.profileReadyTitle, t.profileReadyBody);
+      window.sessionStorage.setItem(
+        "moots.signupSuggestion",
+        JSON.stringify({
+          mainSkill: draft.mainSkill,
+          skills: (draft.skills || []).map((skill) => skill.name),
+          role: draft.role
+        })
+      );
+      navigate("/discover");
+    } catch (err) {
+      console.error("Error saving profile during onboarding:", err);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const goNext = async () => {
     if (errors.length) {
@@ -4803,30 +5301,21 @@ function OnboardingPage() {
 
     setTouched(false);
     if (step === steps.length - 1) {
-      setSaving(true);
-      try {
-        await setProfile({ ...draft, id: "me", mutualInterest: false });
-        if (user?.id) {
-          await fetchDiscoverAndMatches(user.id);
-        }
-        addToast(t.profileReadyTitle, t.profileReadyBody);
-        window.sessionStorage.setItem(
-          "moots.signupSuggestion",
-          JSON.stringify({
-            mainSkill: draft.mainSkill,
-            skills: (draft.skills || []).map((skill) => skill.name),
-            role: draft.role
-          })
-        );
-        navigate("/discover");
-      } catch (err) {
-        console.error("Error saving profile during onboarding:", err);
-      } finally {
-        setSaving(false);
-      }
+      await completeOnboarding();
       return;
     }
     setStep((current) => current + 1);
+  };
+
+  const skipStep = async () => {
+    if (!canSkip) return;
+
+    setTouched(false);
+    if (step === steps.length - 1) {
+      await completeOnboarding();
+      return;
+    }
+    setStep((current) => Math.min(steps.length - 1, current + 1));
   };
 
   const goBack = () => {
@@ -4884,6 +5373,11 @@ function OnboardingPage() {
                 <ArrowLeft size={18} aria-hidden="true" />
                 {t.back}
               </Button>
+              {canSkip ? (
+                <Button variant="ghost" onClick={skipStep} disabled={saving}>
+                  {t.skip}
+                </Button>
+              ) : null}
               <Button variant="primary" onClick={goNext} disabled={saving}>
                 {saving ? "..." : (step === steps.length - 1 ? t.enterDiscover : t.continue)}
                 {!saving && <ArrowRight size={18} aria-hidden="true" />}
@@ -5486,7 +5980,30 @@ function ChatPage() {
   const t = useTranslations();
   const { matchId } = useParams();
   const match = matches.find((item) => item.id === matchId);
-  const candidate = match ? getCandidate(match.candidateId) : null;
+  const candidate = match?.isGroup
+    ? ({
+        id: match.id,
+        name: match.title || t.groupChat,
+        campus: "Moots",
+        program: t.groupChat,
+        role: t.groupChat,
+        mainSkill: `${match.memberIds?.length || 0} ${t.groupMembers.toLowerCase()}`,
+        skills: [],
+        profileSummary: match.summary.join(", "),
+        experienceSummary: "",
+        experiences: [],
+        lookingFor: [],
+        availability: "available",
+        availabilityDetail: "",
+        collaborationGoals: [],
+        portfolioLinks: [],
+        preferredRole: "",
+        suggestedMessage: "",
+        accent: "accent-indigo",
+        online: true,
+        mutualInterest: false
+      } as CandidateProfile)
+    : match ? getCandidate(match.candidateId) : null;
 
   if (!match || !candidate) {
     return (
@@ -5507,7 +6024,7 @@ function ChatPage() {
 
   return (
     <div className="page-stack chat-page page-transition">
-      <PageHeader eyebrow={t.chatPreview} title={`${t.conversationWith} ${candidate.name}`} />
+      <PageHeader eyebrow={match.isGroup ? t.groupChat : t.chatPreview} title={`${match.isGroup ? t.groupChat : t.conversationWith} ${candidate.name}`} />
       <ChatWindow match={match} candidate={candidate} />
     </div>
   );
@@ -5618,7 +6135,7 @@ function findCandidateFromNotification(notification: NotificationItem) {
 }
 
 function NotificationsPage() {
-  const { notifications, markNotificationRead, markAllNotificationsRead, language } = useSymbio();
+  const { notifications, markNotificationRead, markAllNotificationsRead, respondToMatchRequest, language } = useSymbio();
   const unreadCount = notifications.filter((notification) => !notification.read).length;
   const [selectedNotification, setSelectedNotification] = useState<NotificationItem | null>(null);
   const [detailProfile, setDetailProfile] = useState<CandidateProfile | null>(null);
@@ -5665,6 +6182,31 @@ function NotificationsPage() {
                   {t.markRead}
                 </Button>
               ) : null}
+              {notification.type === "match_request" ? (
+                <div className="notification-request-actions" onClick={(event) => event.stopPropagation()}>
+                  {(() => {
+                    const candidate = findCandidateFromNotification(notification);
+                    return candidate ? (
+                      <>
+                        <Button
+                          variant="primary"
+                          onClick={() => respondToMatchRequest(notification, candidate, true)}
+                        >
+                          <Check size={16} aria-hidden="true" />
+                          {t.approve}
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          onClick={() => respondToMatchRequest(notification, candidate, false)}
+                        >
+                          <X size={16} aria-hidden="true" />
+                          {t.reject}
+                        </Button>
+                      </>
+                    ) : null;
+                  })()}
+                </div>
+              ) : null}
             </article>
           );
         })}
@@ -5695,6 +6237,35 @@ function NotificationsPage() {
                     >
                       {language === "id" ? "Lihat Profil" : "View Profile"}
                     </Button>
+                  ) : null;
+                })()
+              )}
+              {selectedNotification.type === "match_request" && (
+                (() => {
+                  const candidate = findCandidateFromNotification(selectedNotification);
+                  return candidate ? (
+                    <>
+                      <Button
+                        variant="primary"
+                        onClick={() => {
+                          respondToMatchRequest(selectedNotification, candidate, true);
+                          setSelectedNotification(null);
+                        }}
+                      >
+                        <Check size={16} aria-hidden="true" />
+                        {t.approve}
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        onClick={() => {
+                          respondToMatchRequest(selectedNotification, candidate, false);
+                          setSelectedNotification(null);
+                        }}
+                      >
+                        <X size={16} aria-hidden="true" />
+                        {t.reject}
+                      </Button>
+                    </>
                   ) : null;
                 })()
               )}
@@ -5898,31 +6469,10 @@ function ChatWindow({
     setReplyTo(null);
   };
 
-  const isFollowed = interestedIds.includes(candidate.id) || (!match.id.startsWith("match-") && !match.id.startsWith("match_"));
+  const isFollowed = match.isGroup || interestedIds.includes(candidate.id) || (!match.id.startsWith("match-") && !match.id.startsWith("match_"));
 
   const handleFollowBanner = async () => {
-    if (user?.id) {
-      try {
-        await supabase.rpc("simulate_mutual_match", {
-          user_id: user.id,
-          candidate_id: candidate.id
-        });
-        await supabase
-          .from("swipes")
-          .upsert({
-            swiper_id: candidate.id,
-            swiped_id: user.id,
-            action: "interest"
-          });
-      } catch (err) {
-        console.warn("Error simulating mutual match on follow from chat banner:", err);
-      }
-    }
     actOnCandidate(candidate, "interest");
-    addToast(
-      language === "id" ? "Berhasil Mengikuti" : "Followed successfully",
-      language === "id" ? `Kamu sekarang mengikuti ${candidate.name}.` : `You are now following ${candidate.name}.`
-    );
   };
 
   return (
@@ -5937,7 +6487,9 @@ function ChatWindow({
               {candidate.online ? t.onlineNow : t.offline} · {candidate.mainSkill}
             </p>
           </div>
-          <button className="button button-secondary" style={{ marginLeft: 'auto' }} onClick={() => setShowProfile(true)}>{t.viewProfile}</button>
+          {!match.isGroup ? (
+            <button className="button button-secondary" style={{ marginLeft: 'auto' }} onClick={() => setShowProfile(true)}>{t.viewProfile}</button>
+          ) : null}
         </header>
 
         {!isFollowed && (
@@ -5977,7 +6529,14 @@ function ChatWindow({
                     </p>
                   );
                 }
-                return <p>{localized}</p>;
+                return (
+                  <p>
+                    {chatMessage.senderName && chatMessage.sender !== "me" ? (
+                      <strong className="message-sender-name">{chatMessage.senderName}</strong>
+                    ) : null}
+                    {localized}
+                  </p>
+                );
               })()}
               <span className="message-time">{localizeTimeLabel(chatMessage.timestamp, t)}</span>
               <div className="message-actions">
@@ -6048,7 +6607,7 @@ function ChatWindow({
         </Button>
       </div>
 
-      {showProfile ? (
+      {showProfile && !match.isGroup ? (
         <div className="chat-profile-overlay" role="presentation" onClick={() => setShowProfile(false)}>
           <div onClick={(e) => e.stopPropagation()}>
             <CandidateDetailSheet profile={candidate} onClose={() => setShowProfile(false)} />
@@ -6258,6 +6817,7 @@ function CandidateCard({
           <button
             type="button"
             className="card-btn card-btn-bookmark"
+            data-tour="save"
             title={t.saveProfile}
             onClick={(e) => {
               e.stopPropagation();
@@ -6269,6 +6829,7 @@ function CandidateCard({
           <button
             type="button"
             className="card-btn card-btn-check"
+            data-tour="interest"
             title={t.showInterest}
             onClick={(e) => {
               e.stopPropagation();
@@ -6332,23 +6893,6 @@ export function CandidateDetailSheet({
       return;
     }
 
-    if (user?.id) {
-      try {
-        await supabase.rpc("simulate_mutual_match", {
-          user_id: user.id,
-          candidate_id: profile.id
-        });
-        await supabase
-          .from("swipes")
-          .upsert({
-            swiper_id: profile.id,
-            swiped_id: user.id,
-            action: "interest"
-          });
-      } catch (err) {
-        console.warn("Error simulating mutual match on follow:", err);
-      }
-    }
     actOnCandidate(profile, "interest");
   };
 
@@ -7846,7 +8390,16 @@ function localizeNotification(notification: NotificationItem, t: TranslationSet)
   if (!isIndonesian(t)) {
     return {
       ...notification,
-      type: notification.type === "match" ? "Match" : notification.type === "message" ? "Message" : "Project"
+      type:
+        notification.type === "match"
+          ? "Match"
+          : notification.type === "match_request"
+            ? "Match Request"
+            : notification.type === "message"
+              ? "Message"
+              : notification.type === "system"
+                ? "System"
+                : "Project"
     };
   }
 
@@ -7868,7 +8421,16 @@ function localizeNotification(notification: NotificationItem, t: TranslationSet)
     }
   };
 
-  const type = notification.type === "match" ? "Kecocokan" : notification.type === "message" ? "Pesan" : "Proyek";
+  const type =
+    notification.type === "match"
+      ? "Kecocokan"
+      : notification.type === "match_request"
+        ? "Permintaan Kecocokan"
+        : notification.type === "message"
+          ? "Pesan"
+          : notification.type === "system"
+            ? "Sistem"
+            : "Proyek";
   return { ...notification, type, ...(known[notification.id] ?? {}) };
 }
 
@@ -8416,12 +8978,6 @@ function validateOnboardingStep(step: number, draft: CandidateProfile, t: Transl
     if (!draft.mainSkill) {
       errors.push(t.mainSkillRequired);
     }
-    if (!(draft.collaborationGoals || []).length) {
-      errors.push(t.collaborationTypeRequired);
-    }
-  }
-  if (step === 3 && (draft.skills || []).length < 3) {
-    errors.push(t.skillRequired);
   }
   if (step === 4) {
     if ((draft.profileSummary || "").length > 180) {
@@ -8430,18 +8986,6 @@ function validateOnboardingStep(step: number, draft: CandidateProfile, t: Transl
   }
   if (step === 5 && (draft.experienceSummary || "").length > 240) {
     errors.push(t.experienceSummaryLimit);
-  }
-  if (step === 6) {
-    const experience = (draft.experiences || [])[0];
-    if (!(experience?.title || "").trim()) {
-      errors.push(t.experienceTitleRequired);
-    }
-    if (!(experience?.organization || "").trim()) {
-      errors.push(t.projectRequired);
-    }
-    if (!(experience?.description || "").trim()) {
-      errors.push(t.experienceDescriptionRequired);
-    }
   }
   if (step === 7) {
     const badLink = (draft.portfolioLinks || []).find((link) => link.url && !isUrlLike(link.url));
@@ -8452,11 +8996,12 @@ function validateOnboardingStep(step: number, draft: CandidateProfile, t: Transl
   if (step === 8 && !draft.availability) {
     errors.push(t.availabilityRequired);
   }
-  if (step === 9 && !(draft.lookingFor || []).length) {
-    errors.push(t.lookingForRequired);
-  }
 
   return errors;
+}
+
+function isOnboardingStepOptional(step: number) {
+  return [3, 4, 5, 6, 7, 9].includes(step);
 }
 
 function validateProfile(profile: CandidateProfile) {

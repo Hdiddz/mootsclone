@@ -8461,3 +8461,243 @@ body {
 .chat-not-followed-banner .banner-follow-btn svg {
   flex-shrink: 0;
 }
+
+.feature-tour-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  background: rgba(31, 27, 18, 0.46);
+  backdrop-filter: blur(2px);
+}
+
+.feature-tour-highlight {
+  position: fixed;
+  z-index: 1201;
+  border: 2px solid var(--accent);
+  border-radius: 14px;
+  box-shadow:
+    0 0 0 9999px rgba(31, 27, 18, 0.18),
+    0 18px 50px rgba(31, 27, 18, 0.24);
+  pointer-events: none;
+}
+
+.feature-tour-card {
+  position: fixed;
+  right: 24px;
+  bottom: max(24px, env(safe-area-inset-bottom));
+  z-index: 1202;
+  display: grid;
+  width: min(380px, calc(100vw - 32px));
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px;
+  color: var(--ink);
+  background: var(--surface);
+  box-shadow: 0 24px 70px rgba(31, 27, 18, 0.24);
+}
+
+.feature-tour-card > span {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.feature-tour-card h2,
+.feature-tour-card p {
+  margin: 0;
+}
+
+.feature-tour-card h2 {
+  font-size: 1.05rem;
+  line-height: 1.2;
+}
+
+.feature-tour-card p {
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.feature-tour-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.notification-request-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.notification-request-actions .button {
+  min-height: 36px;
+  padding: 0 12px;
+}
+
+.message-sender-name {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--primary);
+  font-size: 0.74rem;
+  font-weight: 900;
+}
+
+.matches-header-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.matches-header-row .beeline-intro {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.matches-group-button {
+  flex: 0 0 auto;
+  min-height: 40px;
+  padding: 0 14px;
+  white-space: nowrap;
+}
+
+.group-avatar {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  display: grid;
+  width: 46px;
+  height: 46px;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.34);
+  border-radius: 50%;
+  color: #1f1b12;
+  background: rgba(255, 255, 255, 0.86);
+}
+
+.group-match-row {
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.05), rgba(0, 0, 0, 0.78)),
+    linear-gradient(135deg, #0f766e, #7c3aed 58%, #eab308);
+}
+
+.match-profile-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.group-modal {
+  width: min(520px, calc(100vw - 28px));
+}
+
+.group-modal .field {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0;
+}
+
+.group-modal .field span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.group-modal input[type="text"],
+.group-modal .field input {
+  min-height: 42px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0 12px;
+  color: var(--ink);
+  background: var(--surface-container-lowest);
+}
+
+.group-member-list {
+  display: grid;
+  max-height: 300px;
+  overflow: auto;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.group-member-list label {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px;
+  color: var(--ink);
+  background: var(--surface-container-lowest);
+  cursor: pointer;
+}
+
+.group-member-list label.selected {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.group-member-list input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary);
+}
+
+.group-member-list span {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.group-member-list strong,
+.group-member-list small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.group-member-list small {
+  color: var(--muted);
+}
+
+.error-text {
+  margin: 0;
+  color: var(--danger);
+  font-weight: 800;
+}
+
+:root.dark .feature-tour-card,
+:root.dark .group-modal,
+:root.dark .group-member-list label,
+:root.dark .group-modal .field input {
+  background: var(--surface-container);
+}
+
+@media (max-width: 767px) {
+  .feature-tour-card {
+    right: 16px;
+    bottom: max(102px, calc(env(safe-area-inset-bottom) + 92px));
+  }
+
+  .feature-tour-actions,
+  .notification-request-actions,
+  .matches-header-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .feature-tour-actions .button,
+  .notification-request-actions .button,
+  .matches-group-button {
+    width: 100%;
+  }
+
+  .group-member-list {
+    max-height: 44vh;
+  }
+}
