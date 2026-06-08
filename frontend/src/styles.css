@@ -2868,21 +2868,31 @@ img.avatar {
 
 .toast-stack {
   position: fixed;
-  /* Bottom-center: clear of the header/logo and the bottom-right chat/AI
-     bubbles, and unobtrusive on every screen size. */
-  top: auto !important;
-  bottom: 24px !important;
+  /* Just below the header bar, centered and compact, so it never collides
+     with the Moots logo in the header. */
+  top: 72px !important;
+  bottom: auto !important;
   left: 50% !important;
   right: auto !important;
   transform: translateX(-50%) !important;
-  z-index: 500;
+  z-index: 400;
   display: flex;
   flex-direction: column;
   align-items: center;
   width: max-content !important;
-  max-width: calc(100vw - 32px) !important;
+  max-width: min(360px, calc(100vw - 32px)) !important;
   gap: 8px;
   pointer-events: none;
+}
+
+.toast-stack .toast {
+  padding: 9px 12px;
+  font-size: 0.78rem;
+  border-radius: 10px;
+}
+
+.toast-stack .toast strong {
+  font-size: 0.82rem;
 }
 
 .toast {
@@ -3341,15 +3351,14 @@ img.avatar {
   }
 
   .toast-stack {
-    /* Sit above the mobile bottom nav. */
-    top: auto !important;
-    bottom: 84px !important;
-    left: 12px !important;
-    right: 12px !important;
-    transform: none !important;
-    width: auto !important;
-    max-width: none !important;
-    align-items: stretch;
+    top: 64px !important;
+    bottom: auto !important;
+    left: 50% !important;
+    right: auto !important;
+    transform: translateX(-50%) !important;
+    width: max-content !important;
+    max-width: calc(100vw - 24px) !important;
+    align-items: center;
   }
 }
 
@@ -4999,6 +5008,118 @@ img.avatar {
   background: var(--primary, #765a00);
   color: #fff;
   cursor: pointer;
+}
+
+/* #C Per-box edit pencil on profile panels */
+.box-head-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.profile-info-panel .rail-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.box-edit-btn {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: color 150ms ease, border-color 150ms ease, background 150ms ease;
+}
+
+.box-edit-btn:hover {
+  color: var(--ink);
+  border-color: var(--ink);
+  background: var(--surface-muted, rgba(0, 0, 0, 0.04));
+}
+
+/* #B Multi-item editors (experience / portfolio) in settings */
+.multi-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.multi-editor-item {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  background: var(--surface-muted, transparent);
+}
+
+.multi-editor-item-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.multi-editor-remove {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: none;
+  background: transparent;
+  color: var(--danger);
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.multi-editor-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.multi-editor-add,
+.multi-editor-upload {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  padding: 10px 14px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.multi-editor-add:hover,
+.multi-editor-upload:hover {
+  border-color: var(--ink);
+  border-style: solid;
+}
+
+/* #E Follow-requested badge on match rows */
+.match-request-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  color: #fff;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  vertical-align: middle;
+  white-space: nowrap;
 }
 
 /* #7/#14 Settings — menu of sub-windows */

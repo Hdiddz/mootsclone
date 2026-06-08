@@ -32,12 +32,19 @@ export default function MatchesPage() {
     }
   }, [user?.id, fetchDiscoverAndMatches]);
 
-  const approvedMatches = matches.filter((match) =>
-    !match.isGroup && (
-      (interestedIds || []).includes(match.candidateId) &&
-      (incomingInterests || []).includes(match.candidateId)
-    )
+  // Show every direct match — accepted ones and pending "follow requested" ones
+  // (the user can chat from a pending match before the other follows back).
+  const approvedMatches = matches.filter(
+    (match) => !match.isGroup && getCandidate(match.candidateId)
   );
+
+  const requestStatusLabel = (match: typeof matches[number]): string | null => {
+    if (match.status !== "pending") return null;
+    const iRequested = (interestedIds || []).includes(match.candidateId);
+    const theyRequested = (incomingInterests || []).includes(match.candidateId);
+    if (theyRequested && !iRequested) return t.wantsToFollowYou;
+    return t.followRequested;
+  };
 
   const [selectedId, setSelectedId] = useState(approvedMatches[0]?.id ?? "");
 
@@ -65,7 +72,8 @@ export default function MatchesPage() {
   }
 
   const selected = approvedMatches.find((match) => match.id === selectedId) ?? approvedMatches[0];
-  const directMatches = approvedMatches.filter((match) => !match.isGroup && getCandidate(match.candidateId));
+  // Only accepted matches can be added to a group.
+  const directMatches = approvedMatches.filter((match) => match.status !== "pending" && getCandidate(match.candidateId));
 
   const toggleGroupMember = (candidateId: string) => {
     setGroupError("");
@@ -128,7 +136,12 @@ export default function MatchesPage() {
               >
                 {candidate ? <Avatar profile={candidate} size="sm" /> : <span className="group-avatar"><Users size={21} /></span>}
                 <span>
-                  <strong>{displayName}</strong>
+                  <strong>
+                    {displayName}
+                    {requestStatusLabel(match) ? (
+                      <span className="match-request-badge">{requestStatusLabel(match)}</span>
+                    ) : null}
+                  </strong>
                   <small>{displayMeta}</small>
                   <em>{displayLatest}</em>
                 </span>

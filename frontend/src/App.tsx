@@ -311,6 +311,7 @@ const translations = {
     alertsDesc: "Mock updates for matches, messages, and project invitations.",
     notificationDetail: "Notification Details",
     edit: "Edit",
+    editProfile: "Edit Profile",
     statsMatches: "Matches",
     statsSaved: "Saved",
     statsSkills: "Skills",
@@ -443,6 +444,8 @@ const translations = {
     matchActions: "Match actions",
     removeMatch: "Remove match",
     unfollow: "Unfollow",
+    followRequested: "Follow requested",
+    wantsToFollowYou: "Wants to follow you",
     reportUser: "Report user",
     blockUser: "Block user",
     matchRemovedTitle: "Match removed",
@@ -738,6 +741,7 @@ const translations = {
     alertsDesc: "Pembaruan simulasi untuk kecocokan, pesan, dan undangan proyek.",
     notificationDetail: "Detail Notifikasi",
     edit: "Ubah",
+    editProfile: "Edit Profil",
     statsMatches: "Kecocokan",
     statsSaved: "Disimpan",
     statsSkills: "Keahlian",
@@ -870,6 +874,8 @@ const translations = {
     matchActions: "Aksi kecocokan",
     removeMatch: "Hapus kecocokan",
     unfollow: "Unfollow",
+    followRequested: "Permintaan follow",
+    wantsToFollowYou: "Ingin mengikuti Anda",
     reportUser: "Laporkan pengguna",
     blockUser: "Blokir pengguna",
     matchRemovedTitle: "Kecocokan dihapus",
@@ -1769,6 +1775,7 @@ function App() {
           skillOverlap: overlap,
           latestMessage: "",
           unread: 0,
+          status: (m.status as "pending" | "accepted") || "accepted",
           summary: [
             otherUser?.role ? `Interested in ${otherUser.role} role.` : "",
             overlap.length > 0 ? `Both profiles mention ${overlap.join(", ")}.` : ""
@@ -2296,6 +2303,14 @@ function App() {
           if (error) throw error;
 
           if (action === "interest") {
+            // Create a pending ("follow requested") match so the user can start
+            // chatting before the other person follows back (#E).
+            try {
+              await supabase.rpc("create_pending_match", { target: candidate.id });
+            } catch (err) {
+              console.warn("Could not create pending match (run supabase_changes_v3.sql):", err);
+            }
+
             const requesterName = profileRef.current?.name || user.name || user.email;
             const requestBody =
               language === "id"
@@ -4378,12 +4393,16 @@ function SidebarNav({
   );
 }
 
+type SettingsSection = "profile" | "account" | "preferences" | "privacy" | "danger" | "skills" | "experience" | "portfolio" | "lookingFor" | "status";
+
 function SettingsDrawer({
   onClose,
-  onLogoutRequest
+  onLogoutRequest,
+  initialSection = null
 }: {
   onClose: () => void;
   onLogoutRequest: () => void;
+  initialSection?: SettingsSection | null;
 }) {
   const { profile, setProfile, language, setLanguage, addToast, user, logout, blockedUsers, unblockUser } = useSymbio();
   const t = useTranslations();
@@ -4406,9 +4425,13 @@ function SettingsDrawer({
     experiences: profile.experiences.length ? profile.experiences : [emptyExperience],
     portfolioLinks: profile.portfolioLinks.length
       ? profile.portfolioLinks
-      : [{ label: "GitHub", url: "" }, { label: "Portfolio", url: "" }]
+      : [{ label: "GitHub", url: "" }, { label: "Portfolio", url: "" }],
+    lookingFor: profile.lookingFor,
+    availability: profile.availability,
+    availabilityDetail: profile.availabilityDetail,
+    collaborationGoals: profile.collaborationGoals
   });
-  const [activeSection, setActiveSection] = useState<null | "profile" | "account" | "preferences" | "privacy" | "danger">(null);
+  const [activeSection, setActiveSection] = useState<null | SettingsSection>(initialSection);
   const [settingsError, setSettingsError] = useState("");
   const [confirmConfig, setConfirmConfig] = useState<{
     title: string;
@@ -4455,7 +4478,11 @@ function SettingsDrawer({
       statusLabel: draft.statusLabel.trim(),
       skills: draft.skills,
       experiences: draft.experiences.filter((exp) => (exp.title || exp.organization || exp.description)),
-      portfolioLinks: draft.portfolioLinks.filter((link) => link.url || link.label)
+      portfolioLinks: draft.portfolioLinks.filter((link) => link.url || link.label),
+      lookingFor: draft.lookingFor,
+      availability: draft.availability,
+      availabilityDetail: draft.availabilityDetail,
+      collaborationGoals: draft.collaborationGoals
     }));
     setLanguage(draft.language);
     addToast(t.settingsSavedTitle, t.settingsSavedBody);
@@ -4521,6 +4548,11 @@ function SettingsDrawer({
                     : activeSection === "preferences" ? t.settingsSectionPreferences
                     : activeSection === "privacy" ? t.settingsSectionPrivacy
                     : activeSection === "danger" ? t.settingsSectionDanger
+                    : activeSection === "skills" ? t.mainSkillsTitle
+                    : activeSection === "experience" ? t.experienceTitle
+                    : activeSection === "portfolio" ? t.portfolioTitle
+                    : activeSection === "lookingFor" ? t.lookingForTitle
+                    : activeSection === "status" ? t.statusCollaboration
                     : t.settingsDrawerTitle}
                 </h2>
               </div>
@@ -4536,6 +4568,31 @@ function SettingsDrawer({
               <button type="button" className="settings-menu-item" onClick={() => setActiveSection("profile")}>
                 <User size={18} aria-hidden="true" />
                 <span><strong>{t.settingsSectionProfile}</strong></span>
+                <ChevronDown size={18} aria-hidden="true" className="settings-menu-chevron" />
+              </button>
+              <button type="button" className="settings-menu-item" onClick={() => setActiveSection("skills")}>
+                <Star size={18} aria-hidden="true" />
+                <span><strong>{t.mainSkillsTitle}</strong></span>
+                <ChevronDown size={18} aria-hidden="true" className="settings-menu-chevron" />
+              </button>
+              <button type="button" className="settings-menu-item" onClick={() => setActiveSection("experience")}>
+                <Briefcase size={18} aria-hidden="true" />
+                <span><strong>{t.experienceTitle}</strong></span>
+                <ChevronDown size={18} aria-hidden="true" className="settings-menu-chevron" />
+              </button>
+              <button type="button" className="settings-menu-item" onClick={() => setActiveSection("portfolio")}>
+                <LinkIcon size={18} aria-hidden="true" />
+                <span><strong>{t.portfolioTitle}</strong></span>
+                <ChevronDown size={18} aria-hidden="true" className="settings-menu-chevron" />
+              </button>
+              <button type="button" className="settings-menu-item" onClick={() => setActiveSection("lookingFor")}>
+                <Search size={18} aria-hidden="true" />
+                <span><strong>{t.lookingForTitle}</strong></span>
+                <ChevronDown size={18} aria-hidden="true" className="settings-menu-chevron" />
+              </button>
+              <button type="button" className="settings-menu-item" onClick={() => setActiveSection("status")}>
+                <Compass size={18} aria-hidden="true" />
+                <span><strong>{t.statusCollaboration}</strong></span>
                 <ChevronDown size={18} aria-hidden="true" className="settings-menu-chevron" />
               </button>
               <button type="button" className="settings-menu-item" onClick={() => setActiveSection("account")}>
@@ -4601,25 +4658,110 @@ function SettingsDrawer({
                 />
               </div>
 
-              <div className="settings-section-title">{t.mainSkillsTitle}</div>
+              <div className="settings-actions">
+                <div>
+                  <Button variant="secondary" onClick={() => setActiveSection(null)}>{t.back}</Button>
+                  <Button variant="primary" onClick={saveSettings}>{t.save}</Button>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {activeSection === "skills" ? (
+            <div className="settings-panel">
               <SkillChecklist
                 selected={draft.skills}
                 onChange={(skills) => setDraft((current) => ({ ...current, skills }))}
                 helper={t.skillHelper}
               />
+              <div className="settings-actions">
+                <div>
+                  <Button variant="secondary" onClick={() => setActiveSection(null)}>{t.back}</Button>
+                  <Button variant="primary" onClick={saveSettings}>{t.save}</Button>
+                </div>
+              </div>
+            </div>
+          ) : null}
 
-              <div className="settings-section-title">{t.experienceTitle}</div>
-              <ExperienceEditor
-                experience={draft.experiences[0] ?? emptyExperience}
-                onChange={(experience) => setDraft((current) => ({ ...current, experiences: [{ ...experience, id: current.experiences[0]?.id || "edit-exp-1" }] }))}
+          {activeSection === "experience" ? (
+            <div className="settings-panel">
+              <MultiExperienceEditor
+                experiences={draft.experiences}
+                onChange={(experiences) => setDraft((current) => ({ ...current, experiences }))}
               />
+              <div className="settings-actions">
+                <div>
+                  <Button variant="secondary" onClick={() => setActiveSection(null)}>{t.back}</Button>
+                  <Button variant="primary" onClick={saveSettings}>{t.save}</Button>
+                </div>
+              </div>
+            </div>
+          ) : null}
 
-              <div className="settings-section-title">{t.portfolioTitle}</div>
-              <PortfolioEditor
+          {activeSection === "portfolio" ? (
+            <div className="settings-panel">
+              <PortfolioUploadEditor
                 links={draft.portfolioLinks}
+                userId={user?.id}
                 onChange={(portfolioLinks) => setDraft((current) => ({ ...current, portfolioLinks }))}
               />
+              <div className="settings-actions">
+                <div>
+                  <Button variant="secondary" onClick={() => setActiveSection(null)}>{t.back}</Button>
+                  <Button variant="primary" onClick={saveSettings}>{t.save}</Button>
+                </div>
+              </div>
+            </div>
+          ) : null}
 
+          {activeSection === "lookingFor" ? (
+            <div className="settings-panel">
+              <MultiChipField
+                label={t.lookingForLabel}
+                values={draft.lookingFor}
+                options={roleOptions}
+                onChange={(values) => setDraft((current) => ({ ...current, lookingFor: values }))}
+              />
+              <div className="settings-actions">
+                <div>
+                  <Button variant="secondary" onClick={() => setActiveSection(null)}>{t.back}</Button>
+                  <Button variant="primary" onClick={saveSettings}>{t.save}</Button>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {activeSection === "status" ? (
+            <div className="settings-panel">
+              <label className="field settings-select-field">
+                <span>{t.availabilityLabel}</span>
+                <select value={draft.availability} onChange={(event) => setDraft((current) => ({ ...current, availability: event.target.value as CandidateProfile["availability"] }))}>
+                  <option value="available">{localizeAvailabilityLabel("available", t)}</option>
+                  <option value="limited">{localizeAvailabilityLabel("limited", t)}</option>
+                  <option value="busy">{localizeAvailabilityLabel("busy", t)}</option>
+                </select>
+              </label>
+              <label className="field settings-select-field">
+                <span>{t.statusBadge}</span>
+                <select value={draft.statusLabel} onChange={(event) => updateDraft("statusLabel", event.target.value)}>
+                  <option value="">{t.defaultStatus}</option>
+                  <option value="Looking for project">{t.lookingForProject}</option>
+                  <option value="Available this week">{t.availableThisWeek}</option>
+                  <option value="Busy, message first">{t.busyMessageFirst}</option>
+                </select>
+              </label>
+              <TextAreaField
+                label={t.availabilityDetails}
+                value={draft.availabilityDetail}
+                onChange={(value) => setDraft((current) => ({ ...current, availabilityDetail: value }))}
+                minRows={3}
+              />
+              <MultiChipField
+                label={t.collaborationType}
+                values={draft.collaborationGoals}
+                options={collaborationGoalOptions}
+                onChange={(values) => setDraft((current) => ({ ...current, collaborationGoals: values }))}
+              />
               <div className="settings-actions">
                 <div>
                   <Button variant="secondary" onClick={() => setActiveSection(null)}>{t.back}</Button>
@@ -5485,7 +5627,7 @@ function DiscoverPage() {
       return;
     }
 
-    if ((event.target as HTMLElement | null)?.closest("button, a, input, textarea, select")) {
+    if ((event.target as HTMLElement | null)?.closest("button, a, input, textarea, select, .candidate-identity-row")) {
       return;
     }
 
@@ -5517,6 +5659,28 @@ function DiscoverPage() {
     setActionHint((prev) => (prev === hint ? prev : hint));
   };
 
+  const animateAction = useCallback(
+    (action: SwipeAction) => {
+      if (!current || swipeMotion) {
+        return;
+      }
+
+      if (reducedMotion) {
+        handleAction(action);
+        return;
+      }
+
+      resetCardTransform();
+      setDragging(false);
+      setSwipeMotion(action);
+      window.setTimeout(() => {
+        handleAction(action);
+        setSwipeMotion(null);
+      }, 280);
+    },
+    [current, handleAction, reducedMotion, swipeMotion, resetCardTransform]
+  );
+
   const finishGesture = useCallback(() => {
     if (!pointerStart.current) {
       return;
@@ -5539,30 +5703,15 @@ function DiscoverPage() {
         setRewindAnim(true);
         window.setTimeout(() => setRewindAnim(false), 450);
       }
+      return;
     }
-  }, [handleAction, rewindLast, resetCardTransform]);
 
-  const animateAction = useCallback(
-    (action: SwipeAction) => {
-      if (!current || swipeMotion) {
-        return;
-      }
-
-      if (reducedMotion) {
-        handleAction(action);
-        return;
-      }
-
-      resetCardTransform();
-      setDragging(false);
-      setSwipeMotion(action);
-      window.setTimeout(() => {
-        handleAction(action);
-        setSwipeMotion(null);
-      }, 280);
-    },
-    [current, handleAction, reducedMotion, swipeMotion, resetCardTransform]
-  );
+    // A tap (negligible movement) on the card body — not on a button/control,
+    // since those are filtered out in handlePointerDown — passes the profile.
+    if (horizontal < 10 && vertical < 10) {
+      animateAction("pass");
+    }
+  }, [handleAction, rewindLast, resetCardTransform, animateAction]);
 
   useEffect(() => {
     const storedSuggestion =
@@ -6526,9 +6675,20 @@ function ProfileActivity({ userId, authorProfile, readOnly = false }: { userId?:
 function ProfilePage() {
   const { profile, setProfile, matches, savedIds, language, setLanguage, user } = useSymbio();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsSection, setSettingsSection] = useState<SettingsSection | null>(null);
   const [qrOpen, setQrOpen] = useState(false);
   const [logoutOpen, setLogoutOpen] = useState(false);
   const t = useTranslations();
+
+  const openSettings = (section: SettingsSection | null) => {
+    setSettingsSection(section);
+    setSettingsOpen(true);
+  };
+  const editPencil = (section: SettingsSection) => (
+    <button type="button" className="box-edit-btn" aria-label={t.editProfile} onClick={() => openSettings(section)}>
+      <Edit size={15} aria-hidden="true" />
+    </button>
+  );
 
   return (
     <div className="profile-phone page-stack page-transition">
@@ -6540,7 +6700,7 @@ function ProfilePage() {
         <button aria-label="Open profile QR code" onClick={() => setQrOpen(true)}>
           <QrCode size={21} aria-hidden="true" />
         </button>
-        <button aria-label="Open settings" onClick={() => setSettingsOpen(true)}>
+        <button aria-label="Open settings" onClick={() => openSettings(null)}>
           <Settings size={22} aria-hidden="true" />
         </button>
         <button aria-label={t.logout} onClick={() => setLogoutOpen(true)} title={t.logout} style={{ color: 'var(--danger)', marginLeft: '8px', border: 'none', background: 'transparent' }}>
@@ -6572,8 +6732,8 @@ function ProfilePage() {
           </p>
           <p>{localizeProfileSummary(profile, t)}</p>
         </div>
-        <Button variant="secondary" onClick={() => setSettingsOpen(true)}>
-          {t.edit}
+        <Button variant="secondary" onClick={() => openSettings("profile")}>
+          {t.editProfile}
         </Button>
       </section>
 
@@ -6583,13 +6743,19 @@ function ProfilePage() {
         <section className="profile-info-panel">
           <div className="rail-heading">
             <h2>{t.statusCollaboration}</h2>
-            <AvailabilityBadge availability={profile.availability} label={profile.statusLabel} />
+            <div className="box-head-right">
+              <AvailabilityBadge availability={profile.availability} label={profile.statusLabel} />
+              {editPencil("status")}
+            </div>
           </div>
           <p>{localizeAvailabilityDetail(profile, t) || t.noAvailabilityDetail}</p>
         </section>
 
         <section className="profile-info-panel">
-          <h2>{t.mainSkillsTitle}</h2>
+          <div className="rail-heading">
+            <h2>{t.mainSkillsTitle}</h2>
+            {editPencil("skills")}
+          </div>
           <div className="chip-row">
             {profile.skills.length ? profile.skills.map((skillItem) => (
               <Chip key={`${skillItem.name}-${skillItem.level}`}>{skillItem.name}</Chip>
@@ -6598,7 +6764,10 @@ function ProfilePage() {
         </section>
 
         <section className="profile-info-panel">
-          <h2>{t.lookingForTitle}</h2>
+          <div className="rail-heading">
+            <h2>{t.lookingForTitle}</h2>
+            {editPencil("lookingFor")}
+          </div>
           <div className="chip-row">
             {profile.lookingFor.length ? profile.lookingFor.map((role) => (
               <Chip key={role} tone="soft">{localizeRoleLabel(role, t)}</Chip>
@@ -6607,7 +6776,10 @@ function ProfilePage() {
         </section>
 
         <section className="profile-info-panel">
-          <h2>{t.experienceTitle}</h2>
+          <div className="rail-heading">
+            <h2>{t.experienceTitle}</h2>
+            {editPencil("experience")}
+          </div>
           {profile.experiences.length ? profile.experiences.slice(0, 2).map((experience) => (
             <article className="profile-experience-card" key={experience.id}>
               <strong>{localizeExperienceText(experience.title, t)}</strong>
@@ -6618,7 +6790,10 @@ function ProfilePage() {
         </section>
 
         <section className="profile-info-panel">
-          <h2>{t.portfolioTitle}</h2>
+          <div className="rail-heading">
+            <h2>{t.portfolioTitle}</h2>
+            {editPencil("portfolio")}
+          </div>
           <div className="portfolio-list">
             {profile.portfolioLinks.filter((link) => link.url).length ? profile.portfolioLinks.filter((link) => link.url).map((link) => (
               <a href={link.url} key={`${link.label}-${link.url}`} target="_blank" rel="noreferrer">
@@ -6819,7 +6994,7 @@ function ProfilePage() {
         </div>
       ) : null}
       {settingsOpen ? (
-        <SettingsDrawer onClose={() => setSettingsOpen(false)} onLogoutRequest={() => setLogoutOpen(true)} />
+        <SettingsDrawer onClose={() => setSettingsOpen(false)} onLogoutRequest={() => setLogoutOpen(true)} initialSection={settingsSection} />
       ) : null}
       {qrOpen ? <ProfileQrModal profile={profile} onClose={() => setQrOpen(false)} /> : null}
       {logoutOpen ? <LogoutConfirmModal onClose={() => setLogoutOpen(false)} /> : null}
@@ -8047,6 +8222,8 @@ export function CandidateDetailSheet({
             )}
           </DetailSection>
 
+          <ProfileActivity userId={profile.id} authorProfile={profile} readOnly />
+
           <DetailSection title={t.portfolioLinks}>
             {profile.portfolioLinks.filter((link) => link.url).length ? (
               <div className="portfolio-list">
@@ -8084,8 +8261,6 @@ export function CandidateDetailSheet({
               ))}
             </div>
           </DetailSection>
-
-          <ProfileActivity userId={profile.id} authorProfile={profile} readOnly />
         </div>
       </aside>
     </div>
@@ -9319,6 +9494,143 @@ function PortfolioEditor({
           </div>
         );
       })}
+    </div>
+  );
+}
+
+// Multiple experiences with add/remove (settings).
+function MultiExperienceEditor({
+  experiences,
+  onChange
+}: {
+  experiences: Experience[];
+  onChange: (experiences: Experience[]) => void;
+}) {
+  const t = useTranslations();
+  const id = t.language === "id";
+  const list = experiences.length ? experiences : [emptyExperience];
+
+  const updateAt = (index: number, exp: Experience) => {
+    onChange(list.map((item, i) => (i === index ? exp : item)));
+  };
+  const removeAt = (index: number) => {
+    const next = list.filter((_, i) => i !== index);
+    onChange(next.length ? next : [emptyExperience]);
+  };
+  const add = () => {
+    onChange([...list, { ...emptyExperience, id: `exp-${Date.now()}` }]);
+  };
+
+  return (
+    <div className="multi-editor">
+      {list.map((exp, index) => (
+        <div className="multi-editor-item" key={exp.id || index}>
+          <div className="multi-editor-item-head">
+            <strong>{id ? `Pengalaman ${index + 1}` : `Experience ${index + 1}`}</strong>
+            {list.length > 1 ? (
+              <button type="button" className="multi-editor-remove" onClick={() => removeAt(index)}>
+                <Trash2 size={14} aria-hidden="true" />
+                {id ? "Hapus" : "Remove"}
+              </button>
+            ) : null}
+          </div>
+          <ExperienceEditor
+            experience={exp}
+            onChange={(next) => updateAt(index, { ...next, id: exp.id || `exp-${Date.now()}-${index}` })}
+          />
+        </div>
+      ))}
+      <button type="button" className="multi-editor-add" onClick={add}>
+        <ArrowRight size={15} aria-hidden="true" />
+        {id ? "Tambah pengalaman" : "Add experience"}
+      </button>
+    </div>
+  );
+}
+
+// Portfolio links with add/remove + file upload (png/jpg/pdf) to storage.
+function PortfolioUploadEditor({
+  links,
+  onChange,
+  userId
+}: {
+  links: PortfolioLink[];
+  onChange: (links: PortfolioLink[]) => void;
+  userId?: string;
+}) {
+  const t = useTranslations();
+  const id = t.language === "id";
+  const { addToast } = useSymbio();
+  const [uploading, setUploading] = useState(false);
+  const list = links.length ? links : [{ label: "", url: "" }];
+
+  const updateAt = (index: number, patch: Partial<PortfolioLink>) => {
+    onChange(list.map((link, i) => (i === index ? { ...link, ...patch } : link)));
+  };
+  const removeAt = (index: number) => {
+    const next = list.filter((_, i) => i !== index);
+    onChange(next.length ? next : [{ label: "", url: "" }]);
+  };
+  const add = () => onChange([...list, { label: "", url: "" }]);
+
+  const uploadFile = async (file: File | null) => {
+    if (!file || !userId) return;
+    setUploading(true);
+    try {
+      const path = `${userId}/portfolio/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.\-_]/g, "_")}`;
+      const { error } = await supabase.storage.from("post-images").upload(path, file, { cacheControl: "3600", upsert: false });
+      if (error) throw error;
+      const { data: pub } = supabase.storage.from("post-images").getPublicUrl(path);
+      onChange([...links.filter((l) => l.url || l.label), { label: file.name, url: pub.publicUrl }]);
+      addToast(id ? "File diunggah" : "File uploaded", id ? "File portfolio ditambahkan." : "Portfolio file added.", "success");
+    } catch (err: any) {
+      console.error("Portfolio upload error:", err);
+      addToast(id ? "Gagal mengunggah" : "Upload failed", err?.message || (id ? "Coba lagi." : "Try again."), "error");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div className="multi-editor">
+      {list.map((link, index) => {
+        const hasWarning = link.url && !isUrlLike(link.url);
+        return (
+          <div className="multi-editor-item" key={index}>
+            <div className="multi-editor-item-head">
+              <strong>{id ? `Tautan ${index + 1}` : `Link ${index + 1}`}</strong>
+              {list.length > 1 ? (
+                <button type="button" className="multi-editor-remove" onClick={() => removeAt(index)}>
+                  <Trash2 size={14} aria-hidden="true" />
+                  {id ? "Hapus" : "Remove"}
+                </button>
+              ) : null}
+            </div>
+            <div className="field-grid">
+              <TextField label={t.labelField} value={link.label} onChange={(label) => updateAt(index, { label })} placeholder="GitHub" />
+              <TextField label={t.urlField} value={link.url} onChange={(url) => updateAt(index, { url })} placeholder="https://example.com" />
+              {hasWarning ? <small className="warning-text">{t.urlWarning}</small> : null}
+            </div>
+          </div>
+        );
+      })}
+      <div className="multi-editor-buttons">
+        <button type="button" className="multi-editor-add" onClick={add}>
+          <ArrowRight size={15} aria-hidden="true" />
+          {id ? "Tambah tautan" : "Add link"}
+        </button>
+        <label className="multi-editor-upload">
+          <Upload size={15} aria-hidden="true" />
+          {uploading ? (id ? "Mengunggah…" : "Uploading…") : (id ? "Unggah file (PNG/JPG/PDF)" : "Upload file (PNG/JPG/PDF)")}
+          <input
+            type="file"
+            accept="image/png,image/jpeg,image/jpg,application/pdf"
+            hidden
+            disabled={uploading}
+            onChange={(event) => uploadFile(event.target.files?.[0] ?? null)}
+          />
+        </label>
+      </div>
     </div>
   );
 }

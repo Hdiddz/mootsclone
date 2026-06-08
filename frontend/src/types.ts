@@ -73,6 +73,7 @@ export interface MatchRecord {
   memberIds?: string[];
   ownerId?: string;
   adminIds?: string[];
+  status?: "pending" | "accepted";
 }
 
 export interface ChatMessage {
