@@ -84,6 +84,8 @@ import {
   allSkills,
   candidates,
   collaborationGoalOptions,
+  facultyOptions,
+  facultyConfig,
   createMatchFor,
   mockChats,
   mockMatches,
@@ -149,6 +151,16 @@ type SymbioStore = {
   sendMessage: (matchId: string, text: string) => void;
   respondToMatchRequest: (notification: NotificationItem, candidate: CandidateProfile, approved: boolean) => void;
   createGroupChat: (title: string, memberIds: string[]) => Promise<string>;
+  reportUser: (reportedId: string, reason: string, details: string) => Promise<void>;
+  blockUser: (blockedId: string) => Promise<void>;
+  unblockUser: (blockedId: string) => Promise<void>;
+  blockedUsers: CandidateProfile[];
+  clearChatHistory: (conversationId: string) => Promise<void>;
+  leaveGroup: (groupId: string) => Promise<void>;
+  deleteGroup: (groupId: string) => Promise<void>;
+  addGroupMembers: (groupId: string, memberIds: string[]) => Promise<void>;
+  removeGroupMember: (groupId: string, memberId: string) => Promise<void>;
+  setGroupAdmin: (groupId: string, memberId: string, isAdmin: boolean) => Promise<void>;
   addToast: (title: string, body: string, type?: "success" | "error" | "warning" | "info") => void;
   user: { id?: string; name: string; email: string; role?: string } | null;
   isAuthenticated: boolean;
@@ -430,6 +442,7 @@ const translations = {
     clearMatches: "Clear matches",
     matchActions: "Match actions",
     removeMatch: "Remove match",
+    unfollow: "Unfollow",
     reportUser: "Report user",
     blockUser: "Block user",
     matchRemovedTitle: "Match removed",
@@ -438,6 +451,25 @@ const translations = {
     reportQueuedBody: "This prototype records the action locally for now.",
     blockQueuedTitle: "Block noted",
     blockQueuedBody: "This prototype records the action locally for now.",
+    reportModalTitle: "Report user",
+    reportReasonLabel: "Reason",
+    reportDetailsLabel: "Details (optional)",
+    reportDetailsPlaceholder: "Add any context that helps us review this report…",
+    reportSubmit: "Submit report",
+    reportReasonSpam: "Spam or scam",
+    reportReasonHarassment: "Harassment or bullying",
+    reportReasonInappropriate: "Inappropriate content",
+    reportReasonImpersonation: "Fake account / impersonation",
+    reportReasonOther: "Other",
+    blockedUsersTitle: "Blocked users",
+    blockedUsersDesc: "People you've blocked won't appear in Discover, Matches, or chats.",
+    noBlockedUsers: "You haven't blocked anyone.",
+    unblock: "Unblock",
+    settingsSectionProfile: "Profile",
+    settingsSectionAccount: "Account & security",
+    settingsSectionPreferences: "Preferences",
+    settingsSectionPrivacy: "Privacy & safety",
+    settingsSectionDanger: "Danger zone",
     replyMessage: "Reply",
     deleteMessage: "Delete",
     undoMessage: "Undo",
@@ -837,6 +869,7 @@ const translations = {
     clearMatches: "Hapus kecocokan",
     matchActions: "Aksi kecocokan",
     removeMatch: "Hapus kecocokan",
+    unfollow: "Unfollow",
     reportUser: "Laporkan pengguna",
     blockUser: "Blokir pengguna",
     matchRemovedTitle: "Kecocokan dihapus",
@@ -845,6 +878,25 @@ const translations = {
     reportQueuedBody: "Prototype ini mencatat aksi secara lokal untuk saat ini.",
     blockQueuedTitle: "Blokir dicatat",
     blockQueuedBody: "Prototype ini mencatat aksi secara lokal untuk saat ini.",
+    reportModalTitle: "Laporkan pengguna",
+    reportReasonLabel: "Alasan",
+    reportDetailsLabel: "Detail (opsional)",
+    reportDetailsPlaceholder: "Tambahkan konteks yang membantu kami meninjau laporan ini…",
+    reportSubmit: "Kirim laporan",
+    reportReasonSpam: "Spam atau penipuan",
+    reportReasonHarassment: "Pelecehan atau perundungan",
+    reportReasonInappropriate: "Konten tidak pantas",
+    reportReasonImpersonation: "Akun palsu / peniruan",
+    reportReasonOther: "Lainnya",
+    blockedUsersTitle: "Pengguna diblokir",
+    blockedUsersDesc: "Orang yang Anda blokir tidak akan muncul di Discover, Matches, atau chat.",
+    noBlockedUsers: "Anda belum memblokir siapa pun.",
+    unblock: "Buka blokir",
+    settingsSectionProfile: "Profil",
+    settingsSectionAccount: "Akun & keamanan",
+    settingsSectionPreferences: "Preferensi",
+    settingsSectionPrivacy: "Privasi & keamanan",
+    settingsSectionDanger: "Zona berbahaya",
     replyMessage: "Balas",
     deleteMessage: "Hapus",
     undoMessage: "Urungkan",
@@ -1460,6 +1512,7 @@ function App() {
   const [dbCandidates, setDbCandidates] = useState<CandidateProfile[]>([]);
   const [showSwiped, setShowSwiped] = useState(false);
   const [authReady, setAuthReady] = useState(false);
+  const [blockedIds, setBlockedIds] = useState<string[]>([]);
   const authTokenRef = useRef<string | null>(null);
   const profileRef = useRef<CandidateProfile>(profile);
   profileRef.current = profile;
@@ -1469,12 +1522,24 @@ function App() {
     setShowSwiped(false);
   }, [filters]);
 
+  const themeInitRef = useRef(true);
   useEffect(() => {
+    const root = document.documentElement;
     if (theme === "dark") {
-      document.documentElement.classList.add("dark");
+      root.classList.add("dark");
     } else {
-      document.documentElement.classList.remove("dark");
+      root.classList.remove("dark");
     }
+
+    // Briefly enable a global color transition only while switching themes,
+    // so we get a smooth fade without paying a permanent transition cost.
+    if (themeInitRef.current) {
+      themeInitRef.current = false;
+      return;
+    }
+    root.classList.add("theme-anim");
+    const timer = window.setTimeout(() => root.classList.remove("theme-anim"), 480);
+    return () => window.clearTimeout(timer);
   }, [theme]);
 
   const addToast = useCallback((title: string, body: string, type?: "success" | "error" | "warning" | "info") => {
@@ -1647,8 +1712,27 @@ function App() {
     const swipedIds = swipesData?.filter((s: any) => s.swiper_id === userId).map((s: any) => s.swiped_id) || [];
     swipedIds.push(userId);
 
-    const loadedCandidates = allProfiles.filter((p) => !swipedIds.includes(p.id));
+    // Exclude anyone the current user has blocked (#18).
+    const { data: blockedRows } = await supabase
+      .from("blocked_users")
+      .select("blocked_id")
+      .eq("blocker_id", userId);
+    const blockedSet = new Set((blockedRows ?? []).map((row: any) => row.blocked_id));
+    setBlockedIds(Array.from(blockedSet) as string[]);
+
+    const loadedCandidates = allProfiles.filter((p) => !swipedIds.includes(p.id) && !blockedSet.has(p.id));
     setDbCandidates(loadedCandidates);
+
+    // Per-user "clear history" cutoffs (#16): messages older than this are
+    // hidden for this user only.
+    const clearsMap = new Map<string, number>();
+    const { data: clearRows } = await supabase
+      .from("chat_clears")
+      .select("conversation_id, cleared_at")
+      .eq("user_id", userId);
+    (clearRows ?? []).forEach((row: any) => {
+      clearsMap.set(row.conversation_id, new Date(row.cleared_at).getTime());
+    });
 
     const passed = swipesData?.filter((s: any) => s.swiper_id === userId && s.action === "pass").map((s: any) => s.swiped_id) || [];
     const interested = swipesData?.filter((s: any) => s.swiper_id === userId && s.action === "interest").map((s: any) => s.swiped_id) || [];
@@ -1704,11 +1788,17 @@ function App() {
           const latestMsgs: Record<string, string> = {};
 
           messagesData.forEach((msg: any) => {
+            const createdMs = new Date(msg.created_at).getTime();
+            const clearedAt = clearsMap.get(msg.match_id);
+            if (clearedAt && createdMs <= clearedAt) {
+              return; // hidden by this user's clear-history cutoff
+            }
             const chatMsg: ChatMessage = {
               id: msg.id,
               sender: msg.sender_id === userId ? "me" : "them",
               text: msg.text,
-              timestamp: new Date(msg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+              timestamp: new Date(msg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+              createdAtMs: createdMs
             };
             if (!nextChats[msg.match_id]) {
               nextChats[msg.match_id] = [];
@@ -1741,7 +1831,7 @@ function App() {
             .order("created_at", { ascending: false }),
           supabase
             .from("chat_group_members")
-            .select("group_id, user_id")
+            .select("group_id, user_id, role")
             .in("group_id", groupIds),
           supabase
             .from("group_messages")
@@ -1755,16 +1845,29 @@ function App() {
           acc[row.group_id].push(row.user_id);
           return acc;
         }, {});
+        const adminsByGroup = (groupMembersData || []).reduce<Record<string, string[]>>((acc, row: any) => {
+          if (row.role === "admin") {
+            acc[row.group_id] = acc[row.group_id] || [];
+            acc[row.group_id].push(row.user_id);
+          }
+          return acc;
+        }, {});
 
         const latestGroupMsgs: Record<string, string> = {};
         (groupMessagesData || []).forEach((msg: any) => {
+          const createdMs = new Date(msg.created_at).getTime();
+          const clearedAt = clearsMap.get(msg.group_id);
+          if (clearedAt && createdMs <= clearedAt) {
+            return; // hidden by this user's clear-history cutoff
+          }
           const senderProfile = candidateLookup.get(msg.sender_id);
           const chatMsg: ChatMessage = {
             id: msg.id,
             sender: msg.sender_id === userId ? "me" : "them",
             senderName: msg.sender_id === userId ? undefined : senderProfile?.name || "Member",
             text: msg.text,
-            timestamp: new Date(msg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+            timestamp: new Date(msg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+            createdAtMs: createdMs
           };
           if (!nextChats[msg.group_id]) {
             nextChats[msg.group_id] = [];
@@ -1789,7 +1892,9 @@ function App() {
             summary: memberNames,
             isGroup: true,
             title: group.title,
-            memberIds
+            memberIds,
+            ownerId: group.created_by,
+            adminIds: adminsByGroup[group.id] || []
           };
         }));
       } else if (groupRowsError && groupRowsError.code !== "42P01") {
@@ -1809,7 +1914,7 @@ function App() {
     setMatches((current) => [
       ...current.filter((match) => match.isGroup && match.id.startsWith("group-")),
       ...groupMatches,
-      ...mappedMatches
+      ...mappedMatches.filter((match) => !blockedSet.has(match.candidateId))
     ]);
 
     const { data: notificationsData } = await supabase
@@ -1845,6 +1950,21 @@ function App() {
   useEffect(() => {
     let mounted = true;
 
+    // True while the browser URL still carries an OAuth/magic-link callback
+    // (hash tokens or ?code=). During this window getSession() can briefly
+    // resolve null before supabase parses the URL, which used to flash the
+    // landing page and bounce the user through Discover before onboarding.
+    const hasAuthCallbackInUrl = () => {
+      const hash = window.location.hash || "";
+      const search = window.location.search || "";
+      return (
+        hash.includes("access_token") ||
+        hash.includes("error") ||
+        /[?&]code=/.test(search) ||
+        /[?&]error=/.test(search)
+      );
+    };
+
     const applySession = async (session: any, redirectSignedOut = true) => {
       const userId = session?.user?.id || null;
 
@@ -1861,6 +1981,9 @@ function App() {
           email: session.user.email || ""
         };
         if (!mounted) return;
+        // Show the loader (not a half-routed page) while we resolve the profile
+        // and decide between onboarding vs discover, so there's no flicker.
+        setAuthReady(false);
         authTokenRef.current = session.access_token ?? null;
         setUser(u);
         const p = await loadUserProfileRef.current(session.user.id);
@@ -1896,6 +2019,12 @@ function App() {
     };
 
     supabase.auth.getSession().then(async ({ data: { session } }) => {
+      // Returning from an OAuth redirect: the session isn't parsed from the URL
+      // yet. Stay on the loader and let onAuthStateChange deliver the session,
+      // instead of flashing the landing page as a signed-out user.
+      if (!session && hasAuthCallbackInUrl()) {
+        return;
+      }
       try {
         await applySession(session, false);
       } catch (err) {
@@ -1919,8 +2048,17 @@ function App() {
       }
     });
 
+    // Safety net: never leave the user stuck on the loader if the auth callback
+    // never resolves into a session (e.g. an invalid/expired OAuth redirect).
+    const readyFallback = window.setTimeout(() => {
+      if (mounted) {
+        setAuthReady(true);
+      }
+    }, 5000);
+
     return () => {
       mounted = false;
+      window.clearTimeout(readyFallback);
       subscription.unsubscribe();
     };
   }, []);
@@ -3006,6 +3144,245 @@ function App() {
     };
   }, [addToast, fetchDiscoverAndMatches, language, profile?.skills, setChats, setMatches, setNotifications, user, setDbCandidates]);
 
+  // ---- #18 Report & Block ---------------------------------------------------
+  const loadBlockedIds = useCallback(async (userId: string) => {
+    const { data } = await supabase
+      .from("blocked_users")
+      .select("blocked_id")
+      .eq("blocker_id", userId);
+    setBlockedIds((data ?? []).map((row: any) => row.blocked_id));
+  }, []);
+
+  useEffect(() => {
+    if (user?.id) {
+      loadBlockedIds(user.id);
+    } else {
+      setBlockedIds([]);
+    }
+  }, [user?.id, loadBlockedIds]);
+
+  const reportUser = useCallback(
+    async (reportedId: string, reason: string, details: string) => {
+      if (!user?.id) return;
+      try {
+        const { error } = await supabase.from("user_reports").insert({
+          reporter_id: user.id,
+          reported_id: reportedId,
+          reason,
+          details: details || null
+        });
+        if (error) throw error;
+        addToast(
+          language === "id" ? "Laporan terkirim" : "Report submitted",
+          language === "id"
+            ? "Terima kasih. Tim kami akan meninjau laporan ini."
+            : "Thanks. Our team will review this report.",
+          "success"
+        );
+      } catch (err) {
+        console.error("Error reporting user:", err);
+        addToast(
+          language === "id" ? "Gagal mengirim laporan" : "Report failed",
+          language === "id" ? "Silakan coba lagi." : "Please try again.",
+          "error"
+        );
+      }
+    },
+    [user?.id, addToast, language]
+  );
+
+  const blockUser = useCallback(
+    async (blockedId: string) => {
+      if (!user?.id) return;
+      // Optimistically remove them everywhere they could appear.
+      setBlockedIds((current) => (current.includes(blockedId) ? current : [...current, blockedId]));
+      setDbCandidates((current) => current.filter((candidate) => candidate.id !== blockedId));
+      setMatches((current) => current.filter((match) => match.isGroup || match.candidateId !== blockedId));
+      try {
+        const { error } = await supabase
+          .from("blocked_users")
+          .upsert({ blocker_id: user.id, blocked_id: blockedId });
+        if (error) throw error;
+        addToast(
+          language === "id" ? "Pengguna diblokir" : "User blocked",
+          language === "id"
+            ? "Mereka tidak akan muncul lagi. Anda bisa membuka blokir di Pengaturan."
+            : "They won't appear anymore. You can unblock them in Settings.",
+          "success"
+        );
+      } catch (err) {
+        console.error("Error blocking user:", err);
+        addToast(
+          language === "id" ? "Gagal memblokir" : "Block failed",
+          language === "id" ? "Silakan coba lagi." : "Please try again.",
+          "error"
+        );
+      }
+    },
+    [user?.id, addToast, language, setDbCandidates, setMatches]
+  );
+
+  const unblockUser = useCallback(
+    async (blockedId: string) => {
+      if (!user?.id) return;
+      setBlockedIds((current) => current.filter((id) => id !== blockedId));
+      try {
+        const { error } = await supabase
+          .from("blocked_users")
+          .delete()
+          .eq("blocker_id", user.id)
+          .eq("blocked_id", blockedId);
+        if (error) throw error;
+        if (user.id) {
+          await fetchDiscoverAndMatches(user.id);
+        }
+        addToast(
+          language === "id" ? "Blokir dibuka" : "User unblocked",
+          language === "id" ? "Pengguna ini bisa muncul kembali." : "This user can appear again.",
+          "info"
+        );
+      } catch (err) {
+        console.error("Error unblocking user:", err);
+      }
+    },
+    [user?.id, addToast, language, fetchDiscoverAndMatches]
+  );
+
+  // ---- #16 Chat management --------------------------------------------------
+  const clearChatHistory = useCallback(
+    async (conversationId: string) => {
+      // Local clear is immediate and only affects this user.
+      setChats((current) => ({ ...current, [conversationId]: [] }));
+      setMatches((current) =>
+        current.map((m) => (m.id === conversationId ? { ...m, latestMessage: "", unread: 0 } : m))
+      );
+      if (user?.id && !conversationId.startsWith("group-") && !conversationId.startsWith("match-")) {
+        try {
+          await supabase
+            .from("chat_clears")
+            .upsert({ user_id: user.id, conversation_id: conversationId, cleared_at: new Date().toISOString() });
+        } catch (err) {
+          console.warn("Could not persist chat clear:", err);
+        }
+      }
+      addToast(
+        language === "id" ? "Riwayat dibersihkan" : "History cleared",
+        language === "id" ? "Riwayat chat ini dibersihkan untuk Anda saja." : "This chat history was cleared for you only.",
+        "success"
+      );
+    },
+    [user?.id, language, addToast, setChats, setMatches]
+  );
+
+  const leaveGroup = useCallback(
+    async (groupId: string) => {
+      if (!user?.id) return;
+      setMatches((current) => current.filter((m) => m.id !== groupId));
+      setChats((current) => {
+        const next = { ...current };
+        delete next[groupId];
+        return next;
+      });
+      try {
+        await supabase.from("chat_group_members").delete().eq("group_id", groupId).eq("user_id", user.id);
+        addToast(
+          language === "id" ? "Keluar dari grup" : "Left group",
+          language === "id" ? "Anda telah keluar dari grup ini." : "You have left this group.",
+          "info"
+        );
+      } catch (err) {
+        console.error("Error leaving group:", err);
+      }
+    },
+    [user?.id, language, addToast, setMatches, setChats]
+  );
+
+  const deleteGroup = useCallback(
+    async (groupId: string) => {
+      if (!user?.id) return;
+      setMatches((current) => current.filter((m) => m.id !== groupId));
+      setChats((current) => {
+        const next = { ...current };
+        delete next[groupId];
+        return next;
+      });
+      try {
+        const { error } = await supabase.from("chat_groups").delete().eq("id", groupId);
+        if (error) throw error;
+        addToast(
+          language === "id" ? "Grup dihapus" : "Group deleted",
+          language === "id" ? "Grup beserta percakapannya telah dihapus." : "The group and its conversation were deleted.",
+          "success"
+        );
+      } catch (err) {
+        console.error("Error deleting group:", err);
+      }
+    },
+    [user?.id, language, addToast, setMatches, setChats]
+  );
+
+  const addGroupMembers = useCallback(
+    async (groupId: string, memberIds: string[]) => {
+      if (!user?.id || memberIds.length === 0) return;
+      try {
+        const { error } = await supabase
+          .from("chat_group_members")
+          .insert(memberIds.map((memberId) => ({ group_id: groupId, user_id: memberId })));
+        if (error) throw error;
+        await fetchDiscoverAndMatches(user.id);
+        addToast(
+          language === "id" ? "Anggota ditambahkan" : "Members added",
+          language === "id" ? "Anggota baru telah ditambahkan ke grup." : "New members were added to the group.",
+          "success"
+        );
+      } catch (err) {
+        console.error("Error adding group members:", err);
+      }
+    },
+    [user?.id, language, addToast, fetchDiscoverAndMatches]
+  );
+
+  const removeGroupMember = useCallback(
+    async (groupId: string, memberId: string) => {
+      if (!user?.id) return;
+      try {
+        const { error } = await supabase
+          .from("chat_group_members")
+          .delete()
+          .eq("group_id", groupId)
+          .eq("user_id", memberId);
+        if (error) throw error;
+        await fetchDiscoverAndMatches(user.id);
+      } catch (err) {
+        console.error("Error removing group member:", err);
+      }
+    },
+    [user?.id, fetchDiscoverAndMatches]
+  );
+
+  const setGroupAdmin = useCallback(
+    async (groupId: string, memberId: string, isAdmin: boolean) => {
+      if (!user?.id) return;
+      try {
+        const { error } = await supabase
+          .from("chat_group_members")
+          .update({ role: isAdmin ? "admin" : "member" })
+          .eq("group_id", groupId)
+          .eq("user_id", memberId);
+        if (error) throw error;
+        await fetchDiscoverAndMatches(user.id);
+      } catch (err) {
+        console.error("Error updating member role:", err);
+      }
+    },
+    [user?.id, fetchDiscoverAndMatches]
+  );
+
+  const blockedUsers = useMemo(
+    () => blockedIds.map((id) => candidateLookup.get(id)).filter((p): p is CandidateProfile => Boolean(p)),
+    [blockedIds]
+  );
+
   const value = useMemo<SymbioStore>(
     () => ({
       profile,
@@ -3034,6 +3411,16 @@ function App() {
       sendMessage,
       respondToMatchRequest,
       createGroupChat,
+      reportUser,
+      blockUser,
+      unblockUser,
+      blockedUsers,
+      clearChatHistory,
+      leaveGroup,
+      deleteGroup,
+      addGroupMembers,
+      removeGroupMember,
+      setGroupAdmin,
       addToast,
       user,
       isAuthenticated,
@@ -3078,6 +3465,16 @@ function App() {
       setProfile,
       toasts,
       createGroupChat,
+      reportUser,
+      blockUser,
+      unblockUser,
+      blockedUsers,
+      clearChatHistory,
+      leaveGroup,
+      deleteGroup,
+      addGroupMembers,
+      removeGroupMember,
+      setGroupAdmin,
       user,
       isAuthenticated,
       login,
@@ -3792,19 +4189,27 @@ function FeatureTour({
   const step = steps[index];
 
   useEffect(() => {
-    const updateRect = () => {
-      const element = Array.from(document.querySelectorAll<HTMLElement>(step.selector)).find((candidate) => {
+    const findElement = () =>
+      Array.from(document.querySelectorAll<HTMLElement>(step.selector)).find((candidate) => {
         const rect = candidate.getBoundingClientRect();
         const style = window.getComputedStyle(candidate);
         return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
       });
-      setTargetRect(element?.getBoundingClientRect() ?? null);
+
+    const updateRect = () => {
+      setTargetRect(findElement()?.getBoundingClientRect() ?? null);
     };
+
+    // Bring the spotlighted element into view before measuring it.
+    const target = findElement();
+    target?.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+    const settle = window.setTimeout(updateRect, 320);
 
     updateRect();
     window.addEventListener("resize", updateRect);
     window.addEventListener("scroll", updateRect, true);
     return () => {
+      window.clearTimeout(settle);
       window.removeEventListener("resize", updateRect);
       window.removeEventListener("scroll", updateRect, true);
     };
@@ -3818,8 +4223,16 @@ function FeatureTour({
     setIndex((current) => current + 1);
   };
 
+  // Keep the card clear of the spotlighted element: if the target sits in the
+  // lower half of the viewport, dock the card to the top, otherwise the bottom.
+  const viewportH = typeof window !== "undefined" ? window.innerHeight : 800;
+  const placeCardTop = targetRect ? targetRect.top + targetRect.height / 2 > viewportH * 0.5 : false;
+  const cardStyle: CSSProperties = placeCardTop
+    ? { top: "max(16px, env(safe-area-inset-top))", bottom: "auto" }
+    : {};
+
   return createPortal(
-    <div className="feature-tour-overlay" role="dialog" aria-modal="true">
+    <div className={`feature-tour-overlay ${targetRect ? "" : "no-target"}`} role="dialog" aria-modal="true">
       {targetRect ? (
         <div
           className="feature-tour-highlight"
@@ -3831,7 +4244,7 @@ function FeatureTour({
           }}
         />
       ) : null}
-      <section className="feature-tour-card">
+      <section className="feature-tour-card" style={cardStyle}>
         <span>{t.tourStep} {index + 1}/{steps.length}</span>
         <h2>{step.title}</h2>
         <p>{step.body}</p>
@@ -3860,6 +4273,18 @@ function TopBar({
   theme: "light" | "dark";
   onToggleTheme: () => void;
 }) {
+  const [bellShake, setBellShake] = useState(false);
+  const prevUnreadRef = useRef(unreadCount);
+  useEffect(() => {
+    if (unreadCount > prevUnreadRef.current) {
+      setBellShake(true);
+      const timer = window.setTimeout(() => setBellShake(false), 1000);
+      prevUnreadRef.current = unreadCount;
+      return () => window.clearTimeout(timer);
+    }
+    prevUnreadRef.current = unreadCount;
+  }, [unreadCount]);
+
   return (
     <header className="top-bar">
       <button className="top-icon-button" aria-label="Open menu" onClick={onMenuClick}>
@@ -3879,7 +4304,7 @@ function TopBar({
         >
           {theme === "light" ? <Moon size={20} /> : <Sun size={20} />}
         </button>
-      <Link to="/notifications" className="icon-link" aria-label="Open notifications" data-tour="notifications">
+      <Link to="/notifications" className={`icon-link ${bellShake ? "bell-shake" : ""}`} aria-label="Open notifications" data-tour="notifications">
           <Bell size={20} aria-hidden="true" />
           {unreadCount > 0 ? <span className="count-badge">{unreadCount}</span> : null}
         </Link>
@@ -3969,7 +4394,7 @@ function SettingsDrawer({
   onClose: () => void;
   onLogoutRequest: () => void;
 }) {
-  const { profile, setProfile, language, setLanguage, addToast, user, logout } = useSymbio();
+  const { profile, setProfile, language, setLanguage, addToast, user, logout, blockedUsers, unblockUser } = useSymbio();
   const t = useTranslations();
   const navigate = useNavigate();
   const [draft, setDraft] = useState({
@@ -4096,6 +4521,7 @@ function SettingsDrawer({
             <p>{t.settingsRulesBody}</p>
           </div>
 
+          <div className="settings-section-title">{t.settingsSectionProfile}</div>
           <div className="settings-form-grid">
             <TextField label={t.name} value={draft.name} onChange={(value) => updateDraft("name", value)} />
             <PhotoUploadField
@@ -4139,6 +4565,7 @@ function SettingsDrawer({
             />
           </div>
 
+          <div className="settings-section-title">{t.settingsSectionAccount}</div>
           <div className="settings-security-grid">
             <TextField
               label={t.currentPassword}
@@ -4163,6 +4590,7 @@ function SettingsDrawer({
           </div>
           {settingsError ? <div className="error-box"><p>{settingsError}</p></div> : null}
 
+          <div className="settings-section-title">{t.settingsSectionPreferences}</div>
           <div className="settings-preference-list">
             <label>
               <input type="checkbox" defaultChecked />
@@ -4178,6 +4606,31 @@ function SettingsDrawer({
             </label>
           </div>
 
+          <div className="settings-section-title">{t.settingsSectionPrivacy}</div>
+          <div className="settings-blocked">
+            <p className="settings-blocked-desc">{t.blockedUsersDesc}</p>
+            {blockedUsers.length === 0 ? (
+              <p className="muted-text">{t.noBlockedUsers}</p>
+            ) : (
+              <ul className="blocked-user-list">
+                {blockedUsers.map((blocked) => (
+                  <li key={blocked.id} className="blocked-user-row">
+                    <Avatar profile={blocked} size="xs" />
+                    <span className="blocked-user-name">{blocked.name || t.yourName}</span>
+                    <button
+                      type="button"
+                      className="blocked-unblock-btn"
+                      onClick={() => unblockUser(blocked.id)}
+                    >
+                      {t.unblock}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <div className="settings-section-title settings-section-danger">{t.settingsSectionDanger}</div>
           <div className="settings-actions">
             <Button variant="ghostDanger" onClick={() => { onClose(); onLogoutRequest(); }}>
               <LogOut size={18} aria-hidden="true" />
@@ -4859,10 +5312,14 @@ function DiscoverPage() {
   const [matchedProfile, setMatchedProfile] = useState<CandidateProfile | null>(null);
   const [suggestedProfile, setSuggestedProfile] = useState<CandidateProfile | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
-  const [drag, setDrag] = useState({ x: 0, y: 0, active: false });
+  const [dragging, setDragging] = useState(false);
   const [swipeMotion, setSwipeMotion] = useState<SwipeAction | null>(null);
   const [rewindAnim, setRewindAnim] = useState(false);
+  const [actionHint, setActionHint] = useState<string>("");
   const pointerStart = useRef<{ x: number; y: number } | null>(null);
+  const dragRef = useRef({ x: 0, y: 0 });
+  const cardElRef = useRef<HTMLElement | null>(null);
+  const rafRef = useRef<number | null>(null);
   const reducedMotion = usePrefersReducedMotion();
 
   const filteredProfiles = useMemo(() => applyFilters(dbCandidates, filters), [dbCandidates, filters]);
@@ -4933,7 +5390,6 @@ function DiscoverPage() {
       }
 
       actOnCandidate(current, action, createsMatch);
-      setDrag({ x: 0, y: 0, active: false });
 
       if (createsMatch) {
         setMatchedProfile(current);
@@ -4941,6 +5397,30 @@ function DiscoverPage() {
     },
     [actOnCandidate, current, user?.id]
   );
+
+  // Imperatively drive the card transform during a drag so we never re-render
+  // the (heavy) card on every pointer move — this keeps the gesture buttery on
+  // both desktop and low-powered mobile devices.
+  const applyDragTransform = useCallback(() => {
+    rafRef.current = null;
+    const el = cardElRef.current;
+    if (!el) return;
+    const { x, y } = dragRef.current;
+    const tilt = Math.max(-12, Math.min(12, x / 16));
+    el.style.transform = `translate3d(${x}px, ${y}px, 0) rotate(${tilt}deg)`;
+  }, []);
+
+  const resetCardTransform = useCallback(() => {
+    if (rafRef.current != null) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
+    dragRef.current = { x: 0, y: 0 };
+    const el = cardElRef.current;
+    if (el) {
+      el.style.transform = "";
+    }
+  }, []);
 
   const handlePointerDown: PointerEventHandler<HTMLElement> = (event) => {
     if (!current || swipeMotion) {
@@ -4952,27 +5432,31 @@ function DiscoverPage() {
     }
 
     pointerStart.current = { x: event.clientX, y: event.clientY };
+    cardElRef.current = event.currentTarget;
     event.currentTarget.setPointerCapture?.(event.pointerId);
-    setDrag({ x: 0, y: 0, active: true });
+    dragRef.current = { x: 0, y: 0 };
+    setDragging(true);
   };
 
   const handlePointerMove: PointerEventHandler<HTMLElement> = (event) => {
     if (!pointerStart.current) {
       return;
     }
-    const nextDrag = {
-      x: event.clientX - pointerStart.current.x,
-      y: event.clientY - pointerStart.current.y,
-      active: true
-    };
-    if (Math.abs(nextDrag.x) > 8 && Math.abs(nextDrag.x) > Math.abs(nextDrag.y)) {
+    const x = event.clientX - pointerStart.current.x;
+    const y = event.clientY - pointerStart.current.y;
+    dragRef.current = { x, y };
+
+    if (Math.abs(x) > 8 && Math.abs(x) > Math.abs(y)) {
       event.preventDefault();
     }
-    setDrag({
-      x: nextDrag.x,
-      y: nextDrag.y,
-      active: true
-    });
+
+    if (rafRef.current == null) {
+      rafRef.current = requestAnimationFrame(applyDragTransform);
+    }
+
+    // The hint label changes category rarely, so a state update here is cheap.
+    const hint = getActionHint(x, y);
+    setActionHint((prev) => (prev === hint ? prev : hint));
   };
 
   const finishGesture = useCallback(() => {
@@ -4981,22 +5465,24 @@ function DiscoverPage() {
     }
 
     pointerStart.current = null;
-    const horizontal = Math.abs(drag.x);
-    const vertical = Math.abs(drag.y);
+    const { x, y } = dragRef.current;
+    const horizontal = Math.abs(x);
+    const vertical = Math.abs(y);
+
+    setActionHint("");
+    setDragging(false);
+    resetCardTransform();
 
     if (horizontal > 90 && horizontal > vertical) {
-      if (drag.x > 0) {
+      if (x > 0) {
         handleAction("pass");
       } else {
         rewindLast();
         setRewindAnim(true);
         window.setTimeout(() => setRewindAnim(false), 450);
       }
-      return;
     }
-
-    setDrag({ x: 0, y: 0, active: false });
-  }, [drag.x, drag.y, handleAction, rewindLast]);
+  }, [handleAction, rewindLast, resetCardTransform]);
 
   const animateAction = useCallback(
     (action: SwipeAction) => {
@@ -5009,14 +5495,15 @@ function DiscoverPage() {
         return;
       }
 
-      setDrag({ x: 0, y: 0, active: false });
+      resetCardTransform();
+      setDragging(false);
       setSwipeMotion(action);
       window.setTimeout(() => {
         handleAction(action);
         setSwipeMotion(null);
       }, 280);
     },
-    [current, handleAction, reducedMotion, swipeMotion]
+    [current, handleAction, reducedMotion, swipeMotion, resetCardTransform]
   );
 
   useEffect(() => {
@@ -5086,18 +5573,6 @@ function DiscoverPage() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [animateAction, current, rewindLast]);
 
-  const tilt = Math.max(-12, Math.min(12, drag.x / 16));
-  const dragStyle =
-    drag.active || drag.x || drag.y
-      ? ({
-          transform: reducedMotion
-            ? undefined
-            : `translate(${drag.x}px, ${drag.y}px) rotate(${tilt}deg)`,
-          transition: drag.active ? "none" : undefined
-        } as CSSProperties)
-      : undefined;
-  const actionHint = getActionHint(drag.x, drag.y);
-
   return (
     <div className="page-stack discover-page page-transition">
       <PageHeader
@@ -5127,8 +5602,7 @@ function DiscoverPage() {
         {current ? (
           <CandidateCard
             profile={current}
-            className={`active-card ${drag.active ? "dragging" : ""} ${swipeMotion ? `swiping-${swipeMotion}` : ""} ${rewindAnim ? "card-rewind-anim" : ""}`}
-            style={dragStyle}
+            className={`active-card ${dragging ? "dragging" : ""} ${swipeMotion ? `swiping-${swipeMotion}` : ""} ${rewindAnim ? "card-rewind-anim" : ""}`}
             actionHint={actionHint}
             swipeStatus={getSwipeStatus(current.id)}
             onExpand={() => setDetailProfile(current)}
@@ -5335,29 +5809,42 @@ function OnboardingPage() {
         <Link to="/" className="top-logo" style={{ position: "static", transform: "none" }}>
           Moots <span>✦</span>
         </Link>
-        <button
-          onClick={async () => {
-            await logout();
-            navigate("/");
-          }}
-          className="text-link"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            textDecoration: 'none',
-            fontWeight: 600,
-            background: 'none',
-            border: 'none',
-            cursor: 'pointer',
-            padding: 0,
-            fontFamily: 'inherit',
-            fontSize: 'inherit',
-          }}
-        >
-          <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>logout</span>
-          {t.language === "id" ? "Batal & Keluar" : "Cancel & Exit"}
-        </button>
+        <div className="onboarding-top-actions">
+          {canSkip ? (
+            <button
+              type="button"
+              onClick={skipStep}
+              disabled={saving}
+              className="onboarding-skip-link"
+            >
+              {t.skip}
+              <ArrowRight size={15} aria-hidden="true" />
+            </button>
+          ) : null}
+          <button
+            onClick={async () => {
+              await logout();
+              navigate("/");
+            }}
+            className="text-link"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              textDecoration: 'none',
+              fontWeight: 600,
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              padding: 0,
+              fontFamily: 'inherit',
+              fontSize: 'inherit',
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>logout</span>
+            {t.language === "id" ? "Batal & Keluar" : "Cancel & Exit"}
+          </button>
+        </div>
       </header>
 
       <main className="onboarding-grid">
@@ -5379,11 +5866,6 @@ function OnboardingPage() {
                 <ArrowLeft size={18} aria-hidden="true" />
                 {t.back}
               </Button>
-              {canSkip ? (
-                <Button variant="ghost" onClick={skipStep} disabled={saving}>
-                  {t.skip}
-                </Button>
-              ) : null}
               <Button variant="primary" onClick={goNext} disabled={saving}>
                 {saving ? "..." : (step === steps.length - 1 ? t.enterDiscover : t.continue)}
                 {!saving && <ArrowRight size={18} aria-hidden="true" />}
@@ -5448,6 +5930,8 @@ function OnboardingStep({
   }
 
   if (step === 1) {
+    const facultyPool = facultyConfig[draft.program]?.skills ?? [];
+    const facultyPoolNames = facultyPool.map((s) => s.name);
     return (
       <div className="field-grid">
         <TextField
@@ -5456,87 +5940,84 @@ function OnboardingStep({
           onChange={(value) => update({ campus: value })}
           placeholder="Telkom University"
         />
-        <TextField
+        <SelectField
           label={t.facultyProgram}
-          value={draft.program}
-          onChange={(value) => update({ program: value })}
-          placeholder="S1 Sistem Informasi"
+          value={facultyOptions.includes(draft.program) ? draft.program : ""}
+          onChange={(value) =>
+            setDraft((current) => {
+              const nextPool = facultyConfig[value]?.skills ?? [];
+              const nextPoolNames = nextPool.map((s) => s.name);
+              const nextRoles = facultyConfig[value]?.roles ?? [];
+              return {
+                ...current,
+                program: value,
+                // Cascade: drop role/skills that don't belong to the new faculty.
+                role: nextRoles.includes(current.role) ? current.role : "",
+                mainSkill: nextPoolNames.includes(current.mainSkill) ? current.mainSkill : "",
+                skills: current.skills.filter((s) => nextPoolNames.includes(s.name))
+              };
+            })
+          }
+          options={[
+            { label: t.language === "id" ? "Pilih fakultas" : "Select faculty", value: "" },
+            ...facultyOptions.map((faculty) => ({ label: faculty, value: faculty }))
+          ]}
         />
+        {facultyPoolNames.length === 0 ? (
+          <p className="muted-text" style={{ fontSize: "0.82rem" }}>
+            {t.language === "id"
+              ? "Pilih fakultas untuk menyesuaikan pilihan peran dan skill berikutnya."
+              : "Pick a faculty to tailor the role and skill options in the next steps."}
+          </p>
+        ) : null}
       </div>
     );
   }
 
   if (step === 2) {
-    const baseRoles = ["Technical", "Business", "Design"];
-    const isCustomRole = !baseRoles.includes(draft.role);
-    const uniqueSkillOptions = uniqueSkills();
-    const isCustomSkill = Boolean(draft.mainSkill) && !uniqueSkillOptions.includes(draft.mainSkill);
+    const faculty = facultyConfig[draft.program];
+    const facultyRoles = faculty?.roles ?? [];
+    const facultySkills = faculty?.skills ?? [];
+    const optionalHint = t.language === "id" ? " (opsional)" : " (optional)";
+
+    if (!faculty) {
+      return (
+        <div className="field-grid">
+          <p className="muted-text">
+            {t.language === "id"
+              ? "Silakan pilih fakultas di langkah sebelumnya agar pilihan peran & skill muncul di sini."
+              : "Please choose a faculty in the previous step so the role & skill options appear here."}
+          </p>
+        </div>
+      );
+    }
 
     return (
       <div className="field-grid">
-        <div className="field-group" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <label className="field-label uppercase">{t.mainRole}</label>
-          <div className="role-card-grid">
-            {[
-              { id: "Technical", label: t.technicalRole, icon: "code", color: "dev" },
-              { id: "Business", label: t.businessRole, icon: "trending_up", color: "biz" },
-              { id: "Design", label: t.designRole, icon: "palette", color: "design" },
-              { id: "Other", label: t.otherRole, icon: "extension", color: "other" }
-            ].map((roleCard) => (
-              <div
-                key={roleCard.id}
-                className={`role-card ${
-                  (roleCard.id === "Other" ? isCustomRole : draft.role === roleCard.id)
-                    ? "selected"
-                    : ""
-                }`}
-                onClick={() => update({ role: roleCard.id === "Other" ? "" : roleCard.id })}
-              >
-                <span className={`material-symbols-outlined text-cat-${roleCard.color}`}>
-                  {roleCard.icon}
-                </span>
-                <span className="role-card-label">{roleCard.label}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-        {isCustomRole ? (
-          <TextField
-            label={t.customRole}
-            value={draft.role}
-            onChange={(value) => update({ role: value })}
-            placeholder={t.customRolePlaceholder}
-          />
-        ) : null}
         <SelectField
-          label={t.mainSkillLabel}
-          value={isCustomSkill ? "__custom__" : draft.mainSkill}
+          label={`${t.mainRole}${optionalHint}`}
+          value={facultyRoles.includes(draft.role) ? draft.role : ""}
+          onChange={(value) => update({ role: value })}
+          options={[
+            { label: t.language === "id" ? "Pilih peran" : "Select role", value: "" },
+            ...facultyRoles.map((role) => ({ label: localizeRoleLabel(role, t), value: role }))
+          ]}
+        />
+        <SelectField
+          label={`${t.mainSkillLabel}${optionalHint}`}
+          value={facultySkills.some((s) => s.name === draft.mainSkill) ? draft.mainSkill : ""}
           onChange={(value) =>
             setDraft((current) => ({
               ...current,
-              mainSkill: value === "__custom__" ? "" : value,
-              skills: value === "__custom__" ? current.skills : ensureSkillSelected(current.skills, value)
+              mainSkill: value,
+              skills: value ? ensureSkillSelected(current.skills, value) : current.skills
             }))
           }
           options={[
-            ...uniqueSkillOptions.map((skillName) => ({ label: skillName, value: skillName })),
-            { label: t.otherSkill, value: "__custom__" }
+            { label: t.language === "id" ? "Pilih skill utama" : "Select main skill", value: "" },
+            ...facultySkills.map((s) => ({ label: s.name, value: s.name }))
           ]}
         />
-        {isCustomSkill || draft.mainSkill === "" ? (
-          <TextField
-            label={t.customMainSkill}
-            value={draft.mainSkill}
-            onChange={(value) =>
-              setDraft((current) => ({
-                ...current,
-                mainSkill: value,
-                skills: value ? ensureSkillSelected(current.skills, value) : current.skills
-              }))
-            }
-            placeholder={t.customMainSkillPlaceholder}
-          />
-        ) : null}
         <MultiChipField
           label={t.collaborationType}
           values={draft.collaborationGoals}
@@ -5548,12 +6029,14 @@ function OnboardingStep({
   }
 
   if (step === 3) {
+    const facultyPool = facultyConfig[draft.program]?.skills;
     return (
       <div className="field-grid">
         <SkillChecklist
           selected={draft.skills}
           onChange={(skills) => update({ skills })}
           helper={t.skillHelper}
+          pool={facultyPool}
         />
       </div>
     );
@@ -5662,8 +6145,316 @@ function OnboardingStep({
   );
 }
 
+type ActivityComment = { id: string; authorId: string; authorName: string; text: string };
+type ActivityPost = {
+  id: string;
+  caption: string;
+  imageUrl: string | null;
+  createdAt: string;
+  likeCount: number;
+  likedByMe: boolean;
+  comments: ActivityComment[];
+};
+
+// #9 Activity feed — LinkedIn-style posts with image, likes and comments.
+// Data is loaded on mount (and after each create), satisfying the
+// "refresh on navigation rather than strict realtime" requirement.
+function ProfileActivity({ userId, authorProfile }: { userId?: string; authorProfile: CandidateProfile }) {
+  const t = useTranslations();
+  const { addToast } = useSymbio();
+  const id = t.language === "id";
+  const [posts, setPosts] = useState<ActivityPost[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [caption, setCaption] = useState("");
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string>("");
+  const [submitting, setSubmitting] = useState(false);
+  const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
+  const [openComments, setOpenComments] = useState<Record<string, boolean>>({});
+
+  const loadPosts = useCallback(async () => {
+    if (!userId) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    try {
+      const { data: postRows } = await supabase
+        .from("posts")
+        .select("id, caption, image_url, created_at")
+        .eq("author_id", userId)
+        .order("created_at", { ascending: false });
+
+      const ids = (postRows ?? []).map((p: any) => p.id);
+      let likesRows: any[] = [];
+      let commentRows: any[] = [];
+      if (ids.length) {
+        const [{ data: likes }, { data: comments }] = await Promise.all([
+          supabase.from("post_likes").select("post_id, user_id").in("post_id", ids),
+          supabase
+            .from("post_comments")
+            .select("id, post_id, author_id, text, created_at")
+            .in("post_id", ids)
+            .order("created_at", { ascending: true })
+        ]);
+        likesRows = likes ?? [];
+        commentRows = comments ?? [];
+      }
+
+      const mapped: ActivityPost[] = (postRows ?? []).map((p: any) => ({
+        id: p.id,
+        caption: p.caption ?? "",
+        imageUrl: p.image_url ?? null,
+        createdAt: new Date(p.created_at).toLocaleDateString(),
+        likeCount: likesRows.filter((l) => l.post_id === p.id).length,
+        likedByMe: likesRows.some((l) => l.post_id === p.id && l.user_id === userId),
+        comments: commentRows
+          .filter((c) => c.post_id === p.id)
+          .map((c) => ({
+            id: c.id,
+            authorId: c.author_id,
+            authorName:
+              c.author_id === userId
+                ? authorProfile.name || (id ? "Anda" : "You")
+                : candidateLookup.get(c.author_id)?.name || (id ? "Anggota" : "Member"),
+            text: c.text
+          }))
+      }));
+      setPosts(mapped);
+    } catch (err) {
+      console.warn("Could not load activity posts (did you run supabase_changes_v2.sql?):", err);
+    } finally {
+      setLoading(false);
+    }
+  }, [userId, authorProfile.name, id]);
+
+  useEffect(() => {
+    loadPosts();
+  }, [loadPosts]);
+
+  const pickImage = (file: File | null) => {
+    setImageFile(file);
+    setImagePreview(file ? URL.createObjectURL(file) : "");
+  };
+
+  const createPost = async () => {
+    if (!userId || (!caption.trim() && !imageFile)) return;
+    setSubmitting(true);
+    try {
+      let imageUrl: string | null = null;
+      if (imageFile) {
+        const path = `${userId}/${Date.now()}-${imageFile.name.replace(/[^a-zA-Z0-9.\-_]/g, "_")}`;
+        const { error: upErr } = await supabase.storage.from("post-images").upload(path, imageFile, {
+          cacheControl: "3600",
+          upsert: false
+        });
+        if (upErr) throw upErr;
+        const { data: pub } = supabase.storage.from("post-images").getPublicUrl(path);
+        imageUrl = pub.publicUrl;
+      }
+
+      const { error } = await supabase
+        .from("posts")
+        .insert({ author_id: userId, caption: caption.trim() || null, image_url: imageUrl });
+      if (error) throw error;
+
+      setCaption("");
+      pickImage(null);
+      await loadPosts();
+      addToast(
+        id ? "Postingan dibuat" : "Post published",
+        id ? "Aktivitas Anda telah diperbarui." : "Your activity has been updated.",
+        "success"
+      );
+    } catch (err: any) {
+      console.error("Error creating post:", err);
+      addToast(
+        id ? "Gagal membuat postingan" : "Could not publish post",
+        err?.message || (id ? "Silakan coba lagi." : "Please try again."),
+        "error"
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const toggleLike = async (post: ActivityPost) => {
+    if (!userId) return;
+    const liked = post.likedByMe;
+    setPosts((current) =>
+      current.map((p) =>
+        p.id === post.id
+          ? { ...p, likedByMe: !liked, likeCount: p.likeCount + (liked ? -1 : 1) }
+          : p
+      )
+    );
+    try {
+      if (liked) {
+        await supabase.from("post_likes").delete().eq("post_id", post.id).eq("user_id", userId);
+      } else {
+        await supabase.from("post_likes").upsert({ post_id: post.id, user_id: userId });
+      }
+    } catch (err) {
+      console.error("Error toggling like:", err);
+    }
+  };
+
+  const addComment = async (post: ActivityPost) => {
+    const text = (commentDrafts[post.id] || "").trim();
+    if (!userId || !text) return;
+    try {
+      const { data, error } = await supabase
+        .from("post_comments")
+        .insert({ post_id: post.id, author_id: userId, text })
+        .select("id")
+        .single();
+      if (error) throw error;
+      const newComment: ActivityComment = {
+        id: data?.id || `local-${Date.now()}`,
+        authorId: userId,
+        authorName: authorProfile.name || (id ? "Anda" : "You"),
+        text
+      };
+      setPosts((current) =>
+        current.map((p) => (p.id === post.id ? { ...p, comments: [...p.comments, newComment] } : p))
+      );
+      setCommentDrafts((current) => ({ ...current, [post.id]: "" }));
+    } catch (err) {
+      console.error("Error adding comment:", err);
+    }
+  };
+
+  const deletePost = async (postId: string) => {
+    setPosts((current) => current.filter((p) => p.id !== postId));
+    try {
+      await supabase.from("posts").delete().eq("id", postId);
+    } catch (err) {
+      console.error("Error deleting post:", err);
+    }
+  };
+
+  return (
+    <section className="profile-info-panel activity-panel">
+      <h2>{id ? "Aktivitas" : "Activity"}</h2>
+
+      <div className="activity-composer">
+        <Avatar profile={authorProfile} size="sm" />
+        <div className="activity-composer-body">
+          <textarea
+            value={caption}
+            onChange={(event) => setCaption(event.target.value)}
+            placeholder={id ? "Bagikan aktivitas atau pembaruan…" : "Share an activity or update…"}
+            rows={2}
+          />
+          {imagePreview ? (
+            <div className="activity-image-preview">
+              <img src={imagePreview} alt="preview" />
+              <button type="button" onClick={() => pickImage(null)} aria-label="Remove image">
+                <X size={14} />
+              </button>
+            </div>
+          ) : null}
+          <div className="activity-composer-actions">
+            <label className="activity-photo-btn">
+              <Upload size={16} aria-hidden="true" />
+              {id ? "Foto" : "Photo"}
+              <input
+                type="file"
+                accept="image/*"
+                hidden
+                onChange={(event) => pickImage(event.target.files?.[0] ?? null)}
+              />
+            </label>
+            <button
+              type="button"
+              className="button button-primary activity-post-btn"
+              disabled={submitting || (!caption.trim() && !imageFile)}
+              onClick={createPost}
+            >
+              {submitting ? "..." : id ? "Posting" : "Post"}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {loading ? (
+        <p className="muted-text">{id ? "Memuat aktivitas…" : "Loading activity…"}</p>
+      ) : posts.length === 0 ? (
+        <p className="muted-text">{id ? "Belum ada aktivitas. Buat postingan pertama Anda!" : "No activity yet. Create your first post!"}</p>
+      ) : (
+        <div className="activity-feed">
+          {posts.map((post) => (
+            <article className="activity-post" key={post.id}>
+              <header className="activity-post-head">
+                <Avatar profile={authorProfile} size="xs" />
+                <div>
+                  <strong>{authorProfile.name || (id ? "Anda" : "You")}</strong>
+                  <small>{post.createdAt}</small>
+                </div>
+                <button
+                  type="button"
+                  className="activity-delete-btn"
+                  aria-label={id ? "Hapus postingan" : "Delete post"}
+                  onClick={() => deletePost(post.id)}
+                >
+                  <Trash2 size={15} />
+                </button>
+              </header>
+              {post.caption ? <p className="activity-caption">{post.caption}</p> : null}
+              {post.imageUrl ? <img className="activity-post-image" src={post.imageUrl} alt="" /> : null}
+              <div className="activity-post-actions">
+                <button
+                  type="button"
+                  className={`activity-action ${post.likedByMe ? "liked" : ""}`}
+                  onClick={() => toggleLike(post)}
+                >
+                  <Heart size={16} aria-hidden="true" fill={post.likedByMe ? "currentColor" : "none"} />
+                  {post.likeCount > 0 ? post.likeCount : ""} {id ? "Suka" : "Like"}
+                </button>
+                <button
+                  type="button"
+                  className="activity-action"
+                  onClick={() => setOpenComments((c) => ({ ...c, [post.id]: !c[post.id] }))}
+                >
+                  <MessageCircle size={16} aria-hidden="true" />
+                  {post.comments.length > 0 ? post.comments.length : ""} {id ? "Komentar" : "Comment"}
+                </button>
+              </div>
+              {openComments[post.id] ? (
+                <div className="activity-comments">
+                  {post.comments.map((comment) => (
+                    <div className="activity-comment" key={comment.id}>
+                      <strong>{comment.authorName}</strong>
+                      <span>{comment.text}</span>
+                    </div>
+                  ))}
+                  <div className="activity-comment-input">
+                    <input
+                      value={commentDrafts[post.id] || ""}
+                      onChange={(event) =>
+                        setCommentDrafts((current) => ({ ...current, [post.id]: event.target.value }))
+                      }
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") addComment(post);
+                      }}
+                      placeholder={id ? "Tulis komentar…" : "Write a comment…"}
+                    />
+                    <button type="button" onClick={() => addComment(post)} aria-label={id ? "Kirim" : "Send"}>
+                      <Send size={15} />
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+            </article>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
 function ProfilePage() {
-  const { profile, setProfile, matches, savedIds, language, setLanguage } = useSymbio();
+  const { profile, setProfile, matches, savedIds, language, setLanguage, user } = useSymbio();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [qrOpen, setQrOpen] = useState(false);
   const [logoutOpen, setLogoutOpen] = useState(false);
@@ -5673,7 +6464,7 @@ function ProfilePage() {
     <div className="profile-phone page-stack page-transition">
       <section className="profile-header-bar" aria-label="Profile actions">
         <Avatar profile={profile} size="xs" />
-        <strong>{profile.name}</strong>
+        <strong>{profile.name || t.yourName}</strong>
         <CheckCircle size={16} aria-label={t.verified} />
         <span className="profile-bar-spacer" />
         <button aria-label="Open profile QR code" onClick={() => setQrOpen(true)}>
@@ -5766,6 +6557,8 @@ function ProfilePage() {
           </div>
         </section>
       </div>
+
+      <ProfileActivity userId={user?.id} authorProfile={profile} />
 
       {false && settingsOpen ? (
         <div className="overlay" role="presentation" onClick={() => setSettingsOpen(false)}>
@@ -6326,15 +7119,28 @@ function ChatWindow({
   candidate: CandidateProfile;
   embedded?: boolean;
 }) {
-  const { chats, sendMessage, setChats, setMatches, addToast, interestedIds, user, actOnCandidate, language } = useSymbio();
+  const {
+    chats, sendMessage, setChats, setMatches, addToast, interestedIds, user, actOnCandidate, language,
+    removeMatch, clearChatHistory, leaveGroup, deleteGroup, removeGroupMember, addGroupMembers, setGroupAdmin, matches
+  } = useSymbio();
   const t = useTranslations();
+  const navigate = useNavigate();
+  const id = language === "id";
   const [message, setMessage] = useState("");
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
   const [editingId, setEditingId] = useState("");
   const [showProfile, setShowProfile] = useState(false);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
+  const [chatMenuOpen, setChatMenuOpen] = useState(false);
+  const [manageOpen, setManageOpen] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
   const messages = chats[match.id] ?? [];
+  const isOwner = match.isGroup && match.ownerId === user?.id;
+  const isAdmin = isOwner || (match.isGroup && (match.adminIds ?? []).includes(user?.id ?? ""));
+
+  const afterRemoveNavigate = () => {
+    if (!embedded) navigate("/matches");
+  };
 
   const scrollToBottom = () => {
     if (listRef.current) {
@@ -6445,6 +7251,55 @@ function ChatWindow({
           {!match.isGroup ? (
             <button className="button button-secondary" style={{ marginLeft: 'auto' }} onClick={() => setShowProfile(true)}>{t.viewProfile}</button>
           ) : null}
+          <div className="chat-header-menu" style={match.isGroup ? { marginLeft: 'auto' } : undefined}>
+            <button
+              type="button"
+              className="chat-menu-trigger"
+              aria-label={id ? "Opsi chat" : "Chat options"}
+              aria-expanded={chatMenuOpen}
+              onClick={() => setChatMenuOpen((open) => !open)}
+            >
+              <MoreVertical size={18} aria-hidden="true" />
+            </button>
+            {chatMenuOpen ? (
+              <>
+                <div className="chat-menu-backdrop" onClick={() => setChatMenuOpen(false)} />
+                <div className="chat-menu-panel" role="menu">
+                  <button type="button" onClick={() => { clearChatHistory(match.id); setChatMenuOpen(false); }}>
+                    <Trash2 size={15} aria-hidden="true" />
+                    {id ? "Bersihkan riwayat" : "Clear history"}
+                  </button>
+                  {match.isGroup ? (
+                    <>
+                      {isAdmin ? (
+                        <button type="button" onClick={() => { setManageOpen(true); setChatMenuOpen(false); }}>
+                          <Users size={15} aria-hidden="true" />
+                          {id ? "Kelola anggota" : "Manage members"}
+                        </button>
+                      ) : null}
+                      {!isOwner ? (
+                        <button type="button" onClick={() => { leaveGroup(match.id); setChatMenuOpen(false); afterRemoveNavigate(); }}>
+                          <LogOut size={15} aria-hidden="true" />
+                          {id ? "Keluar dari grup" : "Leave group"}
+                        </button>
+                      ) : null}
+                      {isOwner ? (
+                        <button type="button" className="danger" onClick={() => { deleteGroup(match.id); setChatMenuOpen(false); afterRemoveNavigate(); }}>
+                          <X size={15} aria-hidden="true" />
+                          {id ? "Hapus grup" : "Delete group"}
+                        </button>
+                      ) : null}
+                    </>
+                  ) : (
+                    <button type="button" className="danger" onClick={() => { removeMatch(match.id); setChatMenuOpen(false); afterRemoveNavigate(); }}>
+                      <X size={15} aria-hidden="true" />
+                      {id ? "Hapus chat" : "Delete chat"}
+                    </button>
+                  )}
+                </div>
+              </>
+            ) : null}
+          </div>
         </header>
 
         {!isFollowed && (
@@ -6569,7 +7424,135 @@ function ChatWindow({
           </div>
         </div>
       ) : null}
+
+      {manageOpen && match.isGroup ? (
+        <GroupManageModal
+          match={match}
+          candidateMatches={matches}
+          isOwner={!!isOwner}
+          currentUserId={user?.id}
+          onClose={() => setManageOpen(false)}
+          onAdd={(ids) => addGroupMembers(match.id, ids)}
+          onRemove={(memberId) => removeGroupMember(match.id, memberId)}
+          onToggleAdmin={(memberId, makeAdmin) => setGroupAdmin(match.id, memberId, makeAdmin)}
+        />
+      ) : null}
     </section>
+  );
+}
+
+function GroupManageModal({
+  match,
+  candidateMatches,
+  isOwner,
+  currentUserId,
+  onClose,
+  onAdd,
+  onRemove,
+  onToggleAdmin
+}: {
+  match: MatchRecord;
+  candidateMatches: MatchRecord[];
+  isOwner: boolean;
+  currentUserId?: string;
+  onClose: () => void;
+  onAdd: (ids: string[]) => void;
+  onRemove: (memberId: string) => void;
+  onToggleAdmin: (memberId: string, makeAdmin: boolean) => void;
+}) {
+  const t = useTranslations();
+  const id = t.language === "id";
+  const memberIds = match.memberIds ?? [];
+  const adminIds = match.adminIds ?? [];
+  const [selected, setSelected] = useState<string[]>([]);
+
+  // Candidates that can be added: direct matches not already in the group.
+  const addable = candidateMatches
+    .filter((m) => !m.isGroup)
+    .map((m) => getCandidate(m.candidateId))
+    .filter((c): c is CandidateProfile => Boolean(c) && !memberIds.includes(c!.id));
+
+  return (
+    <div className="overlay confirm-overlay" role="presentation" onClick={onClose}>
+      <section className="confirm-modal group-modal group-manage-modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
+        <h2>{match.title || (id ? "Kelola grup" : "Manage group")}</h2>
+
+        <p className="group-manage-section-label">{id ? "Anggota" : "Members"}</p>
+        <div className="group-member-list">
+          {memberIds.map((memberId) => {
+            const member = getCandidate(memberId);
+            const isGroupOwner = memberId === match.ownerId;
+            const memberIsAdmin = adminIds.includes(memberId) || isGroupOwner;
+            const name = member?.name || (memberId === currentUserId ? (id ? "Anda" : "You") : "Member");
+            return (
+              <div key={memberId} className="group-manage-row">
+                {member ? <Avatar profile={member} size="xs" /> : <span className="group-avatar"><Users size={16} /></span>}
+                <span className="group-manage-name">
+                  {name}
+                  {isGroupOwner ? <em>{id ? " · pemilik" : " · owner"}</em> : memberIsAdmin ? <em>{id ? " · admin" : " · admin"}</em> : null}
+                </span>
+                {isOwner && !isGroupOwner ? (
+                  <div className="group-manage-actions">
+                    <button type="button" onClick={() => onToggleAdmin(memberId, !memberIsAdmin)}>
+                      {memberIsAdmin ? (id ? "Cabut admin" : "Unadmin") : (id ? "Jadikan admin" : "Make admin")}
+                    </button>
+                    <button type="button" className="danger" onClick={() => onRemove(memberId)}>
+                      {id ? "Keluarkan" : "Remove"}
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
+
+        {addable.length ? (
+          <>
+            <p className="group-manage-section-label">{id ? "Tambah anggota" : "Add members"}</p>
+            <div className="group-member-list">
+              {addable.map((candidate) => (
+                <label key={candidate.id} className={selected.includes(candidate.id) ? "selected" : ""}>
+                  <input
+                    type="checkbox"
+                    checked={selected.includes(candidate.id)}
+                    onChange={() =>
+                      setSelected((current) =>
+                        current.includes(candidate.id)
+                          ? current.filter((cid) => cid !== candidate.id)
+                          : [...current, candidate.id]
+                      )
+                    }
+                  />
+                  <Avatar profile={candidate} size="xs" />
+                  <span>
+                    <strong>{candidate.name}</strong>
+                    <small>{candidate.mainSkill}</small>
+                  </span>
+                </label>
+              ))}
+            </div>
+          </>
+        ) : null}
+
+        <div className="modal-actions">
+          <button type="button" className="button button-secondary" onClick={onClose}>
+            {t.cancel}
+          </button>
+          <button
+            type="button"
+            className="button button-primary"
+            disabled={selected.length === 0}
+            onClick={() => {
+              onAdd(selected);
+              setSelected([]);
+              onClose();
+            }}
+          >
+            {id ? "Tambah terpilih" : "Add selected"}
+          </button>
+        </div>
+      </section>
+    </div>
   );
 }
 
@@ -6661,13 +7644,19 @@ function CandidateCard({
 
       {/* Card Header Image Area */}
       <div className="card-cover">
-        <img
-          className="card-cover-image"
-          src={profile.avatarUrl || "/profile-cover-rizky.jpg"}
-          alt={profile.name}
-          style={{ objectPosition: profile.avatarPosition || "center 43%" }}
-          draggable={false}
-        />
+        {profile.avatarUrl ? (
+          <img
+            className="card-cover-image"
+            src={profile.avatarUrl}
+            alt={profile.name}
+            style={{ objectPosition: profile.avatarPosition || "center 43%" }}
+            draggable={false}
+          />
+        ) : (
+          <div className="card-cover-placeholder" aria-hidden="true">
+            <span>{getInitials(profile.name) || "?"}</span>
+          </div>
+        )}
         <div className="cover-badge-wrap">
           <AvailabilityBadge availability={profile.availability} label={profile.statusLabel} />
         </div>
@@ -6851,25 +7840,31 @@ export function CandidateDetailSheet({
     actOnCandidate(profile, "interest");
   };
 
+  const { addToast } = useSymbio();
   const handleChat = () => {
-    let existingMatch = matches.find((m) => m.candidateId === profile.id);
-    if (!existingMatch) {
-      existingMatch = createMatchFor(profile);
-      setMatches((prev) => [existingMatch!, ...prev]);
-      setChats((prev) => ({
-        ...prev,
-        [existingMatch!.id]: [
-          {
-            id: `sheet-init-${profile.id}`,
-            sender: "them",
-            text: language === "id" ? `Halo! Saya ${profile.name}. Senang bertemu dengan Anda. Mari kita mulai kolaborasi.` : `Hi there! I'm ${profile.name}. Nice to meet you. Let's start collaborating.`,
-            timestamp: "Just now"
-          }
-        ]
-      }));
+    // A real (mutual / approved) match comes from the DB matches table and has a
+    // UUID id. If one exists, open the conversation directly.
+    const existingMatch = matches.find(
+      (m) => !m.isGroup && m.candidateId === profile.id && !m.id.startsWith("match-") && !m.id.startsWith("local")
+    );
+    if (existingMatch) {
+      onClose();
+      navigate(`/chat/${existingMatch.id}`);
+      return;
     }
-    onClose(); // Close sheet
-    navigate(`/chat/${existingMatch.id}`);
+
+    // #17: Otherwise a conversation requires the other person's approval.
+    // Sending interest creates a chat request notification on their side; the
+    // chat only opens once they approve (which forms the mutual match).
+    actOnCandidate(profile, "interest");
+    addToast(
+      language === "id" ? "Permintaan chat terkirim" : "Chat request sent",
+      language === "id"
+        ? `${profile.name} harus menyetujui sebelum percakapan dimulai.`
+        : `${profile.name} needs to approve before the conversation can start.`,
+      "info"
+    );
+    onClose();
   };
 
   useEffect(() => {
@@ -8085,15 +9080,17 @@ function MultiChipField({
 function SkillChecklist({
   selected,
   onChange,
-  helper
+  helper,
+  pool
 }: {
   selected: Skill[];
   onChange: (skills: Skill[]) => void;
   helper?: string;
+  pool?: Skill[];
 }) {
   const t = useTranslations();
   const selectedNames = selected.map((skillItem) => skillItem.name);
-  const grouped = groupSkills(allSkills);
+  const grouped = groupSkills(pool && pool.length ? pool : allSkills);
   const [customSkill, setCustomSkill] = useState("");
 
   const toggle = (skillItem: Skill) => {
@@ -8926,14 +9923,7 @@ function validateOnboardingStep(step: number, draft: CandidateProfile, t: Transl
       errors.push(t.programRequired);
     }
   }
-  if (step === 2) {
-    if (!draft.role) {
-      errors.push(t.mainRoleRequired);
-    }
-    if (!draft.mainSkill) {
-      errors.push(t.mainSkillRequired);
-    }
-  }
+  // Step 2 (role & main skill) is now fully optional — no validation here.
   if (step === 4) {
     if ((draft.profileSummary || "").length > 180) {
       errors.push(t.profileSummaryLimit);
@@ -8956,7 +9946,7 @@ function validateOnboardingStep(step: number, draft: CandidateProfile, t: Transl
 }
 
 function isOnboardingStepOptional(step: number) {
-  return [3, 4, 5, 6, 7, 9].includes(step);
+  return [2, 3, 4, 5, 6, 7, 9].includes(step);
 }
 
 function validateProfile(profile: CandidateProfile) {

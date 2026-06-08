@@ -39,6 +39,117 @@ export const roleOptions = [
   "Pitch Deck Writer"
 ];
 
+// Telkom University faculties. Selecting one cascades the relevant role and
+// skill options in onboarding so the form stays short and relevant.
+export const facultyOptions = [
+  "Fakultas Teknik Elektro",
+  "Fakultas Rekayasa Industri",
+  "Fakultas Informatika",
+  "Fakultas Industri Kreatif",
+  "Fakultas Ekonomi dan Bisnis",
+  "Fakultas Komunikasi dan Ilmu Sosial",
+  "Fakultas Ilmu Terapan"
+];
+
+export const facultyConfig: Record<string, { roles: string[]; skills: Skill[] }> = {
+  "Fakultas Teknik Elektro": {
+    roles: ["Hardware Engineer", "IoT Builder", "Embedded Systems Engineer", "Robotics Engineer", "Telecommunication Engineer"],
+    skills: [
+      skill("Embedded Systems", "Hardware/IoT", "Advanced"),
+      skill("IoT Prototyping", "Hardware/IoT", "Project-ready"),
+      skill("Arduino", "Hardware/IoT", "Advanced"),
+      skill("Sensor Integration", "Hardware/IoT", "Advanced"),
+      skill("PCB Design", "Hardware/IoT", "Intermediate"),
+      skill("Microcontroller", "Hardware/IoT", "Advanced"),
+      skill("Signal Processing", "Hardware/IoT", "Intermediate"),
+      skill("MATLAB", "Data", "Intermediate"),
+      skill("C/C++", "Development", "Advanced")
+    ]
+  },
+  "Fakultas Rekayasa Industri": {
+    roles: ["Industrial Engineer", "Supply Chain Analyst", "Project Manager", "Business Analyst", "Operations Specialist"],
+    skills: [
+      skill("Supply Chain", "Business", "Advanced"),
+      skill("Lean Manufacturing", "Business", "Intermediate"),
+      skill("Six Sigma", "Business", "Intermediate"),
+      skill("Project Management", "Business", "Advanced"),
+      skill("Data Analysis", "Data", "Advanced"),
+      skill("ERP Systems", "Business", "Intermediate"),
+      skill("Logistics", "Business", "Intermediate"),
+      skill("Quality Control", "Business", "Intermediate"),
+      skill("Storyboarding", "Content", "Intermediate")
+    ]
+  },
+  "Fakultas Informatika": {
+    roles: ["Frontend Developer", "Backend Developer", "Fullstack Developer", "Mobile Developer", "Data Analyst", "AI/ML Engineer", "DevOps Engineer"],
+    skills: [
+      skill("React", "Development", "Project-ready"),
+      skill("TypeScript", "Development", "Advanced"),
+      skill("Node.js", "Development", "Advanced"),
+      skill("Laravel", "Development", "Advanced"),
+      skill("Python", "Data", "Advanced"),
+      skill("Machine Learning", "Data", "Advanced"),
+      skill("MySQL", "Development", "Advanced"),
+      skill("Docker", "Development", "Intermediate"),
+      skill("REST API", "Development", "Advanced"),
+      skill("Tailwind CSS", "Development", "Project-ready")
+    ]
+  },
+  "Fakultas Industri Kreatif": {
+    roles: ["UI/UX Designer", "Graphic Designer", "Video Editor", "Animator", "Content Creator", "Illustrator", "Product Designer"],
+    skills: [
+      skill("Figma", "Design", "Project-ready"),
+      skill("Video Editing", "Content", "Project-ready"),
+      skill("Storyboarding", "Content", "Advanced"),
+      skill("Motion Graphics", "Content", "Intermediate"),
+      skill("Illustration", "Design", "Advanced"),
+      skill("Photoshop", "Design", "Advanced"),
+      skill("3D Modeling", "Design", "Intermediate"),
+      skill("Branding", "Design", "Intermediate"),
+      skill("Prototyping", "Design", "Advanced")
+    ]
+  },
+  "Fakultas Ekonomi dan Bisnis": {
+    roles: ["Business Strategist", "Financial Analyst", "Marketing Specialist", "Accountant", "Entrepreneur", "Product Manager"],
+    skills: [
+      skill("Financial Analysis", "Business", "Advanced"),
+      skill("Market Research", "Research", "Advanced"),
+      skill("Business Model", "Business", "Project-ready"),
+      skill("Digital Marketing", "Business", "Advanced"),
+      skill("Accounting", "Business", "Intermediate"),
+      skill("Pitch Deck", "Business", "Project-ready"),
+      skill("Sales Strategy", "Business", "Intermediate"),
+      skill("Excel Modeling", "Data", "Advanced")
+    ]
+  },
+  "Fakultas Komunikasi dan Ilmu Sosial": {
+    roles: ["Public Relations", "Content Strategist", "Social Media Manager", "Journalist", "Copywriter", "Event Organizer"],
+    skills: [
+      skill("Copywriting", "Content", "Advanced"),
+      skill("Public Speaking", "Communication", "Advanced"),
+      skill("Social Media", "Content", "Advanced"),
+      skill("Content Strategy", "Content", "Advanced"),
+      skill("Journalism", "Content", "Intermediate"),
+      skill("Public Relations", "Communication", "Advanced"),
+      skill("Campaign Planning", "Business", "Intermediate"),
+      skill("Photography", "Content", "Intermediate")
+    ]
+  },
+  "Fakultas Ilmu Terapan": {
+    roles: ["Web Developer", "Network Engineer", "Multimedia Specialist", "Database Administrator", "IT Support"],
+    skills: [
+      skill("Web Development", "Development", "Advanced"),
+      skill("Networking", "Development", "Intermediate"),
+      skill("Database", "Development", "Advanced"),
+      skill("Multimedia", "Content", "Intermediate"),
+      skill("System Administration", "Development", "Intermediate"),
+      skill("HTML/CSS", "Development", "Project-ready"),
+      skill("PHP", "Development", "Advanced"),
+      skill("Video Editing", "Content", "Intermediate")
+    ]
+  }
+};
+
 export const collaborationGoalOptions = [
   "Competition team",
   "Startup prototype",

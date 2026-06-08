@@ -15,7 +15,7 @@ import {
 } from "../App";
 
 export default function MatchesPage() {
-  const { matches, removeMatch, addToast, createGroupChat, fetchDiscoverAndMatches, user, interestedIds, incomingInterests } = useSymbio();
+  const { matches, removeMatch, createGroupChat, fetchDiscoverAndMatches, user, interestedIds, incomingInterests, reportUser, blockUser } = useSymbio();
   const t = useTranslations();
   const navigate = useNavigate();
   const [openMenuId, setOpenMenuId] = useState("");
@@ -24,6 +24,7 @@ export default function MatchesPage() {
   const [groupTitle, setGroupTitle] = useState("");
   const [groupMemberIds, setGroupMemberIds] = useState<string[]>([]);
   const [groupError, setGroupError] = useState("");
+  const [reportTarget, setReportTarget] = useState<CandidateProfile | null>(null);
 
   useEffect(() => {
     if (user?.id) {
@@ -65,7 +66,6 @@ export default function MatchesPage() {
 
   const selected = approvedMatches.find((match) => match.id === selectedId) ?? approvedMatches[0];
   const directMatches = approvedMatches.filter((match) => !match.isGroup && getCandidate(match.candidateId));
-  const showPrototypeActionToast = (title: string, body: string) => addToast(title, body);
 
   const toggleGroupMember = (candidateId: string) => {
     setGroupError("");
@@ -182,28 +182,33 @@ export default function MatchesPage() {
                     ) : null}
                     <button type="button" onClick={() => { removeMatch(match.id); setOpenMenuId(""); }}>
                       <Trash2 size={15} aria-hidden="true" />
-                      {t.removeMatch}
+                      {t.unfollow}
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        showPrototypeActionToast(t.reportQueuedTitle, t.reportQueuedBody);
-                        setOpenMenuId("");
-                      }}
-                    >
-                      <Flag size={15} aria-hidden="true" />
-                      {t.reportUser}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        showPrototypeActionToast(t.blockQueuedTitle, t.blockQueuedBody);
-                        setOpenMenuId("");
-                      }}
-                    >
-                      <X size={15} aria-hidden="true" />
-                      {t.blockUser}
-                    </button>
+                    {candidate ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setReportTarget(candidate);
+                          setOpenMenuId("");
+                        }}
+                      >
+                        <Flag size={15} aria-hidden="true" />
+                        {t.reportUser}
+                      </button>
+                    ) : null}
+                    {candidate ? (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          setOpenMenuId("");
+                          await blockUser(candidate.id);
+                          if (user?.id) fetchDiscoverAndMatches(user.id);
+                        }}
+                      >
+                        <X size={15} aria-hidden="true" />
+                        {t.blockUser}
+                      </button>
+                    ) : null}
                   </div>
                 ) : null}
               </article>
@@ -258,6 +263,80 @@ export default function MatchesPage() {
       {detailProfile ? (
         <CandidateDetailSheet profile={detailProfile} onClose={() => setDetailProfile(null)} />
       ) : null}
+      {reportTarget ? (
+        <ReportModal
+          target={reportTarget}
+          onClose={() => setReportTarget(null)}
+          onSubmit={async (reason, details) => {
+            await reportUser(reportTarget.id, reason, details);
+            setReportTarget(null);
+          }}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function ReportModal({
+  target,
+  onClose,
+  onSubmit
+}: {
+  target: CandidateProfile;
+  onClose: () => void;
+  onSubmit: (reason: string, details: string) => void | Promise<void>;
+}) {
+  const t = useTranslations();
+  const reasons = [
+    t.reportReasonSpam,
+    t.reportReasonHarassment,
+    t.reportReasonInappropriate,
+    t.reportReasonImpersonation,
+    t.reportReasonOther
+  ];
+  const [reason, setReason] = useState(reasons[0]);
+  const [details, setDetails] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  return (
+    <div className="overlay confirm-overlay" role="presentation" onClick={onClose}>
+      <section className="confirm-modal report-modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
+        <h2>{t.reportModalTitle}</h2>
+        <p style={{ color: "var(--muted)", marginTop: 0 }}>{target.name}</p>
+        <label className="field">
+          <span>{t.reportReasonLabel}</span>
+          <select value={reason} onChange={(event) => setReason(event.target.value)}>
+            {reasons.map((option) => (
+              <option key={option} value={option}>{option}</option>
+            ))}
+          </select>
+        </label>
+        <label className="field">
+          <span>{t.reportDetailsLabel}</span>
+          <textarea
+            rows={4}
+            value={details}
+            onChange={(event) => setDetails(event.target.value)}
+            placeholder={t.reportDetailsPlaceholder}
+          />
+        </label>
+        <div className="modal-actions">
+          <button type="button" className="button button-secondary" onClick={onClose} disabled={submitting}>
+            {t.cancel}
+          </button>
+          <button
+            type="button"
+            className="button button-primary"
+            disabled={submitting}
+            onClick={async () => {
+              setSubmitting(true);
+              await onSubmit(reason, details);
+            }}
+          >
+            {t.reportSubmit}
+          </button>
+        </div>
+      </section>
     </div>
   );
 }

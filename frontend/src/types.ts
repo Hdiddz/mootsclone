@@ -71,6 +71,8 @@ export interface MatchRecord {
   isGroup?: boolean;
   title?: string;
   memberIds?: string[];
+  ownerId?: string;
+  adminIds?: string[];
 }
 
 export interface ChatMessage {
@@ -79,6 +81,7 @@ export interface ChatMessage {
   text: string;
   timestamp: string;
   senderName?: string;
+  createdAtMs?: number;
 }
 
 export interface NotificationItem {

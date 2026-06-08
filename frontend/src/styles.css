@@ -384,6 +384,44 @@ body::-webkit-scrollbar {
   display: none !important;
 }
 
+/* #13 Responsive safety net — keep media, long words, and headings from
+   overflowing or overlapping on small screens. */
+img,
+video,
+canvas,
+svg {
+  max-width: 100%;
+}
+
+input,
+textarea,
+select,
+button {
+  max-width: 100%;
+}
+
+.page-stack,
+.page-transition {
+  min-width: 0;
+}
+
+@media (max-width: 480px) {
+  /* Prevent unbreakable strings (emails, URLs, names) from pushing layout. */
+  .candidate-identity-row h2,
+  .match-row strong,
+  .chat-window-name,
+  .profile-card-summary h2,
+  .detail-sheet h2 {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  /* Tame oversized display headings on phones. */
+  h1 {
+    font-size: clamp(1.5rem, 7vw, 2rem);
+  }
+}
+
 #root {
   min-height: 100%;
   overflow-x: clip;
@@ -1772,6 +1810,37 @@ img.avatar {
   background: var(--surface);
 }
 
+.onboarding-top-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.onboarding-skip-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 7px 14px;
+  background: var(--surface-muted, transparent);
+  color: var(--muted);
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
+}
+
+.onboarding-skip-link:hover {
+  color: var(--ink);
+  border-color: var(--ink);
+}
+
+.onboarding-skip-link:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 .onboarding-grid {
   display: grid;
   width: min(1180px, calc(100% - 40px));
@@ -2772,15 +2841,16 @@ img.avatar {
 
 .toast-stack {
   position: fixed;
-  top: 24px !important;
-  right: auto !important;
+  /* Anchored below the header and to the right so it never covers the logo. */
+  top: 74px !important;
+  right: 16px !important;
   bottom: auto !important;
-  left: 50% !important;
-  transform: translateX(-50%) !important;
+  left: auto !important;
+  transform: none !important;
   z-index: 500;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-end;
   width: max-content !important;
   max-width: calc(100vw - 32px) !important;
   gap: 8px;
@@ -3243,10 +3313,13 @@ img.avatar {
   }
 
   .toast-stack {
-    top: 12px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: calc(100% - 24px);
+    top: 68px !important;
+    right: 12px !important;
+    left: 12px !important;
+    transform: none !important;
+    width: auto !important;
+    max-width: none !important;
+    align-items: stretch;
   }
 }
 
@@ -4548,6 +4621,452 @@ img.avatar {
   background: var(--primary-soft);
 }
 
+/* #16 Chat header menu + group management */
+.chat-header-menu {
+  position: relative;
+}
+
+.chat-menu-trigger {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.chat-menu-trigger:hover {
+  background: var(--surface-muted, rgba(0, 0, 0, 0.04));
+}
+
+.chat-menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+}
+
+.chat-menu-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  min-width: 200px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 6px;
+  background: var(--surface);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.18);
+  animation: modalPop 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.chat-menu-panel button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.chat-menu-panel button:hover {
+  background: var(--surface-muted, rgba(0, 0, 0, 0.05));
+}
+
+.chat-menu-panel button.danger {
+  color: var(--danger);
+}
+
+.group-manage-section-label {
+  margin: 14px 0 6px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.group-manage-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 4px;
+  border-bottom: 1px solid var(--border);
+}
+
+.group-manage-name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+}
+
+.group-manage-name em {
+  color: var(--muted);
+  font-weight: 500;
+  font-style: normal;
+  font-size: 0.82rem;
+}
+
+.group-manage-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.group-manage-actions button {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px 10px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 0.76rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.group-manage-actions button.danger {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 30%, transparent);
+}
+
+/* #9 Activity feed */
+.activity-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.activity-composer {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.activity-composer-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.activity-composer-body textarea {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  resize: vertical;
+}
+
+.activity-composer-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.activity-photo-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 7px 14px;
+  color: var(--muted);
+  font-weight: 700;
+  font-size: 0.84rem;
+  cursor: pointer;
+}
+
+.activity-photo-btn:hover {
+  color: var(--ink);
+  border-color: var(--ink);
+}
+
+.activity-post-btn {
+  padding: 8px 20px;
+}
+
+.activity-image-preview {
+  position: relative;
+  align-self: flex-start;
+  max-width: 220px;
+}
+
+.activity-image-preview img {
+  width: 100%;
+  border-radius: 12px;
+  display: block;
+}
+
+.activity-image-preview button {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  cursor: pointer;
+}
+
+.activity-feed {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.activity-post {
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 14px;
+  background: var(--surface);
+}
+
+.activity-post-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.activity-post-head div {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.activity-post-head strong {
+  font-size: 0.92rem;
+}
+
+.activity-post-head small {
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.activity-delete-btn {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 8px;
+}
+
+.activity-delete-btn:hover {
+  color: var(--danger);
+}
+
+.activity-caption {
+  margin: 10px 0;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.activity-post-image {
+  width: 100%;
+  border-radius: 12px;
+  margin: 6px 0 10px;
+  display: block;
+}
+
+.activity-post-actions {
+  display: flex;
+  gap: 8px;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+
+.activity-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 0.84rem;
+  cursor: pointer;
+  padding: 6px 10px;
+  border-radius: 8px;
+}
+
+.activity-action:hover {
+  background: var(--surface-muted, transparent);
+  color: var(--ink);
+}
+
+.activity-action.liked {
+  color: var(--danger, #e0245e);
+}
+
+.activity-comments {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.activity-comment {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--surface-muted, rgba(0, 0, 0, 0.03));
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+
+.activity-comment strong {
+  font-size: 0.82rem;
+}
+
+.activity-comment span {
+  font-size: 0.88rem;
+  overflow-wrap: anywhere;
+}
+
+.activity-comment-input {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.activity-comment-input input {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 8px 14px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+}
+
+.activity-comment-input button {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--primary, #765a00);
+  color: #fff;
+  cursor: pointer;
+}
+
+/* #14 Settings — section headers for a clearer, more modern layout. */
+.settings-section-title {
+  margin-top: 4px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+  color: var(--ink);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.settings-section-title.settings-section-danger {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 30%, transparent);
+}
+
+/* #18 Blocked users list */
+.settings-blocked-desc {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.blocked-user-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.blocked-user-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: var(--surface-muted, transparent);
+}
+
+.blocked-user-name {
+  flex: 1;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.blocked-unblock-btn {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 6px 14px;
+  background: transparent;
+  color: var(--primary-strong, var(--ink));
+  font-weight: 700;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: background 150ms ease, border-color 150ms ease;
+}
+
+.blocked-unblock-btn:hover {
+  border-color: var(--ink);
+  background: var(--primary-soft, transparent);
+}
+
+/* #18 Report modal */
+.report-modal {
+  width: min(440px, calc(100vw - 32px));
+  text-align: left;
+}
+
+.report-modal .field {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.report-modal .field span {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.report-modal select,
+.report-modal textarea {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  resize: vertical;
+}
+
 .settings-note p {
   margin: 6px 0 0;
   color: var(--on-surface-variant);
@@ -4769,12 +5288,38 @@ img.avatar {
 
 .card-cover::after {
   border-radius: 22px;
+  /* Smoother, more gradual fade so the photo stays visible higher up. */
   background:
-    linear-gradient(180deg, rgba(0, 0, 0, 0.04) 0%, transparent 36%, rgba(0, 0, 0, 0.28) 58%, rgba(0, 0, 0, 0.92) 100%) !important;
+    linear-gradient(
+      180deg,
+      rgba(0, 0, 0, 0) 0%,
+      rgba(0, 0, 0, 0.04) 42%,
+      rgba(0, 0, 0, 0.18) 60%,
+      rgba(0, 0, 0, 0.45) 76%,
+      rgba(0, 0, 0, 0.82) 100%
+    ) !important;
 }
 
 .cover-badge-wrap {
   z-index: 2;
+}
+
+/* Neutral placeholder shown when a user has not set a profile photo, so the
+   name/role text never floats over an unrelated stock face. */
+.card-cover-placeholder {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(150deg, var(--accent, #6366f1) 0%, rgba(17, 17, 17, 0.92) 90%);
+}
+
+.card-cover-placeholder span {
+  font-size: clamp(3rem, 14vw, 5.5rem);
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.92);
+  letter-spacing: 0.04em;
+  text-shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
 }
 
 .candidate-body {
@@ -4784,16 +5329,24 @@ img.avatar {
   left: 0 !important;
   z-index: 3 !important;
   display: grid !important;
-  gap: 10px !important;
-  max-height: 64% !important;
+  gap: 8px !important;
+  max-height: 50% !important;
   overflow: hidden !important;
-  padding: 96px 20px 92px !important;
+  padding: 60px 20px 22px !important;
   color: #ffffff !important;
-  background: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.58) 20%, rgba(0, 0, 0, 0.94) 100%) !important;
+  /* Lighter, smoother scrim so the person's photo isn't buried by the info. */
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(0, 0, 0, 0.12) 30%,
+    rgba(0, 0, 0, 0.5) 62%,
+    rgba(0, 0, 0, 0.88) 100%
+  ) !important;
 }
 
 .candidate-body.expanded {
-  max-height: 86% !important;
+  max-height: 82% !important;
+  padding-top: 90px !important;
   overflow-y: auto !important;
 }
 
@@ -5219,8 +5772,9 @@ img.avatar {
   }
 
   .candidate-body {
-    padding: 44px 16px 86px !important;
-    gap: 8px !important;
+    padding: 36px 16px 84px !important;
+    gap: 7px !important;
+    max-height: 46% !important;
   }
 
   .candidate-body.expanded {
@@ -6597,8 +7151,63 @@ img.avatar {
 .project-detail-modal,
 .detail-sheet,
 .settings-drawer,
-.notification-detail-modal {
+.notification-detail-modal,
+.match-modal,
+.signup-suggestion-modal {
   animation: modalPop 230ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.bottom-sheet {
+  animation: sheetSlideUp 280ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes sheetSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(36px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Smooth theme (dark/light) crossfade — enabled only while switching. */
+:root.theme-anim,
+:root.theme-anim body,
+:root.theme-anim .app-shell,
+:root.theme-anim .top-bar,
+:root.theme-anim .side-nav,
+:root.theme-anim .surface-card,
+:root.theme-anim .candidate-card,
+:root.theme-anim .modal-sheet,
+:root.theme-anim .settings-drawer,
+:root.theme-anim .panel,
+:root.theme-anim .card,
+:root.theme-anim button,
+:root.theme-anim input,
+:root.theme-anim textarea,
+:root.theme-anim a {
+  transition: background-color 420ms ease, color 420ms ease, border-color 420ms ease, fill 420ms ease !important;
+}
+
+/* Bell shake when a new notification arrives. */
+.icon-link.bell-shake {
+  animation: bellShake 1s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+  transform-origin: top center;
+}
+
+@keyframes bellShake {
+  0%, 100% { transform: rotate(0deg); }
+  10% { transform: rotate(16deg); }
+  20% { transform: rotate(-14deg); }
+  30% { transform: rotate(12deg); }
+  40% { transform: rotate(-10deg); }
+  50% { transform: rotate(8deg); }
+  60% { transform: rotate(-6deg); }
+  70% { transform: rotate(4deg); }
+  80% { transform: rotate(-2deg); }
+  90% { transform: rotate(1deg); }
 }
 
 .count-badge,
@@ -7748,6 +8357,9 @@ body {
 .candidate-card.active-card.dragging {
   cursor: grabbing;
   box-shadow: 0 24px 56px rgba(31, 27, 18, 0.22);
+  /* No transition while the finger/pointer drives the transform directly, so
+     the card tracks the pointer 1:1 instead of easing behind it. */
+  transition: none !important;
 }
 
 .message {
@@ -8466,8 +9078,14 @@ body {
   position: fixed;
   inset: 0;
   z-index: 1200;
-  background: rgba(31, 27, 18, 0.46);
-  backdrop-filter: blur(2px);
+  /* No full-screen tint/blur here: the dimming is done by the highlight's
+     box-shadow ring so the highlighted element itself stays sharp & visible. */
+  background: transparent;
+}
+
+/* When nothing matches the step selector, fall back to a gentle full dim. */
+.feature-tour-overlay.no-target {
+  background: rgba(20, 18, 12, 0.55);
 }
 
 .feature-tour-highlight {
@@ -8475,10 +9093,13 @@ body {
   z-index: 1201;
   border: 2px solid var(--accent);
   border-radius: 14px;
+  /* The huge spread shadow dims everything EXCEPT the highlighted cutout. */
   box-shadow:
-    0 0 0 9999px rgba(31, 27, 18, 0.18),
-    0 18px 50px rgba(31, 27, 18, 0.24);
+    0 0 0 9999px rgba(20, 18, 12, 0.6),
+    0 0 0 4px rgba(255, 255, 255, 0.12),
+    0 18px 50px rgba(0, 0, 0, 0.3);
   pointer-events: none;
+  transition: top 220ms ease, left 220ms ease, width 220ms ease, height 220ms ease;
 }
 
 .feature-tour-card {
@@ -8693,8 +9314,21 @@ body {
 
 @media (max-width: 767px) {
   .feature-tour-card {
-    right: 16px;
+    right: 12px;
+    left: 12px;
+    width: auto;
+    padding: 14px;
+    gap: 8px;
     bottom: max(102px, calc(env(safe-area-inset-bottom) + 92px));
+  }
+
+  .feature-tour-card h2 {
+    font-size: 0.98rem;
+  }
+
+  .feature-tour-card p {
+    font-size: 0.85rem;
+    line-height: 1.45;
   }
 
   .feature-tour-actions,
