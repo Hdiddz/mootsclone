@@ -5010,6 +5010,94 @@ img.avatar {
   cursor: pointer;
 }
 
+/* #3 Portfolio file display (image thumbnails + file chips) */
+.portfolio-display-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.portfolio-thumb-link {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 110px;
+  text-decoration: none;
+  color: var(--ink);
+}
+
+.portfolio-thumb {
+  width: 110px;
+  height: 110px;
+  object-fit: cover;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  display: block;
+}
+
+.portfolio-thumb-label {
+  font-size: 0.74rem;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.portfolio-file-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-muted, transparent);
+  color: var(--ink);
+  font-weight: 600;
+  font-size: 0.86rem;
+  text-decoration: none;
+}
+
+.portfolio-file-chip:hover {
+  border-color: var(--ink);
+}
+
+.portfolio-edit-preview {
+  margin: 8px 0;
+}
+
+/* Cover status label (Followed / Saved / Passed) on the swipe card */
+.cover-status-label {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 4;
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+.cover-status-label.cover-status-interest {
+  background: rgba(22, 163, 74, 0.85);
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+.cover-status-label.cover-status-save {
+  background: rgba(37, 99, 235, 0.85);
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+.cover-status-label.cover-status-pass {
+  background: rgba(0, 0, 0, 0.6);
+}
+
 /* #C Per-box edit pencil on profile panels */
 .box-head-right {
   display: flex;

@@ -555,6 +555,9 @@ const translations = {
     alreadyInterested: "You have added this candidate",
     alreadyPassed: "You skipped this candidate",
     alreadySaved: "You saved this candidate",
+    labelFollowed: "Followed",
+    labelSaved: "Saved",
+    labelPassed: "Passed",
     profileReadyTitle: "Profile ready",
     profileReadyBody: "Your mock profile is saved for the demo.",
     back: "Back",
@@ -985,6 +988,9 @@ const translations = {
     alreadyInterested: "Anda sudah memasukkan kandidat ini",
     alreadyPassed: "Anda melewati kandidat ini",
     alreadySaved: "Anda menyimpan kandidat ini",
+    labelFollowed: "Diikuti",
+    labelSaved: "Disimpan",
+    labelPassed: "Dilewati",
     profileReadyTitle: "Profil siap",
     profileReadyBody: "Profil demo Anda sudah disimpan.",
     back: "Kembali",
@@ -1726,7 +1732,12 @@ function App() {
     const blockedSet = new Set((blockedRows ?? []).map((row: any) => row.blocked_id));
     setBlockedIds(Array.from(blockedSet) as string[]);
 
-    const loadedCandidates = allProfiles.filter((p) => !swipedIds.includes(p.id) && !blockedSet.has(p.id));
+    // Keep every candidate in the deck (except self + blocked). Followed/saved/
+    // passed profiles stay visible and are labelled in the UI instead of being
+    // removed. Stable sort by id so re-fetches don't reshuffle the deck cursor.
+    const loadedCandidates = allProfiles
+      .filter((p) => p.id !== userId && !blockedSet.has(p.id))
+      .sort((a, b) => a.id.localeCompare(b.id));
     setDbCandidates(loadedCandidates);
 
     // Per-user "clear history" cutoffs (#16): messages older than this are
@@ -5523,51 +5534,46 @@ function DiscoverPage() {
   const reducedMotion = usePrefersReducedMotion();
 
   const filteredProfiles = useMemo(() => applyFilters(dbCandidates, filters), [dbCandidates, filters]);
-  const deck = useMemo(
-    () => {
-      if (showSwiped) {
-        return filteredProfiles;
-      }
-      return filteredProfiles.filter(
-        (candidate) =>
-          !passedIds.includes(candidate.id) &&
-          !interestedIds.includes(candidate.id) &&
-          !savedIds.includes(candidate.id)
-      );
-    },
-    [filteredProfiles, interestedIds, passedIds, savedIds, showSwiped]
-  );
-  const current = deck[0] ?? null;
-  const next = deck[1] ?? null;
-  const isRefreshingRef = useRef(false);
 
-  // Auto-refresh the deck when the user runs out of cards
+  // Cursor-based deck: every profile stays in the deck (labelled by status);
+  // acting advances the cursor, rewind steps back, and reaching the end loops
+  // back to the start so followed/saved cards remain visible (just labelled).
+  const [cursor, setCursor] = useState(0);
   useEffect(() => {
-    const hasSwipes = passedIds.length > 0 || savedIds.length > 0 || interestedIds.length > 0;
-    if (dbCandidates.length === 0 && hasSwipes && !showSwiped) {
-      if (isRefreshingRef.current) return;
-      isRefreshingRef.current = true;
+    setCursor(0);
+  }, [filters]);
 
+  const current = filteredProfiles[cursor] ?? null;
+  const next = filteredProfiles[cursor + 1] ?? null;
+  const reachedEnd = filteredProfiles.length > 0 && cursor >= filteredProfiles.length;
+  const loopRef = useRef(false);
+
+  useEffect(() => {
+    if (reachedEnd && !loopRef.current) {
+      loopRef.current = true;
       addToast(
-        language === "id" ? "Semua kartu sudah habis" : "Deck complete",
+        language === "id" ? "Sampai di ujung deck" : "End of deck",
         language === "id"
-          ? "Semua kartu sudah habis. Memuat ulang deck secara otomatis..."
-          : "No more candidates. Auto-refreshing the deck...",
+          ? "Menampilkan ulang semua profil (yang sudah di-follow/disimpan tetap tampil dengan label)..."
+          : "Showing all profiles again (followed/saved stay visible with a label)...",
         "info"
       );
-      const timer = setTimeout(() => {
-        resetDeck();
-      }, 1500);
-      return () => clearTimeout(timer);
-    } else {
-      isRefreshingRef.current = false;
+      const timer = window.setTimeout(() => {
+        setCursor(0);
+        loopRef.current = false;
+      }, 1200);
+      return () => window.clearTimeout(timer);
     }
-  }, [dbCandidates.length, passedIds.length, interestedIds.length, savedIds.length, showSwiped, resetDeck, addToast, language]);
+  }, [reachedEnd, addToast, language]);
+
+  const goToPrevious = useCallback(() => {
+    setCursor((c) => Math.max(0, c - 1));
+  }, []);
 
   const getSwipeStatus = (candidateId: string) => {
     if (interestedIds.includes(candidateId)) return "interest";
-    if (passedIds.includes(candidateId)) return "pass";
     if (savedIds.includes(candidateId)) return "save";
+    if (passedIds.includes(candidateId)) return "pass";
     return null;
   };
 
@@ -5590,6 +5596,8 @@ function DiscoverPage() {
       }
 
       actOnCandidate(current, action, createsMatch);
+      // Advance to the next card; the acted profile stays in the deck (labelled).
+      setCursor((c) => c + 1);
 
       if (createsMatch) {
         setMatchedProfile(current);
@@ -5699,7 +5707,8 @@ function DiscoverPage() {
       if (x > 0) {
         handleAction("pass");
       } else {
-        rewindLast();
+        // Swipe left rewinds to the previous card, keeping its label intact.
+        goToPrevious();
         setRewindAnim(true);
         window.setTimeout(() => setRewindAnim(false), 450);
       }
@@ -5711,7 +5720,7 @@ function DiscoverPage() {
     if (horizontal < 10 && vertical < 10) {
       animateAction("pass");
     }
-  }, [handleAction, rewindLast, resetCardTransform, animateAction]);
+  }, [handleAction, goToPrevious, resetCardTransform, animateAction]);
 
   useEffect(() => {
     const storedSuggestion =
@@ -5758,7 +5767,7 @@ function DiscoverPage() {
       }
 
       if (event.key === "ArrowLeft") {
-        rewindLast();
+        goToPrevious();
       }
       if (event.key === "ArrowRight") {
         animateAction("pass");
@@ -5767,7 +5776,7 @@ function DiscoverPage() {
         animateAction("save");
       }
       if (event.key === "Backspace" || event.key.toLowerCase() === "r") {
-        rewindLast();
+        goToPrevious();
         setRewindAnim(true);
         window.setTimeout(() => setRewindAnim(false), 450);
       }
@@ -5778,7 +5787,7 @@ function DiscoverPage() {
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [animateAction, current, rewindLast]);
+  }, [animateAction, current, goToPrevious]);
 
   return (
     <div className="page-stack discover-page page-transition">
@@ -5834,7 +5843,16 @@ function DiscoverPage() {
                 : (language === "id" ? "Anda telah menelusuri semua kartu. Ulangi kembali untuk menampilkan semua pengguna." : "You have gone through all candidate cards. Refresh to see them again.")
             }
             action={
-              <Button variant="primary" onClick={resetDeck}>
+              <Button
+                variant="primary"
+                onClick={() => {
+                  if (filteredProfiles.length === 0) {
+                    resetDeck();
+                  } else {
+                    setCursor(0);
+                  }
+                }}
+              >
                 <RefreshCw size={18} />
                 {language === "id" ? "Ulangi Deck" : "Refresh Deck"}
               </Button>
@@ -6794,12 +6812,9 @@ function ProfilePage() {
             <h2>{t.portfolioTitle}</h2>
             {editPencil("portfolio")}
           </div>
-          <div className="portfolio-list">
+          <div className="portfolio-display-grid">
             {profile.portfolioLinks.filter((link) => link.url).length ? profile.portfolioLinks.filter((link) => link.url).map((link) => (
-              <a href={link.url} key={`${link.label}-${link.url}`} target="_blank" rel="noreferrer">
-                <LinkIcon size={16} aria-hidden="true" />
-                {link.label}
-              </a>
+              <PortfolioFileDisplay key={`${link.label}-${link.url}`} link={link} />
             )) : <span className="muted-text">{t.noPortfolioYet}</span>}
           </div>
         </section>
@@ -7878,10 +7893,10 @@ function CandidateCard({
       aria-label={`${profile.name}, ${localizeRoleLabel(profile.role, t)}, ${t.mainSkillLabel} ${profile.mainSkill}`}
     >
       {swipeStatus ? (
-        <div className={`swipe-status-banner swipe-status-${swipeStatus}`}>
-          {swipeStatus === "interest" && t.alreadyInterested}
-          {swipeStatus === "pass" && t.alreadyPassed}
-          {swipeStatus === "save" && t.alreadySaved}
+        <div className={`cover-status-label cover-status-${swipeStatus}`}>
+          {swipeStatus === "interest" && t.labelFollowed}
+          {swipeStatus === "pass" && t.labelPassed}
+          {swipeStatus === "save" && t.labelSaved}
         </div>
       ) : null}
 
@@ -8226,14 +8241,11 @@ export function CandidateDetailSheet({
 
           <DetailSection title={t.portfolioLinks}>
             {profile.portfolioLinks.filter((link) => link.url).length ? (
-              <div className="portfolio-list">
+              <div className="portfolio-display-grid">
                 {profile.portfolioLinks
                   .filter((link) => link.url)
                   .map((link) => (
-                    <a href={link.url} key={`${link.label}-${link.url}`} target="_blank" rel="noreferrer">
-                      <LinkIcon size={17} aria-hidden="true" />
-                      {link.label}
-                    </a>
+                    <PortfolioFileDisplay key={`${link.label}-${link.url}`} link={link} />
                   ))}
               </div>
             ) : (
@@ -9549,6 +9561,30 @@ function MultiExperienceEditor({
 }
 
 // Portfolio links with add/remove + file upload (png/jpg/pdf) to storage.
+function isImagePortfolio(url: string) {
+  return /\.(png|jpe?g|gif|webp|avif)(\?|$)/i.test(url);
+}
+
+// Renders an uploaded portfolio file: image thumbnail for images, a file chip
+// (with PDF/file icon) otherwise. Used in the editor and on profiles.
+function PortfolioFileDisplay({ link }: { link: PortfolioLink }) {
+  if (!link.url) return null;
+  if (isImagePortfolio(link.url)) {
+    return (
+      <a href={link.url} target="_blank" rel="noreferrer" className="portfolio-thumb-link" title={link.label}>
+        <img src={link.url} alt={link.label || "portfolio"} className="portfolio-thumb" />
+        {link.label ? <span className="portfolio-thumb-label">{link.label}</span> : null}
+      </a>
+    );
+  }
+  return (
+    <a href={link.url} target="_blank" rel="noreferrer" className="portfolio-file-chip">
+      <LinkIcon size={16} aria-hidden="true" />
+      {link.label || (link.url.toLowerCase().endsWith(".pdf") ? "PDF" : "File")}
+    </a>
+  );
+}
+
 function PortfolioUploadEditor({
   links,
   onChange,
@@ -9561,7 +9597,7 @@ function PortfolioUploadEditor({
   const t = useTranslations();
   const id = t.language === "id";
   const { addToast } = useSymbio();
-  const [uploading, setUploading] = useState(false);
+  const [uploadingIndex, setUploadingIndex] = useState<number | null>(null);
   const list = links.length ? links : [{ label: "", url: "" }];
 
   const updateAt = (index: number, patch: Partial<PortfolioLink>) => {
@@ -9573,63 +9609,65 @@ function PortfolioUploadEditor({
   };
   const add = () => onChange([...list, { label: "", url: "" }]);
 
-  const uploadFile = async (file: File | null) => {
+  const uploadFileAt = async (index: number, file: File | null) => {
     if (!file || !userId) return;
-    setUploading(true);
+    setUploadingIndex(index);
     try {
       const path = `${userId}/portfolio/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.\-_]/g, "_")}`;
       const { error } = await supabase.storage.from("post-images").upload(path, file, { cacheControl: "3600", upsert: false });
       if (error) throw error;
       const { data: pub } = supabase.storage.from("post-images").getPublicUrl(path);
-      onChange([...links.filter((l) => l.url || l.label), { label: file.name, url: pub.publicUrl }]);
+      updateAt(index, { url: pub.publicUrl, label: list[index]?.label || file.name });
       addToast(id ? "File diunggah" : "File uploaded", id ? "File portfolio ditambahkan." : "Portfolio file added.", "success");
     } catch (err: any) {
       console.error("Portfolio upload error:", err);
       addToast(id ? "Gagal mengunggah" : "Upload failed", err?.message || (id ? "Coba lagi." : "Try again."), "error");
     } finally {
-      setUploading(false);
+      setUploadingIndex(null);
     }
   };
 
   return (
     <div className="multi-editor">
-      {list.map((link, index) => {
-        const hasWarning = link.url && !isUrlLike(link.url);
-        return (
-          <div className="multi-editor-item" key={index}>
-            <div className="multi-editor-item-head">
-              <strong>{id ? `Tautan ${index + 1}` : `Link ${index + 1}`}</strong>
-              {list.length > 1 ? (
-                <button type="button" className="multi-editor-remove" onClick={() => removeAt(index)}>
-                  <Trash2 size={14} aria-hidden="true" />
-                  {id ? "Hapus" : "Remove"}
-                </button>
-              ) : null}
-            </div>
-            <div className="field-grid">
-              <TextField label={t.labelField} value={link.label} onChange={(label) => updateAt(index, { label })} placeholder="GitHub" />
-              <TextField label={t.urlField} value={link.url} onChange={(url) => updateAt(index, { url })} placeholder="https://example.com" />
-              {hasWarning ? <small className="warning-text">{t.urlWarning}</small> : null}
-            </div>
+      {list.map((link, index) => (
+        <div className="multi-editor-item" key={index}>
+          <div className="multi-editor-item-head">
+            <strong>{id ? `Item ${index + 1}` : `Item ${index + 1}`}</strong>
+            {list.length > 1 ? (
+              <button type="button" className="multi-editor-remove" onClick={() => removeAt(index)}>
+                <Trash2 size={14} aria-hidden="true" />
+                {id ? "Hapus" : "Remove"}
+              </button>
+            ) : null}
           </div>
-        );
-      })}
+          <TextField label={t.labelField} value={link.label} onChange={(label) => updateAt(index, { label })} placeholder={id ? "mis. Sertifikat, Desain UI" : "e.g. Certificate, UI design"} />
+          {link.url ? (
+            <div className="portfolio-edit-preview">
+              <PortfolioFileDisplay link={link} />
+            </div>
+          ) : null}
+          <label className="multi-editor-upload">
+            <Upload size={15} aria-hidden="true" />
+            {uploadingIndex === index
+              ? (id ? "Mengunggah…" : "Uploading…")
+              : link.url
+                ? (id ? "Ganti file" : "Replace file")
+                : (id ? "Unggah file (PNG/JPG/PDF)" : "Upload file (PNG/JPG/PDF)")}
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/jpg,image/gif,image/webp,application/pdf"
+              hidden
+              disabled={uploadingIndex !== null}
+              onChange={(event) => uploadFileAt(index, event.target.files?.[0] ?? null)}
+            />
+          </label>
+        </div>
+      ))}
       <div className="multi-editor-buttons">
         <button type="button" className="multi-editor-add" onClick={add}>
           <ArrowRight size={15} aria-hidden="true" />
-          {id ? "Tambah tautan" : "Add link"}
+          {id ? "Tambah item" : "Add item"}
         </button>
-        <label className="multi-editor-upload">
-          <Upload size={15} aria-hidden="true" />
-          {uploading ? (id ? "Mengunggah…" : "Uploading…") : (id ? "Unggah file (PNG/JPG/PDF)" : "Upload file (PNG/JPG/PDF)")}
-          <input
-            type="file"
-            accept="image/png,image/jpeg,image/jpg,application/pdf"
-            hidden
-            disabled={uploading}
-            onChange={(event) => uploadFile(event.target.files?.[0] ?? null)}
-          />
-        </label>
       </div>
     </div>
   );
