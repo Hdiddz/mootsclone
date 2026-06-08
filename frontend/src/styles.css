@@ -4952,9 +4952,13 @@ img.avatar {
   color: var(--danger);
 }
 
-.activity-post-tools {
+.activity-post-head .activity-post-tools {
   display: flex;
-  gap: 4px;
+  flex-direction: row;
+  flex: 0 0 auto;
+  gap: 6px;
+  margin-left: auto;
+  align-self: flex-start;
 }
 
 .activity-tool-btn {
@@ -5110,12 +5114,17 @@ img.avatar {
 /* #2 Quick-edit popup (per profile box) */
 .quick-edit-modal {
   width: min(560px, calc(100vw - 32px));
+  min-height: 0 !important; /* override .modal-sheet's tall min-height */
   max-height: 88vh;
   display: flex;
   flex-direction: column;
   gap: 0;
   padding: 0;
   overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.28);
 }
 
 .quick-edit-head {
