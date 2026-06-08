@@ -26,8 +26,20 @@ export const setSupabaseRememberMe = (remember: boolean) => {
   window.localStorage.setItem(rememberMeKey, remember ? "true" : "false");
 };
 
-const getActiveStorage = () => (getSupabaseRememberMe() ? window.localStorage : window.sessionStorage);
-const getInactiveStorage = () => (getSupabaseRememberMe() ? window.sessionStorage : window.localStorage);
+// Per-tab auth sessions.
+//
+// The Supabase session lives in sessionStorage, which is unique to each tab and
+// is NOT shared between tabs (and its changes don't fire cross-tab `storage`
+// events). That means you can sign in as a different account in every tab of
+// the same browser — handy for testing, and harmless in production.
+//
+// To still keep users "logged in" across reloads / new tabs / browser restarts,
+// we mirror the session into localStorage under a DIFFERENT (prefixed) key — a
+// "seed". A freshly opened tab with no session restores itself from the seed.
+// Because the seed uses its own key, writing it never triggers Supabase's
+// cross-tab sync on the real key, so tabs stay independent. The seed is only
+// written when "remember me" is on.
+const seedKey = (key: string) => `moots.seed::${key}`;
 
 const supabaseStorage = {
   getItem(key: string) {
@@ -35,29 +47,54 @@ const supabaseStorage = {
       return null;
     }
 
-    const activeValue = getActiveStorage().getItem(key);
-    if (activeValue) {
-      return activeValue;
+    // 1) This tab's own session.
+    const fromSession = window.sessionStorage.getItem(key);
+    if (fromSession !== null) {
+      return fromSession;
     }
 
-    const hasExplicitPreference = window.localStorage.getItem(rememberMeKey) !== null;
-    return hasExplicitPreference ? null : window.sessionStorage.getItem(key);
+    // 2) Restore a fresh tab from the persisted seed (stay-logged-in).
+    const seed = window.localStorage.getItem(seedKey(key));
+    if (seed !== null) {
+      window.sessionStorage.setItem(key, seed);
+      return seed;
+    }
+
+    // 3) One-time migration of legacy sessions stored under the real key.
+    const legacy = window.localStorage.getItem(key);
+    if (legacy !== null) {
+      window.sessionStorage.setItem(key, legacy);
+      if (getSupabaseRememberMe()) {
+        window.localStorage.setItem(seedKey(key), legacy);
+      }
+      return legacy;
+    }
+
+    return null;
   },
   setItem(key: string, value: string) {
     if (!canUseBrowserStorage()) {
       return;
     }
 
-    getActiveStorage().setItem(key, value);
-    getInactiveStorage().removeItem(key);
+    window.sessionStorage.setItem(key, value);
+    if (getSupabaseRememberMe()) {
+      window.localStorage.setItem(seedKey(key), value);
+    } else {
+      window.localStorage.removeItem(seedKey(key));
+    }
+    // Never keep the real key in localStorage — that's what causes tabs to share
+    // a session and sync sign-in/out across each other.
+    window.localStorage.removeItem(key);
   },
   removeItem(key: string) {
     if (!canUseBrowserStorage()) {
       return;
     }
 
-    window.localStorage.removeItem(key);
     window.sessionStorage.removeItem(key);
+    window.localStorage.removeItem(seedKey(key));
+    window.localStorage.removeItem(key);
   }
 };
 
