@@ -182,6 +182,7 @@ type SymbioStore = {
   resetDeck: () => void;
   clearMatches: () => void;
   removeMatch: (matchId: string) => void;
+  unfollowCandidate: (candidateId: string) => Promise<void>;
   removeSaved: (candidateId: string) => void;
   clearFilters: () => void;
   markNotificationRead: (notificationId: string) => void;
@@ -1703,10 +1704,12 @@ function App() {
         return next;
       });
 
-      // Clear local states so they don't immediately trigger matches or show up as swiped
+      // Unfollow = no longer interested/saved, and treat as "passed" so the
+      // person reappears in Discover labelled "Passed" (and the Follow button
+      // flips back to "Follow").
       setInterestedIds((current) => current.filter((id) => id !== candidateId));
-      setPassedIds((current) => current.filter((id) => id !== candidateId));
       setSavedIds((current) => current.filter((id) => id !== candidateId));
+      setPassedIds((current) => (current.includes(candidateId) ? current : [candidateId, ...current]));
 
       try {
         // 1. Delete the match record
@@ -1716,17 +1719,17 @@ function App() {
           .eq("id", matchId);
         if (matchErr) throw matchErr;
 
-        // 2. Delete the swipes between these two users
+        // 2. Set my swipe on them to 'pass' (instead of deleting it) so Discover
+        //    shows them as passed rather than unlabelled.
         const { error: swipeErr } = await supabase
           .from("swipes")
-          .delete()
-          .or(`and(swiper_id.eq.${user.id},swiped_id.eq.${candidateId}),and(swiper_id.eq.${candidateId},swiped_id.eq.${user.id})`);
+          .upsert(
+            { swiper_id: user.id, swiped_id: candidateId, action: "pass" },
+            { onConflict: "swiper_id,swiped_id" }
+          );
         if (swipeErr) {
-          console.warn("Could not delete swipes, possibly due to RLS:", swipeErr);
+          console.warn("Could not update swipe to pass:", swipeErr);
         }
-
-        // 3. Refresh discover and matches from Supabase
-        await fetchDiscoverAndMatches(user.id);
 
         addToast(
           language === "id" ? translations.id.matchRemovedTitle : translations.en.matchRemovedTitle,
@@ -1738,6 +1741,32 @@ function App() {
       }
     },
     [addToast, language, user?.id, matches, setChats, setMatches, setInterestedIds, setPassedIds, setSavedIds, fetchDiscoverAndMatches]
+  );
+
+  // Unfollow a person (works whether or not there is a match): flips them to
+  // "passed" so Discover shows the "Passed" label and any Follow button resets.
+  const unfollowCandidate = useCallback(
+    async (candidateId: string) => {
+      if (!user?.id) return;
+      setInterestedIds((current) => current.filter((id) => id !== candidateId));
+      setSavedIds((current) => current.filter((id) => id !== candidateId));
+      setPassedIds((current) => (current.includes(candidateId) ? current : [candidateId, ...current]));
+      setMatches((current) => current.filter((m) => m.isGroup || m.candidateId !== candidateId));
+      try {
+        await supabase
+          .from("swipes")
+          .upsert(
+            { swiper_id: user.id, swiped_id: candidateId, action: "pass" },
+            { onConflict: "swiper_id,swiped_id" }
+          );
+        const a = user.id < candidateId ? user.id : candidateId;
+        const b = user.id > candidateId ? user.id : candidateId;
+        await supabase.from("matches").delete().eq("user_a_id", a).eq("user_b_id", b);
+      } catch (err) {
+        console.warn("Error unfollowing candidate:", err);
+      }
+    },
+    [user?.id, setInterestedIds, setSavedIds, setPassedIds, setMatches]
   );
 
   const removeSaved = useCallback(
@@ -2682,6 +2711,7 @@ function App() {
       resetDeck,
       clearMatches,
       removeMatch,
+      unfollowCandidate,
       removeSaved,
       clearFilters,
       markNotificationRead,
@@ -2722,6 +2752,7 @@ function App() {
       setChats,
       clearMatches,
       removeMatch,
+      unfollowCandidate,
       respondToMatchRequest,
       clearFilters,
       filters,
@@ -4306,7 +4337,7 @@ function FollowChatBubble({ isOpen, onToggle }: { isOpen: boolean; onToggle: (op
 }
 
 function AiAssistantBubble({ isOpen, onToggle }: { isOpen: boolean; onToggle: (open: boolean) => void }) {
-  const { language, matches, setMatches, setChats, interestedIds, actOnCandidate, user, removeMatch, fetchDiscoverAndMatches } = useSymbio();
+  const { language, matches, setMatches, setChats, interestedIds, actOnCandidate, user, removeMatch, unfollowCandidate, fetchDiscoverAndMatches } = useSymbio();
   const t = useTranslations();
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
@@ -4375,22 +4406,7 @@ function AiAssistantBubble({ isOpen, onToggle }: { isOpen: boolean; onToggle: (o
           ? `Apakah kamu yakin ingin berhenti mengikuti ${candidate.name}?` 
           : `Are you sure you want to unfollow ${candidate.name}?`,
         onConfirm: async () => {
-          if (existingMatch) {
-            await removeMatch(existingMatch.id);
-          } else {
-            if (user?.id) {
-              try {
-                await supabase
-                  .from("swipes")
-                  .delete()
-                  .eq("swiper_id", user.id)
-                  .eq("swiped_id", candidate.id);
-                await fetchDiscoverAndMatches(user.id);
-              } catch (err) {
-                console.warn("Error deleting swipe on unfollow:", err);
-              }
-            }
-          }
+          await unfollowCandidate(candidate.id);
         }
       });
       return;
@@ -7672,7 +7688,7 @@ export function CandidateDetailSheet({
 }) {
   const t = useTranslations();
   const groupedSkills = groupSkills(profile.skills);
-  const { language, matches, setMatches, setChats, interestedIds, actOnCandidate, user, removeMatch, fetchDiscoverAndMatches } = useSymbio();
+  const { language, matches, setMatches, setChats, interestedIds, actOnCandidate, user, removeMatch, unfollowCandidate, fetchDiscoverAndMatches } = useSymbio();
   const navigate = useNavigate();
 
   const existingMatch = matches.find((m) => m.candidateId === profile.id);
@@ -7691,22 +7707,7 @@ export function CandidateDetailSheet({
           ? `Apakah kamu yakin ingin berhenti mengikuti ${profile.name}?` 
           : `Are you sure you want to unfollow ${profile.name}?`,
         onConfirm: async () => {
-          if (existingMatch) {
-            await removeMatch(existingMatch.id);
-          } else {
-            if (user?.id) {
-              try {
-                await supabase
-                  .from("swipes")
-                  .delete()
-                  .eq("swiper_id", user.id)
-                  .eq("swiped_id", profile.id);
-                await fetchDiscoverAndMatches(user.id);
-              } catch (err) {
-                console.warn("Error deleting swipe on unfollow:", err);
-              }
-            }
-          }
+          await unfollowCandidate(profile.id);
         }
       });
       return;
