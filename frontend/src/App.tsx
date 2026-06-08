@@ -6854,13 +6854,13 @@ function NotificationsPage() {
                     const candidate = findCandidateFromNotification(notification);
                     if (!candidate) return null;
                     
+                    // Already mutual → matched. Otherwise always offer Approve
+                    // (follow back) / Reject — even if this user happened to pass
+                    // them earlier in Discover.
                     if (interestedIds.includes(candidate.id)) {
                       return <span className="status-text approved">{t.approved}</span>;
                     }
-                    if (passedIds.includes(candidate.id)) {
-                      return <span className="status-text rejected">{t.rejected}</span>;
-                    }
-                    
+
                     return (
                       <>
                         <Button
@@ -6929,9 +6929,6 @@ function NotificationsPage() {
                   
                   if (interestedIds.includes(candidate.id)) {
                     return <span className="status-text approved">{t.approved}</span>;
-                  }
-                  if (passedIds.includes(candidate.id)) {
-                    return <span className="status-text rejected">{t.rejected}</span>;
                   }
 
                   return (
