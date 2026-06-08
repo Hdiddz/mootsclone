@@ -3375,6 +3375,46 @@ img.avatar {
     height: 360px;
   }
 
+  /* #9 Tidy the landing swipe-deck card text on small phones. */
+  .hero-card-overlay {
+    padding: 18px;
+    gap: 8px;
+    background: linear-gradient(180deg, transparent 20%, rgba(0, 0, 0, 0.35) 50%, rgba(0, 0, 0, 0.92) 100%);
+  }
+
+  .hero-card-topline {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .hero-card-overlay h3 {
+    font-size: 1.15rem;
+    line-height: 1.15;
+  }
+
+  .hero-card-overlay p {
+    font-size: 0.68rem;
+  }
+
+  .hero-card-overlay small {
+    font-size: 0.8rem;
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .hero-card-overlay .hero-card-chips {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .hero-status-pill {
+    align-self: flex-start;
+  }
+
   .top-actions {
     gap: 8px;
   }
@@ -4912,6 +4952,63 @@ img.avatar {
   color: var(--danger);
 }
 
+.activity-post-tools {
+  display: flex;
+  gap: 4px;
+}
+
+.activity-tool-btn {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: color 150ms ease, border-color 150ms ease;
+}
+
+.activity-tool-btn:hover {
+  color: var(--ink);
+  border-color: var(--ink);
+}
+
+.activity-tool-btn.danger:hover {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.activity-edited {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.activity-edit-box {
+  margin: 10px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.activity-edit-box textarea {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  resize: vertical;
+}
+
+.activity-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .activity-caption {
   margin: 10px 0;
   line-height: 1.5;
@@ -5008,6 +5105,46 @@ img.avatar {
   background: var(--primary, #765a00);
   color: #fff;
   cursor: pointer;
+}
+
+/* #2 Quick-edit popup (per profile box) */
+.quick-edit-modal {
+  width: min(560px, calc(100vw - 32px));
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.quick-edit-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.quick-edit-head h2 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.quick-edit-body {
+  padding: 18px 20px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.quick-edit-actions {
+  margin: 0;
+  padding: 14px 20px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
 }
 
 /* #3 Portfolio file display (image thumbnails + file chips) */
@@ -6814,11 +6951,13 @@ img.avatar {
 
 /* FIX #10: Rewind animation */
 @keyframes cardRewind {
-  from { transform: translateX(-120%) rotate(-15deg); opacity: 0; }
-  to { transform: translateX(0) rotate(0); opacity: 1; }
+  0% { transform: translate3d(-120%, 0, 0) rotate(-14deg); opacity: 0; }
+  60% { opacity: 1; }
+  100% { transform: translate3d(0, 0, 0) rotate(0); opacity: 1; }
 }
 .card-rewind-anim {
-  animation: cardRewind 400ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: cardRewind 460ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  will-change: transform, opacity;
 }
 
 /* FIX #13: Mobile filter popup sizing */
@@ -7357,9 +7496,16 @@ img.avatar {
 }
 
 @media (max-width: 767px) {
+  /* #7 Lower the floating bubbles on mobile and stack the AI bubble above the
+     chat bubble so they no longer collide. They sit just above the bottom nav. */
   .chat-bubble {
     right: 16px;
-    bottom: max(92px, calc(env(safe-area-inset-bottom) + 84px));
+    bottom: max(74px, calc(env(safe-area-inset-bottom) + 66px));
+  }
+
+  .ai-assistant-bubble {
+    right: 16px;
+    bottom: max(140px, calc(env(safe-area-inset-bottom) + 132px));
   }
 
   .chat-bubble.open {

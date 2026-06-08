@@ -2919,13 +2919,15 @@ function App() {
       const otherSkills = otherUser?.skills?.map((s: any) => s.name) || [];
       const overlap = otherSkills.filter((s: string) => mySkills.includes(s));
 
+      const matchStatus = (newMatch.status as "pending" | "accepted") || "accepted";
       const mappedMatch: MatchRecord = {
         id: newMatch.id,
         candidateId: otherId,
         createdAt: new Date(newMatch.created_at).toLocaleDateString(),
         skillOverlap: overlap,
         latestMessage: "",
-        unread: 1,
+        unread: matchStatus === "accepted" ? 1 : 0,
+        status: matchStatus,
         summary: [
           otherUser?.role ? `Interested in ${otherUser.role} role.` : "",
           overlap.length > 0 ? `Both profiles mention ${overlap.join(", ")}.` : ""
@@ -2937,12 +2939,26 @@ function App() {
         return [mappedMatch, ...current];
       });
 
-      addToast(
-        language === "id" ? "Kecocokan baru!" : "New Match!",
-        language === "id"
-          ? `Anda cocok dengan ${otherUser?.name || "seseorang"}!`
-          : `You matched with ${otherUser?.name || "someone"}!`,
-        "success"
+      // Only celebrate real (mutual) matches. Pending follow requests are
+      // surfaced by their own match_request notification instead.
+      if (matchStatus === "accepted") {
+        addToast(
+          language === "id" ? "Kecocokan baru!" : "New Match!",
+          language === "id"
+            ? `Anda cocok dengan ${otherUser?.name || "seseorang"}!`
+            : `You matched with ${otherUser?.name || "someone"}!`,
+          "success"
+        );
+      }
+    };
+
+    // When a pending match is promoted to accepted (the other person followed
+    // back), reflect it live.
+    const handleMatchUpdate = (payload: any) => {
+      const updated = payload.new;
+      if (updated.user_a_id !== user.id && updated.user_b_id !== user.id) return;
+      setMatches((current) =>
+        current.map((m) => (m.id === updated.id ? { ...m, status: (updated.status as "pending" | "accepted") || m.status } : m))
       );
     };
 
@@ -2967,6 +2983,16 @@ function App() {
           filter: `user_b_id=eq.${user.id}`
         },
         handleMatchInsert
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "matches", filter: `user_a_id=eq.${user.id}` },
+        handleMatchUpdate
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "matches", filter: `user_b_id=eq.${user.id}` },
+        handleMatchUpdate
       )
       .on(
         "postgres_changes",
@@ -5678,15 +5704,41 @@ function DiscoverPage() {
         return;
       }
 
-      resetCardTransform();
-      setDragging(false);
+      const el = cardElRef.current;
+      if (!el) {
+        handleAction(action);
+        return;
+      }
+
+      // Cancel any pending drag frame, then fling the card off-screen with a
+      // single eased transition that continues from its CURRENT position (no
+      // snap-to-center first) — this removes the stutter on drag-release.
+      if (rafRef.current != null) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
       setSwipeMotion(action);
+
+      const dir = action === "save" ? "up" : action === "interest" ? "left" : "right";
+      const tx = dir === "right" ? "150%" : dir === "left" ? "-150%" : "0";
+      const ty = dir === "up" ? "-150%" : "26px";
+      const rot = dir === "right" ? 18 : dir === "left" ? -18 : 0;
+
+      el.style.transition = "transform 340ms cubic-bezier(0.22, 0.61, 0.36, 1), opacity 300ms ease";
+      el.style.transform = `translate3d(${tx}, ${ty}, 0) rotate(${rot}deg)`;
+      el.style.opacity = "0";
+
       window.setTimeout(() => {
+        // Reset the (reused) card element before showing the next profile.
+        el.style.transition = "";
+        el.style.transform = "";
+        el.style.opacity = "";
+        dragRef.current = { x: 0, y: 0 };
         handleAction(action);
         setSwipeMotion(null);
-      }, 280);
+      }, 320);
     },
-    [current, handleAction, reducedMotion, swipeMotion, resetCardTransform]
+    [current, handleAction, reducedMotion, swipeMotion]
   );
 
   const finishGesture = useCallback(() => {
@@ -5701,13 +5753,14 @@ function DiscoverPage() {
 
     setActionHint("");
     setDragging(false);
-    resetCardTransform();
 
     if (horizontal > 90 && horizontal > vertical) {
       if (x > 0) {
-        handleAction("pass");
+        // Glide the card off from its current position (no snap) — smooth.
+        animateAction("pass");
       } else {
         // Swipe left rewinds to the previous card, keeping its label intact.
+        resetCardTransform();
         goToPrevious();
         setRewindAnim(true);
         window.setTimeout(() => setRewindAnim(false), 450);
@@ -5719,8 +5772,12 @@ function DiscoverPage() {
     // since those are filtered out in handlePointerDown — passes the profile.
     if (horizontal < 10 && vertical < 10) {
       animateAction("pass");
+      return;
     }
-  }, [handleAction, goToPrevious, resetCardTransform, animateAction]);
+
+    // Otherwise it was a small drag that didn't cross the threshold — snap back.
+    resetCardTransform();
+  }, [goToPrevious, resetCardTransform, animateAction]);
 
   useEffect(() => {
     const storedSuggestion =
@@ -5818,7 +5875,7 @@ function DiscoverPage() {
         {current ? (
           <CandidateCard
             profile={current}
-            className={`active-card ${dragging ? "dragging" : ""} ${swipeMotion ? `swiping-${swipeMotion}` : ""} ${rewindAnim ? "card-rewind-anim" : ""}`}
+            className={`active-card ${dragging ? "dragging" : ""} ${rewindAnim ? "card-rewind-anim" : ""}`}
             actionHint={actionHint}
             swipeStatus={getSwipeStatus(current.id)}
             onExpand={() => setDetailProfile(current)}
@@ -6376,10 +6433,40 @@ type ActivityPost = {
   caption: string;
   imageUrl: string | null;
   createdAt: string;
+  createdAtRaw: string;
+  updatedAtRaw: string;
   likeCount: number;
   likedByMe: boolean;
   comments: ActivityComment[];
 };
+
+// "HH:MM, DD|MM|YY"
+function formatPostTimestamp(iso: string) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const time = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  const date = `${pad(d.getDate())}|${pad(d.getMonth() + 1)}|${pad(d.getFullYear() % 100)}`;
+  return `${time}, ${date}`;
+}
+
+function relativeTimeFrom(iso: string, indonesian: boolean) {
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return "";
+  const secs = Math.max(0, Math.floor((Date.now() - then) / 1000));
+  const units: Array<[number, string, string]> = [
+    [86400, "day", "hari"],
+    [3600, "hour", "jam"],
+    [60, "minute", "menit"]
+  ];
+  for (const [size, en, idn] of units) {
+    if (secs >= size) {
+      const n = Math.floor(secs / size);
+      return indonesian ? `${n} ${idn} lalu` : `${n} ${en}${n > 1 ? "s" : ""} ago`;
+    }
+  }
+  return indonesian ? "baru saja" : "just now";
+}
 
 // #9 Activity feed — LinkedIn-style posts with image, likes and comments.
 // Data is loaded on mount (and after each create), satisfying the
@@ -6398,6 +6485,9 @@ function ProfileActivity({ userId, authorProfile, readOnly = false }: { userId?:
   const [submitting, setSubmitting] = useState(false);
   const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
   const [openComments, setOpenComments] = useState<Record<string, boolean>>({});
+  const [editingPostId, setEditingPostId] = useState<string>("");
+  const [editingCaption, setEditingCaption] = useState("");
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string>("");
 
   const loadPosts = useCallback(async () => {
     if (!userId) {
@@ -6408,7 +6498,7 @@ function ProfileActivity({ userId, authorProfile, readOnly = false }: { userId?:
     try {
       const { data: postRows } = await supabase
         .from("posts")
-        .select("id, caption, image_url, created_at")
+        .select("id, caption, image_url, created_at, updated_at")
         .eq("author_id", userId)
         .order("created_at", { ascending: false });
 
@@ -6432,7 +6522,9 @@ function ProfileActivity({ userId, authorProfile, readOnly = false }: { userId?:
         id: p.id,
         caption: p.caption ?? "",
         imageUrl: p.image_url ?? null,
-        createdAt: new Date(p.created_at).toLocaleDateString(),
+        createdAt: formatPostTimestamp(p.created_at),
+        createdAtRaw: p.created_at,
+        updatedAtRaw: p.updated_at ?? p.created_at,
         likeCount: likesRows.filter((l) => l.post_id === p.id).length,
         likedByMe: likesRows.some((l) => l.post_id === p.id && l.user_id === meId),
         comments: commentRows
@@ -6554,11 +6646,31 @@ function ProfileActivity({ userId, authorProfile, readOnly = false }: { userId?:
   };
 
   const deletePost = async (postId: string) => {
+    setConfirmDeleteId("");
     setPosts((current) => current.filter((p) => p.id !== postId));
     try {
       await supabase.from("posts").delete().eq("id", postId);
     } catch (err) {
       console.error("Error deleting post:", err);
+    }
+  };
+
+  const startEdit = (post: ActivityPost) => {
+    setEditingPostId(post.id);
+    setEditingCaption(post.caption);
+  };
+
+  const saveEdit = async (post: ActivityPost) => {
+    const nextCaption = editingCaption.trim();
+    const nowIso = new Date().toISOString();
+    setPosts((current) =>
+      current.map((p) => (p.id === post.id ? { ...p, caption: nextCaption, updatedAtRaw: nowIso } : p))
+    );
+    setEditingPostId("");
+    try {
+      await supabase.from("posts").update({ caption: nextCaption || null, updated_at: nowIso }).eq("id", post.id);
+    } catch (err) {
+      console.error("Error editing post:", err);
     }
   };
 
@@ -6624,20 +6736,56 @@ function ProfileActivity({ userId, authorProfile, readOnly = false }: { userId?:
                 <Avatar profile={authorProfile} size="xs" />
                 <div>
                   <strong>{authorProfile.name || (id ? "Anda" : "You")}</strong>
-                  <small>{post.createdAt}</small>
+                  <small>
+                    {post.createdAt}
+                    {new Date(post.updatedAtRaw).getTime() - new Date(post.createdAtRaw).getTime() > 60000 ? (
+                      <span className="activity-edited">
+                        {" · "}
+                        {id ? "Diedit" : "Last edited"} {relativeTimeFrom(post.updatedAtRaw, id)}
+                      </span>
+                    ) : null}
+                  </small>
                 </div>
                 {isOwnFeed ? (
-                  <button
-                    type="button"
-                    className="activity-delete-btn"
-                    aria-label={id ? "Hapus postingan" : "Delete post"}
-                    onClick={() => deletePost(post.id)}
-                  >
-                    <Trash2 size={15} />
-                  </button>
+                  <div className="activity-post-tools">
+                    <button
+                      type="button"
+                      className="activity-tool-btn"
+                      aria-label={id ? "Edit postingan" : "Edit post"}
+                      onClick={() => startEdit(post)}
+                    >
+                      <Edit size={14} />
+                    </button>
+                    <button
+                      type="button"
+                      className="activity-tool-btn danger"
+                      aria-label={id ? "Hapus postingan" : "Delete post"}
+                      onClick={() => setConfirmDeleteId(post.id)}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
                 ) : null}
               </header>
-              {post.caption ? <p className="activity-caption">{post.caption}</p> : null}
+              {editingPostId === post.id ? (
+                <div className="activity-edit-box">
+                  <textarea
+                    value={editingCaption}
+                    onChange={(event) => setEditingCaption(event.target.value)}
+                    rows={3}
+                  />
+                  <div className="activity-edit-actions">
+                    <button type="button" className="button button-secondary" onClick={() => setEditingPostId("")}>
+                      {t.cancel}
+                    </button>
+                    <button type="button" className="button button-primary" onClick={() => saveEdit(post)}>
+                      {t.save}
+                    </button>
+                  </div>
+                </div>
+              ) : post.caption ? (
+                <p className="activity-caption">{post.caption}</p>
+              ) : null}
               {post.imageUrl ? <img className="activity-post-image" src={post.imageUrl} alt="" /> : null}
               <div className="activity-post-actions">
                 <button
@@ -6686,7 +6834,169 @@ function ProfileActivity({ userId, authorProfile, readOnly = false }: { userId?:
           ))}
         </div>
       )}
+
+      {confirmDeleteId ? (
+        <ConfirmModal
+          title={id ? "Hapus postingan?" : "Delete post?"}
+          message={id ? "Postingan ini akan dihapus permanen." : "This post will be permanently deleted."}
+          confirmText={id ? "Hapus" : "Delete"}
+          cancelText={t.cancel}
+          onConfirm={() => deletePost(confirmDeleteId)}
+          onClose={() => setConfirmDeleteId("")}
+        />
+      ) : null}
     </section>
+  );
+}
+
+type QuickEditSection = "profile" | "skills" | "experience" | "portfolio" | "lookingFor" | "status";
+
+// #2 A focused, lightweight edit popup for a single profile section, opened by
+// the pencil icon on each box — instead of the full Settings drawer.
+function ProfileQuickEdit({ section, onClose }: { section: QuickEditSection; onClose: () => void }) {
+  const { profile, setProfile, addToast, user } = useSymbio();
+  const t = useTranslations();
+  const id = t.language === "id";
+
+  const [name, setName] = useState(profile.name);
+  const [avatarUrl, setAvatarUrl] = useState(profile.avatarUrl ?? "");
+  const [avatarPosition, setAvatarPosition] = useState(profile.avatarPosition ?? "center 42%");
+  const [campus, setCampus] = useState(profile.campus);
+  const [program, setProgram] = useState(profile.program);
+  const [role, setRole] = useState(profile.role);
+  const [mainSkill, setMainSkill] = useState(profile.mainSkill);
+  const [about, setAbout] = useState(profile.profileSummary);
+  const [skills, setSkills] = useState<Skill[]>(profile.skills);
+  const [experiences, setExperiences] = useState<Experience[]>(profile.experiences.length ? profile.experiences : [emptyExperience]);
+  const [portfolioLinks, setPortfolioLinks] = useState<PortfolioLink[]>(profile.portfolioLinks.length ? profile.portfolioLinks : [{ label: "", url: "" }]);
+  const [lookingFor, setLookingFor] = useState<string[]>(profile.lookingFor);
+  const [availability, setAvailability] = useState(profile.availability);
+  const [availabilityDetail, setAvailabilityDetail] = useState(profile.availabilityDetail);
+  const [statusLabel, setStatusLabel] = useState(profile.statusLabel ?? "");
+  const [collaborationGoals, setCollaborationGoals] = useState<string[]>(profile.collaborationGoals);
+
+  const titleMap: Record<QuickEditSection, string> = {
+    profile: t.editProfile,
+    skills: t.mainSkillsTitle,
+    experience: t.experienceTitle,
+    portfolio: t.portfolioTitle,
+    lookingFor: t.lookingForTitle,
+    status: t.statusCollaboration
+  };
+
+  const save = () => {
+    setProfile((cur) => {
+      switch (section) {
+        case "profile":
+          return {
+            ...cur,
+            name: name.trim() || cur.name,
+            avatarUrl: avatarUrl.trim() || cur.avatarUrl,
+            avatarPosition,
+            campus: campus.trim(),
+            program: program.trim(),
+            role: role.trim(),
+            mainSkill: mainSkill.trim(),
+            profileSummary: about.trim()
+          };
+        case "skills":
+          return { ...cur, skills };
+        case "experience":
+          return { ...cur, experiences: experiences.filter((e) => e.title || e.organization || e.description) };
+        case "portfolio":
+          return { ...cur, portfolioLinks: portfolioLinks.filter((l) => l.url || l.label) };
+        case "lookingFor":
+          return { ...cur, lookingFor };
+        case "status":
+          return { ...cur, availability, availabilityDetail, statusLabel, collaborationGoals };
+        default:
+          return cur;
+      }
+    });
+    addToast(t.settingsSavedTitle, t.settingsSavedBody, "success");
+    onClose();
+  };
+
+  return createPortal(
+    <div className="overlay" role="presentation" onClick={onClose}>
+      <section className="modal-sheet quick-edit-modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+        <header className="quick-edit-head">
+          <h2>{titleMap[section]}</h2>
+          <Button variant="circle" aria-label="Close" onClick={onClose}>
+            <X size={18} aria-hidden="true" />
+          </Button>
+        </header>
+
+        <div className="quick-edit-body">
+          {section === "profile" ? (
+            <div className="field-grid">
+              <TextField label={t.name} value={name} onChange={setName} />
+              <PhotoUploadField label={t.profilePhoto} value={avatarUrl} position={avatarPosition} onChange={setAvatarUrl} onPositionChange={setAvatarPosition} />
+              <TextField label={t.campus} value={campus} onChange={setCampus} />
+              <SelectField
+                label={t.facultyProgram}
+                value={facultyOptions.includes(program) ? program : ""}
+                onChange={setProgram}
+                options={[{ label: id ? "Pilih fakultas" : "Select faculty", value: "" }, ...facultyOptions.map((f) => ({ label: f, value: f }))]}
+              />
+              <TextField label={t.roleMain} value={role} onChange={setRole} />
+              <TextField label={t.mainSkill} value={mainSkill} onChange={setMainSkill} />
+              <TextAreaField label={t.aboutProfile} value={about} onChange={setAbout} minRows={4} />
+            </div>
+          ) : null}
+
+          {section === "skills" ? (
+            <SkillChecklist selected={skills} onChange={setSkills} helper={t.skillHelper} />
+          ) : null}
+
+          {section === "experience" ? (
+            <MultiExperienceEditor experiences={experiences} onChange={setExperiences} />
+          ) : null}
+
+          {section === "portfolio" ? (
+            <PortfolioUploadEditor links={portfolioLinks} userId={user?.id} onChange={setPortfolioLinks} />
+          ) : null}
+
+          {section === "lookingFor" ? (
+            <MultiChipField label={t.lookingForLabel} values={lookingFor} options={roleOptions} onChange={setLookingFor} />
+          ) : null}
+
+          {section === "status" ? (
+            <div className="field-grid">
+              <SelectField
+                label={t.availabilityLabel}
+                value={availability}
+                onChange={(v) => setAvailability(v as CandidateProfile["availability"])}
+                options={[
+                  { label: localizeAvailabilityLabel("available", t), value: "available" },
+                  { label: localizeAvailabilityLabel("limited", t), value: "limited" },
+                  { label: localizeAvailabilityLabel("busy", t), value: "busy" }
+                ]}
+              />
+              <SelectField
+                label={t.statusBadge}
+                value={statusLabel}
+                onChange={setStatusLabel}
+                options={[
+                  { label: t.defaultStatus, value: "" },
+                  { label: t.lookingForProject, value: "Looking for project" },
+                  { label: t.availableThisWeek, value: "Available this week" },
+                  { label: t.busyMessageFirst, value: "Busy, message first" }
+                ]}
+              />
+              <TextAreaField label={t.availabilityDetails} value={availabilityDetail} onChange={setAvailabilityDetail} minRows={3} />
+              <MultiChipField label={t.collaborationType} values={collaborationGoals} options={collaborationGoalOptions} onChange={setCollaborationGoals} />
+            </div>
+          ) : null}
+        </div>
+
+        <div className="modal-actions quick-edit-actions">
+          <Button variant="secondary" onClick={onClose}>{t.cancel}</Button>
+          <Button variant="primary" onClick={save}>{t.save}</Button>
+        </div>
+      </section>
+    </div>,
+    document.body
   );
 }
 
@@ -6694,6 +7004,7 @@ function ProfilePage() {
   const { profile, setProfile, matches, savedIds, language, setLanguage, user } = useSymbio();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsSection, setSettingsSection] = useState<SettingsSection | null>(null);
+  const [quickEdit, setQuickEdit] = useState<QuickEditSection | null>(null);
   const [qrOpen, setQrOpen] = useState(false);
   const [logoutOpen, setLogoutOpen] = useState(false);
   const t = useTranslations();
@@ -6702,8 +7013,8 @@ function ProfilePage() {
     setSettingsSection(section);
     setSettingsOpen(true);
   };
-  const editPencil = (section: SettingsSection) => (
-    <button type="button" className="box-edit-btn" aria-label={t.editProfile} onClick={() => openSettings(section)}>
+  const editPencil = (section: QuickEditSection) => (
+    <button type="button" className="box-edit-btn" aria-label={t.editProfile} onClick={() => setQuickEdit(section)}>
       <Edit size={15} aria-hidden="true" />
     </button>
   );
@@ -6750,7 +7061,7 @@ function ProfilePage() {
           </p>
           <p>{localizeProfileSummary(profile, t)}</p>
         </div>
-        <Button variant="secondary" onClick={() => openSettings("profile")}>
+        <Button variant="secondary" onClick={() => setQuickEdit("profile")}>
           {t.editProfile}
         </Button>
       </section>
@@ -7010,6 +7321,9 @@ function ProfilePage() {
       ) : null}
       {settingsOpen ? (
         <SettingsDrawer onClose={() => setSettingsOpen(false)} onLogoutRequest={() => setLogoutOpen(true)} initialSection={settingsSection} />
+      ) : null}
+      {quickEdit ? (
+        <ProfileQuickEdit section={quickEdit} onClose={() => setQuickEdit(null)} />
       ) : null}
       {qrOpen ? <ProfileQrModal profile={profile} onClose={() => setQrOpen(false)} /> : null}
       {logoutOpen ? <LogoutConfirmModal onClose={() => setLogoutOpen(false)} /> : null}
@@ -8101,27 +8415,61 @@ export function CandidateDetailSheet({
   };
 
   const { addToast } = useSymbio();
-  const handleChat = () => {
-    // A real (mutual / approved) match comes from the DB matches table and has a
-    // UUID id. If one exists, open the conversation directly.
-    const existingMatch = matches.find(
+  const handleChat = async () => {
+    // If a real (DB) match already exists — accepted OR pending — open it.
+    const existing = matches.find(
       (m) => !m.isGroup && m.candidateId === profile.id && !m.id.startsWith("match-") && !m.id.startsWith("local")
     );
-    if (existingMatch) {
+    if (existing) {
       onClose();
-      navigate(`/chat/${existingMatch.id}`);
+      navigate(`/chat/${existing.id}`);
       return;
     }
 
-    // #17: Otherwise a conversation requires the other person's approval.
-    // Sending interest creates a chat request notification on their side; the
-    // chat only opens once they approve (which forms the mutual match).
-    actOnCandidate(profile, "interest");
+    if (!user?.id) return;
+
+    // #1 You can chat someone even before they follow back: create a pending
+    // match so a conversation exists, then open it. Their side sees it as a
+    // "Follow requested" chat they can approve.
+    try {
+      // Record the interest/follow request (notification to the other person).
+      actOnCandidate(profile, "interest");
+      const { data, error } = await supabase.rpc("create_pending_match", { target: profile.id });
+      if (error) throw error;
+      const matchId = data as string | null;
+      if (matchId) {
+        // Optimistically add the pending match so the chat page finds it
+        // immediately (no bounce to "conversation not found").
+        setMatches((prev) =>
+          prev.some((m) => m.id === matchId)
+            ? prev
+            : [
+                {
+                  id: matchId,
+                  candidateId: profile.id,
+                  createdAt: new Date().toLocaleDateString(),
+                  skillOverlap: [],
+                  latestMessage: "",
+                  unread: 0,
+                  status: "pending" as const,
+                  summary: []
+                },
+                ...prev
+              ]
+        );
+        onClose();
+        navigate(`/chat/${matchId}`);
+        return;
+      }
+    } catch (err) {
+      console.error("Could not open chat (run supabase_changes_v3.sql?):", err);
+    }
+
     addToast(
       language === "id" ? "Permintaan chat terkirim" : "Chat request sent",
       language === "id"
-        ? `${profile.name} harus menyetujui sebelum percakapan dimulai.`
-        : `${profile.name} needs to approve before the conversation can start.`,
+        ? `Permintaan terkirim ke ${profile.name}.`
+        : `Request sent to ${profile.name}.`,
       "info"
     );
     onClose();
