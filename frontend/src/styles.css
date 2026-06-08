@@ -7406,30 +7406,41 @@ img.avatar {
   right: 12px;
 }
 
-/* "Follow back" CTA for an incoming follow request, pinned top-centre of the
-   match card (clear of the avatar and the three-dot menu). */
+/* "Follow back" CTA for an incoming follow request — a normal item in the
+   bottom action row (Follow back | Chat | Profile), not a floating pill. */
 .match-followback-button {
-  position: absolute;
-  top: 12px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 4;
+  position: static !important;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   min-height: 34px;
-  padding: 7px 18px;
+  padding: 7px 14px;
   border: none;
   border-radius: 999px;
   background: var(--primary);
   color: #fff;
   font-weight: 800;
-  font-size: 0.82rem;
+  font-size: 0.8rem;
+  white-space: nowrap;
   cursor: pointer;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.28);
+  pointer-events: auto;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.28);
 }
 
 .match-followback-button:hover {
   filter: brightness(1.05);
+}
+
+@media (max-width: 767px) {
+  .match-followback-button {
+    flex: 1 !important;
+    min-width: 0 !important;
+    height: 26px !important;
+    min-height: 26px !important;
+    padding: 0 6px !important;
+    font-size: 0.7rem !important;
+    border-radius: 6px !important;
+  }
 }
 
 .notification-detail-overlay {
