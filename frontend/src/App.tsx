@@ -2042,6 +2042,7 @@ function App() {
         setNotifications([]);
         setDbCandidates([]);
         setShowSwiped(false);
+        candidateLookup.clear();
 
         const path = window.location.pathname;
         if (redirectSignedOut && path !== "/login" && path !== "/signup" && path !== "/" && path !== "/terms" && path !== "/privacy") {
@@ -2268,6 +2269,8 @@ function App() {
           .eq("id", user.id);
       }
       await supabase.auth.signOut();
+      // Reset every piece of user-scoped state so nothing from this account
+      // lingers for the next person who signs in on the same browser.
       setUser(null);
       setProfileState(starterProfile);
       setMatches([]);
@@ -2275,6 +2278,21 @@ function App() {
       setNotifications([]);
       setDbCandidates([]);
       setShowSwiped(false);
+      setPassedIds([]);
+      setInterestedIds([]);
+      setSavedIds([]);
+      setIncomingInterests([]);
+      setPreviousActions([]);
+      setFilters(defaultFilters);
+      setBlockedIds([]);
+      candidateLookup.clear();
+      // Drop the cached copies in localStorage too (they use shared keys).
+      ["profile", "filters", "passed", "interested", "saved", "matches", "notifications", "chats", "previous"].forEach((key) => {
+        window.localStorage.removeItem(`moots.${key}`);
+        window.sessionStorage.removeItem(`moots.${key}`);
+        window.localStorage.removeItem(`mutualizm.${key}`);
+        window.sessionStorage.removeItem(`mutualizm.${key}`);
+      });
       addToast(
         language === "id" ? "Keluar" : "Logged out",
         language === "id" ? "Anda sudah keluar dari sesi." : "You have been logged out of your session.",
@@ -2283,7 +2301,7 @@ function App() {
     } catch (err: any) {
       console.error("Logout error:", err);
     }
-  }, [addToast, language, user]);
+  }, [addToast, language, user, setPassedIds, setInterestedIds, setSavedIds, setIncomingInterests, setPreviousActions, setFilters]);
 
   const actOnCandidate = useCallback(
     async (candidate: CandidateProfile, action: SwipeAction, createdMatch = false) => {
