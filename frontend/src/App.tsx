@@ -1132,7 +1132,8 @@ function App() {
           title: n.title,
           body: n.body,
           time: new Date(n.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-          read: n.read
+          read: n.read,
+          actorId: n.actor_id ?? undefined
         }))
       );
     }
@@ -1507,11 +1508,14 @@ function App() {
           // person to approve (#17): only their side gets the request.
           const { error } = await supabase
             .from("swipes")
-            .upsert({
-              swiper_id: user.id,
-              swiped_id: candidate.id,
-              action: action
-            });
+            .upsert(
+              {
+                swiper_id: user.id,
+                swiped_id: candidate.id,
+                action: action
+              },
+              { onConflict: "swiper_id,swiped_id" }
+            );
           if (error) throw error;
 
           if (action === "interest") {
@@ -1805,11 +1809,14 @@ function App() {
         if (approved) {
           const { error } = await supabase
             .from("swipes")
-            .upsert({
-              swiper_id: user.id,
-              swiped_id: candidate.id,
-              action: "interest"
-            });
+            .upsert(
+              {
+                swiper_id: user.id,
+                swiped_id: candidate.id,
+                action: "interest"
+              },
+              { onConflict: "swiper_id,swiped_id" }
+            );
           if (error) throw error;
 
           addToast(
@@ -1820,11 +1827,14 @@ function App() {
         } else {
           const { error } = await supabase
             .from("swipes")
-            .upsert({
-              swiper_id: user.id,
-              swiped_id: candidate.id,
-              action: "pass"
-            });
+            .upsert(
+              {
+                swiper_id: user.id,
+                swiped_id: candidate.id,
+                action: "pass"
+              },
+              { onConflict: "swiper_id,swiped_id" }
+            );
           if (error) throw error;
 
           addToast(
@@ -2348,7 +2358,8 @@ function App() {
               title: newNotif.title,
               body: newNotif.body,
               time: new Date(newNotif.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-              read: newNotif.read
+              read: newNotif.read,
+              actorId: newNotif.actor_id ?? undefined
             };
 
             setNotifications((current) => [mappedNotif, ...current]);
@@ -4963,24 +4974,24 @@ function DiscoverPage() {
       }
       setSwipeMotion(action);
 
-      const dir = action === "save" ? "up" : action === "interest" ? "left" : "right";
-      const tx = dir === "right" ? "150%" : dir === "left" ? "-150%" : "0";
-      const ty = dir === "up" ? "-150%" : "26px";
-      const rot = dir === "right" ? 18 : dir === "left" ? -18 : 0;
+      // pass / interest exit toward the right, save floats up — each with a
+      // gentle rotate, scale-down and fade for a natural, polished throw.
+      const dir = action === "save" ? "up" : "right";
+      const tx = dir === "right" ? "135%" : "0";
+      const ty = dir === "up" ? "-135%" : "40px";
+      const rot = dir === "right" ? 14 : 0;
 
-      el.style.transition = "transform 340ms cubic-bezier(0.22, 0.61, 0.36, 1), opacity 300ms ease";
-      el.style.transform = `translate3d(${tx}, ${ty}, 0) rotate(${rot}deg)`;
+      el.style.transition = "transform 380ms cubic-bezier(0.33, 0, 0.2, 1), opacity 320ms ease-in";
+      el.style.transform = `translate3d(${tx}, ${ty}, 0) rotate(${rot}deg) scale(0.92)`;
       el.style.opacity = "0";
 
       window.setTimeout(() => {
-        // Reset the (reused) card element before showing the next profile.
-        el.style.transition = "";
-        el.style.transform = "";
-        el.style.opacity = "";
         dragRef.current = { x: 0, y: 0 };
+        // Advancing the cursor remounts the next card (key=current.id), which
+        // plays the entrance animation. The old element unmounts with it.
         handleAction(action);
         setSwipeMotion(null);
-      }, 320);
+      }, 300);
     },
     [current, handleAction, reducedMotion, swipeMotion]
   );
@@ -5118,8 +5129,9 @@ function DiscoverPage() {
         ) : null}
         {current ? (
           <CandidateCard
+            key={current.id}
             profile={current}
-            className={`active-card ${dragging ? "dragging" : ""} ${rewindAnim ? "card-rewind-anim" : ""}`}
+            className={`active-card card-enter ${dragging ? "dragging" : ""} ${rewindAnim ? "card-rewind-anim" : ""}`}
             actionHint={actionHint}
             swipeStatus={getSwipeStatus(current.id)}
             onExpand={() => setDetailProfile(current)}
@@ -6765,6 +6777,12 @@ function SavedPage() {
 }
 
 function findCandidateFromNotification(notification: NotificationItem) {
+  // Prefer the reliable actor_id link when present.
+  if (notification.actorId) {
+    const byActor = getCandidate(notification.actorId);
+    if (byActor) return byActor;
+  }
+
   const allProfiles = candidateLookup.size > 0 ? Array.from(candidateLookup.values()) : candidates;
   const sortedProfiles = [...allProfiles].sort((a, b) => b.name.length - a.name.length);
   
@@ -6846,6 +6864,13 @@ function NotificationsPage() {
                     return (
                       <>
                         <Button
+                          variant="secondary"
+                          onClick={() => setDetailProfile(candidate)}
+                        >
+                          <User size={16} aria-hidden="true" />
+                          {language === "id" ? "Lihat Profil" : "View profile"}
+                        </Button>
+                        <Button
                           variant="primary"
                           onClick={() => respondToMatchRequest(notification, candidate, true)}
                         >
@@ -6911,6 +6936,16 @@ function NotificationsPage() {
 
                   return (
                     <>
+                      <Button
+                        variant="secondary"
+                        onClick={() => {
+                          setDetailProfile(candidate);
+                          setSelectedNotification(null);
+                        }}
+                      >
+                        <User size={16} aria-hidden="true" />
+                        {language === "id" ? "Lihat Profil" : "View profile"}
+                      </Button>
                       <Button
                         variant="primary"
                         onClick={() => {

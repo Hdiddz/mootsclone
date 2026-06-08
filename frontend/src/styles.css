@@ -6950,6 +6950,17 @@ img.avatar {
 }
 
 /* FIX #10: Rewind animation */
+/* Gentle fade-in for each new top card (plays on mount via key=current.id).
+   Opacity only — animating transform here would fight the inline drag/fling
+   transform and make the card un-draggable. */
+@keyframes cardEnter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.candidate-card.card-enter {
+  animation: cardEnter 260ms ease-out;
+}
+
 @keyframes cardRewind {
   0% { transform: translate3d(-120%, 0, 0) rotate(-14deg); opacity: 0; }
   60% { opacity: 1; }

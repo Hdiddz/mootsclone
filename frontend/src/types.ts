@@ -92,6 +92,7 @@ export interface NotificationItem {
   body: string;
   time: string;
   read: boolean;
+  actorId?: string;
 }
 
 export interface ProjectOpportunity {
