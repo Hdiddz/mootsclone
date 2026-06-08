@@ -38,12 +38,16 @@ export default function MatchesPage() {
     (match) => !match.isGroup && getCandidate(match.candidateId)
   );
 
+  // A pending match I started (I follow them) is my outgoing "Follow requested".
+  // A pending match I did NOT start means the other person follows me and is
+  // waiting for me to follow back — "Wants to follow you". Deriving this from my
+  // own interestedIds is reliable even before incomingInterests has synced.
+  const isIncomingRequest = (match: typeof matches[number]) =>
+    match.status === "pending" && !(interestedIds || []).includes(match.candidateId);
+
   const requestStatusLabel = (match: typeof matches[number]): string | null => {
     if (match.status !== "pending") return null;
-    const iRequested = (interestedIds || []).includes(match.candidateId);
-    const theyRequested = (incomingInterests || []).includes(match.candidateId);
-    if (theyRequested && !iRequested) return t.wantsToFollowYou;
-    return t.followRequested;
+    return isIncomingRequest(match) ? t.wantsToFollowYou : t.followRequested;
   };
 
   const [selectedId, setSelectedId] = useState(approvedMatches[0]?.id ?? "");
@@ -147,10 +151,7 @@ export default function MatchesPage() {
                 </span>
                 {match.unread ? <b>{match.unread}</b> : null}
                 <div className="match-quick-actions">
-                  {candidate &&
-                  match.status === "pending" &&
-                  (incomingInterests || []).includes(match.candidateId) &&
-                  !(interestedIds || []).includes(match.candidateId) ? (
+                  {candidate && isIncomingRequest(match) ? (
                     <button
                       type="button"
                       className="match-followback-button"
