@@ -7431,8 +7431,32 @@ img.avatar {
   filter: brightness(1.05);
 }
 
+.match-reject-button {
+  position: static !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 7px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.42);
+  color: #fff;
+  font-weight: 800;
+  font-size: 0.8rem;
+  white-space: nowrap;
+  cursor: pointer;
+  pointer-events: auto;
+  backdrop-filter: blur(6px);
+}
+
+.match-reject-button:hover {
+  background: rgba(0, 0, 0, 0.6);
+}
+
 @media (max-width: 767px) {
-  .match-followback-button {
+  .match-followback-button,
+  .match-reject-button {
     flex: 1 !important;
     min-width: 0 !important;
     height: 26px !important;
@@ -9486,6 +9510,15 @@ body {
 .sheet-btn-new.chat-btn-new:hover {
   background: var(--primary-strong);
   border-color: var(--primary-strong);
+}
+
+.sheet-btn-new.reject-btn-new {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 45%, transparent);
+}
+
+.sheet-btn-new.reject-btn-new:hover {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
 }
 
 /* Responsive sidebar detail adjustments */

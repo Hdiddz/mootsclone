@@ -1836,17 +1836,26 @@ function App() {
 
       try {
         if (approved) {
+          // Follow back → mutual. Optimistically mark interested + accepted so
+          // the UI updates instantly.
+          setInterestedIds((c) => (c.includes(candidate.id) ? c : [candidate.id, ...c]));
+          setPassedIds((c) => c.filter((id) => id !== candidate.id));
+          setMatches((current) =>
+            current.map((m) => (!m.isGroup && m.candidateId === candidate.id ? { ...m, status: "accepted" } : m))
+          );
+
           const { error } = await supabase
             .from("swipes")
             .upsert(
-              {
-                swiper_id: user.id,
-                swiped_id: candidate.id,
-                action: "interest"
-              },
+              { swiper_id: user.id, swiped_id: candidate.id, action: "interest" },
               { onConflict: "swiper_id,swiped_id" }
             );
           if (error) throw error;
+          try {
+            await supabase.rpc("create_pending_match", { target: candidate.id });
+          } catch {
+            // optional
+          }
 
           addToast(
             language === "id" ? translations.id.matchRequestApprovedTitle : translations.en.matchRequestApprovedTitle,
@@ -1854,17 +1863,21 @@ function App() {
             "success"
           );
         } else {
+          // Reject → pass them and drop the pending match so it disappears.
+          setPassedIds((c) => (c.includes(candidate.id) ? c : [candidate.id, ...c]));
+          setInterestedIds((c) => c.filter((id) => id !== candidate.id));
+          setMatches((current) => current.filter((m) => m.isGroup || m.candidateId !== candidate.id));
+
           const { error } = await supabase
             .from("swipes")
             .upsert(
-              {
-                swiper_id: user.id,
-                swiped_id: candidate.id,
-                action: "pass"
-              },
+              { swiper_id: user.id, swiped_id: candidate.id, action: "pass" },
               { onConflict: "swiper_id,swiped_id" }
             );
           if (error) throw error;
+          const a = user.id < candidate.id ? user.id : candidate.id;
+          const b = user.id > candidate.id ? user.id : candidate.id;
+          await supabase.from("matches").delete().eq("user_a_id", a).eq("user_b_id", b);
 
           addToast(
             language === "id" ? translations.id.matchRequestRejectedTitle : translations.en.matchRequestRejectedTitle,
@@ -1881,7 +1894,6 @@ function App() {
         setNotifications((current) =>
           current.map((item) => (item.id === notification.id ? { ...item, read: true } : item))
         );
-        await fetchDiscoverAndMatches(user.id);
       } catch (err) {
         console.error("Error responding to match request:", err);
         addToast(
@@ -4397,7 +4409,9 @@ function AiAssistantBubble({ isOpen, onToggle }: { isOpen: boolean; onToggle: (o
 
   const handleFollow = async (candidate: CandidateProfile) => {
     const existingMatch = matches.find((m) => m.candidateId === candidate.id);
-    const isFollowed = interestedIds.includes(candidate.id) || !!existingMatch;
+    // You only "follow" someone if YOU swiped interest on them. A pending match
+    // where they follow you must NOT count as followed.
+    const isFollowed = interestedIds.includes(candidate.id);
 
     if (isFollowed) {
       setConfirmConfig({
@@ -4587,7 +4601,7 @@ ${allProfiles.map((candidate) => {
                     {mentionedCandidates.length > 0 && (
                       <div className="ai-mentioned-cards">
                         {mentionedCandidates.map(candidate => {
-                          const isFollowed = interestedIds.includes(candidate.id) || matches.some(m => m.candidateId === candidate.id);
+                          const isFollowed = interestedIds.includes(candidate.id);
                           return (
                             <div className="ai-mentioned-card" key={candidate.id}>
                               <div className="ai-mentioned-card-info" onClick={() => setDetailProfile(candidate)}>
@@ -7692,7 +7706,10 @@ export function CandidateDetailSheet({
   const navigate = useNavigate();
 
   const existingMatch = matches.find((m) => m.candidateId === profile.id);
-  const isFollowed = interestedIds.includes(profile.id) || !!existingMatch;
+  // Only count an actual outgoing interest as "followed" (not a pending match
+  // where the other person follows you).
+  const isFollowed = interestedIds.includes(profile.id);
+  const incomingPending = !!existingMatch && existingMatch.status === "pending" && !interestedIds.includes(profile.id);
   const [confirmConfig, setConfirmConfig] = useState<{
     title: string;
     message: string;
@@ -7826,11 +7843,27 @@ export function CandidateDetailSheet({
                   type="button"
                   className={`sheet-btn-new follow-btn-new ${isFollowed ? "followed" : ""}`}
                   onClick={handleFollow}
-                  title={isFollowed ? "Mutual Interest / Followed" : "Follow / Show Interest"}
+                  title={isFollowed ? "Mutual Interest / Followed" : incomingPending ? "Follow back" : "Follow / Show Interest"}
                 >
                   <Heart size={15} fill={isFollowed ? "var(--danger)" : "none"} stroke={isFollowed ? "var(--danger)" : "currentColor"} />
-                  <span>{isFollowed ? (language === "id" ? "Mengikuti" : "Followed") : (language === "id" ? "Ikuti" : "Follow")}</span>
+                  <span>
+                    {isFollowed
+                      ? (language === "id" ? "Mengikuti" : "Followed")
+                      : incomingPending
+                        ? (language === "id" ? "Ikuti balik" : "Follow back")
+                        : (language === "id" ? "Ikuti" : "Follow")}
+                  </span>
                 </button>
+                {incomingPending ? (
+                  <button
+                    type="button"
+                    className="sheet-btn-new reject-btn-new"
+                    onClick={() => { unfollowCandidate(profile.id); onClose(); }}
+                  >
+                    <X size={15} />
+                    <span>{language === "id" ? "Tolak" : "Reject"}</span>
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   className="sheet-btn-new chat-btn-new"

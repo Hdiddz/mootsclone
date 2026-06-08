@@ -15,7 +15,7 @@ import {
 } from "../App";
 
 export default function MatchesPage() {
-  const { matches, removeMatch, createGroupChat, fetchDiscoverAndMatches, user, interestedIds, incomingInterests, reportUser, blockUser, actOnCandidate } = useSymbio();
+  const { matches, setMatches, removeMatch, createGroupChat, fetchDiscoverAndMatches, user, interestedIds, reportUser, blockUser, actOnCandidate, unfollowCandidate } = useSymbio();
   const t = useTranslations();
   const navigate = useNavigate();
   const [openMenuId, setOpenMenuId] = useState("");
@@ -152,24 +152,40 @@ export default function MatchesPage() {
                 {match.unread ? <b>{match.unread}</b> : null}
                 <div className="match-quick-actions">
                   {candidate && isIncomingRequest(match) ? (
-                    <button
-                      type="button"
-                      className="match-followback-button"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        actOnCandidate(candidate, "interest");
-                      }}
+                    <>
+                      <button
+                        type="button"
+                        className="match-followback-button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          actOnCandidate(candidate, "interest");
+                          setMatches((current) =>
+                            current.map((m) => (m.id === match.id ? { ...m, status: "accepted" } : m))
+                          );
+                        }}
+                      >
+                        {t.language === "id" ? "Ikuti balik" : "Follow back"}
+                      </button>
+                      <button
+                        type="button"
+                        className="match-reject-button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          unfollowCandidate(match.candidateId);
+                        }}
+                      >
+                        {t.language === "id" ? "Tolak" : "Reject"}
+                      </button>
+                    </>
+                  ) : (
+                    <Link
+                      className="match-chat-button"
+                      to={`/chat/${match.id}`}
+                      onClick={(event) => event.stopPropagation()}
                     >
-                      {t.language === "id" ? "Ikuti balik" : "Follow back"}
-                    </button>
-                  ) : null}
-                  <Link
-                    className="match-chat-button"
-                    to={`/chat/${match.id}`}
-                    onClick={(event) => event.stopPropagation()}
-                  >
-                    {t.chat}
-                  </Link>
+                      {t.chat}
+                    </Link>
+                  )}
                   <button
                     type="button"
                     className="match-profile-button"
