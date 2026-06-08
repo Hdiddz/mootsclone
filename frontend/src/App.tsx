@@ -190,6 +190,20 @@ const defaultFilters: FilterValues = {
 
 const onlineStaleMs = 90_000;
 
+// A profile only needs onboarding if it is essentially empty. Since main skill
+// is now optional, we must NOT require it here — otherwise a registered user
+// who left it blank gets bounced back to /onboarding on every refresh.
+function profileNeedsOnboarding(p: CandidateProfile | null | undefined): boolean {
+  if (!p) return true;
+  const hasBasics =
+    Boolean((p.campus || "").trim()) ||
+    Boolean((p.program || "").trim()) ||
+    Boolean((p.mainSkill || "").trim()) ||
+    (Array.isArray(p.skills) && p.skills.length > 0) ||
+    Boolean((p.profileSummary || "").trim());
+  return !hasBasics;
+}
+
 function isProfileOnline(row: any) {
   if (!row?.online) {
     return false;
@@ -1210,7 +1224,7 @@ function AuthPage() {
     }
 
     if (isAuthenticated && user && profile && profile.id === user.id) {
-      if (!profile.mainSkill || !profile.campus) {
+      if (profileNeedsOnboarding(profile)) {
         navigate("/onboarding", { replace: true });
       } else {
         const dest = from === "/" || from === "/login" || from === "/signup" ? "/discover" : from;
@@ -1231,7 +1245,7 @@ function AuthPage() {
     if (mode === "login") {
       const profileResult = await login(loginEmail, password, rememberMe);
       if (profileResult) {
-        if (!profileResult.mainSkill || !profileResult.campus) {
+        if (profileNeedsOnboarding(profileResult)) {
           navigate("/onboarding", { replace: true });
         } else {
           navigate(from === "/" || from === "/login" || from === "/signup" ? "/discover" : from, { replace: true });
@@ -2008,7 +2022,7 @@ function App() {
         await fetchDiscoverAndMatchesRef.current(session.user.id);
         if (!mounted) return;
 
-        if (!p || !p.mainSkill || !p.campus) {
+        if (profileNeedsOnboarding(p)) {
           if (window.location.pathname !== "/onboarding") {
             navigateRef.current("/onboarding", { replace: true });
           }
@@ -2315,9 +2329,33 @@ function App() {
 
           if (action === "interest") {
             // Create a pending ("follow requested") match so the user can start
-            // chatting before the other person follows back (#E).
+            // chatting before the other person follows back. Then add it to the
+            // local matches list immediately so Matches/Chat work without a
+            // full, race-prone refetch.
             try {
-              await supabase.rpc("create_pending_match", { target: candidate.id });
+              const { data: pendingId } = await supabase.rpc("create_pending_match", { target: candidate.id });
+              if (pendingId) {
+                candidateLookup.set(candidate.id, candidate);
+                setMatches((current) =>
+                  current.some((m) => m.id === pendingId)
+                    ? current.map((m) =>
+                        m.id === pendingId ? { ...m, status: createdMatch ? "accepted" : m.status ?? "pending" } : m
+                      )
+                    : [
+                        {
+                          id: pendingId as string,
+                          candidateId: candidate.id,
+                          createdAt: new Date().toLocaleDateString(),
+                          skillOverlap: [],
+                          latestMessage: "",
+                          unread: 0,
+                          status: createdMatch ? "accepted" : "pending",
+                          summary: []
+                        },
+                        ...current
+                      ]
+                );
+              }
             } catch (err) {
               console.warn("Could not create pending match (run supabase_changes_v3.sql):", err);
             }
@@ -2346,22 +2384,21 @@ function App() {
                 console.warn("Could not create remote match request notification:", insertError);
               }
             }
-
-            addToast(
-              language === "id" ? translations.id.matchRequestSentTitle : translations.en.matchRequestSentTitle,
-              language === "id" ? translations.id.matchRequestSentBody : translations.en.matchRequestSentBody,
-              "success"
-            );
           }
-
-          // Refresh state from database
-          await fetchDiscoverAndMatches(user.id);
+          // No full refetch here: optimistic local state + realtime keep things
+          // in sync. Refetching on every swipe caused races where a slow earlier
+          // reload overwrote the newer state, so saves/follows "disappeared".
         } catch (err) {
           console.error("Error saving swipe:", err);
+          addToast(
+            language === "id" ? "Gagal menyimpan aksi" : "Action failed to save",
+            language === "id" ? "Periksa koneksi lalu coba lagi." : "Check your connection and try again.",
+            "error"
+          );
         }
       }
     },
-    [addToast, fetchDiscoverAndMatches, language, setInterestedIds, setPassedIds, setPreviousActions, setSavedIds, user]
+    [addToast, language, setInterestedIds, setMatches, setPassedIds, setPreviousActions, setSavedIds, user]
   );
 
   const rewindLast = useCallback(async () => {
@@ -5088,25 +5125,45 @@ function AiAssistantBubble({ isOpen, onToggle }: { isOpen: boolean; onToggle: (o
 
   const allProfiles = candidateLookup.size > 0 ? Array.from(candidateLookup.values()) : candidates;
 
-  const startChat = (candidate: CandidateProfile) => {
-    let existingMatch = matches.find((m) => m.candidateId === candidate.id);
-    if (!existingMatch) {
-      existingMatch = createMatchFor(candidate);
-      setMatches((prev) => [existingMatch!, ...prev]);
-      setChats((prev) => ({
-        ...prev,
-        [existingMatch!.id]: [
-          {
-            id: `ai-init-${candidate.id}`,
-            sender: "them",
-            text: language === "id" ? `Halo! Saya ${candidate.name}. Senang bertemu dengan Anda. Mari kita mulai kolaborasi.` : `Hi there! I'm ${candidate.name}. Nice to meet you. Let's start collaborating.`,
-            timestamp: "Just now"
-          }
-        ]
-      }));
+  const startChat = async (candidate: CandidateProfile) => {
+    const existing = matches.find(
+      (m) => !m.isGroup && m.candidateId === candidate.id && !m.id.startsWith("match-") && !m.id.startsWith("local")
+    );
+    if (existing) {
+      onToggle(false);
+      navigate(`/chat/${existing.id}`);
+      return;
     }
-    onToggle(false); // Close AI panel
-    navigate(`/chat/${existingMatch.id}`);
+    if (!user?.id) return;
+    try {
+      actOnCandidate(candidate, "interest");
+      const { data, error } = await supabase.rpc("create_pending_match", { target: candidate.id });
+      if (error) throw error;
+      const matchId = data as string | null;
+      if (matchId) {
+        setMatches((prev) =>
+          prev.some((m) => m.id === matchId)
+            ? prev
+            : [
+                {
+                  id: matchId,
+                  candidateId: candidate.id,
+                  createdAt: new Date().toLocaleDateString(),
+                  skillOverlap: [],
+                  latestMessage: "",
+                  unread: 0,
+                  status: "pending" as const,
+                  summary: []
+                },
+                ...prev
+              ]
+        );
+        onToggle(false);
+        navigate(`/chat/${matchId}`);
+      }
+    } catch (err) {
+      console.error("Could not start chat (run supabase_changes_v3.sql?):", err);
+    }
   };
 
   const handleFollow = async (candidate: CandidateProfile) => {
@@ -7410,7 +7467,7 @@ function ChatPage() {
 }
 
 function SavedPage() {
-  const { savedIds, removeSaved, matches, setMatches, setChats } = useSymbio();
+  const { savedIds, removeSaved, matches, setMatches, setChats, user, actOnCandidate } = useSymbio();
   const [detailProfile, setDetailProfile] = useState<CandidateProfile | null>(null);
   const navigate = useNavigate();
   const t = useTranslations();
@@ -7419,24 +7476,49 @@ function SavedPage() {
     .map((id) => getCandidate(id))
     .filter((candidate): candidate is CandidateProfile => Boolean(candidate));
 
-  const startChat = (candidate: CandidateProfile) => {
-    let existingMatch = matches.find((m) => m.candidateId === candidate.id);
-    if (!existingMatch) {
-      existingMatch = createMatchFor(candidate);
-      setMatches((prev) => [existingMatch!, ...prev]);
-      setChats((prev) => ({
-        ...prev,
-        [existingMatch!.id]: [
-          {
-            id: `saved-init-${candidate.id}`,
-            sender: "them",
-            text: t.savedChatStarter,
-            timestamp: "Just now"
-          }
-        ]
-      }));
+  const startChat = async (candidate: CandidateProfile) => {
+    // Open an existing real (DB) match if there is one.
+    const existing = matches.find(
+      (m) => !m.isGroup && m.candidateId === candidate.id && !m.id.startsWith("match-") && !m.id.startsWith("local")
+    );
+    if (existing) {
+      navigate(`/chat/${existing.id}`);
+      return;
     }
-    navigate(`/chat/${existingMatch.id}`);
+
+    if (!user?.id) return;
+
+    // Create a real pending match so the conversation persists (a local-only
+    // "match-…" entry got wiped by the chat page's refetch → "not found").
+    try {
+      actOnCandidate(candidate, "interest");
+      const { data, error } = await supabase.rpc("create_pending_match", { target: candidate.id });
+      if (error) throw error;
+      const matchId = data as string | null;
+      if (matchId) {
+        setMatches((prev) =>
+          prev.some((m) => m.id === matchId)
+            ? prev
+            : [
+                {
+                  id: matchId,
+                  candidateId: candidate.id,
+                  createdAt: new Date().toLocaleDateString(),
+                  skillOverlap: [],
+                  latestMessage: "",
+                  unread: 0,
+                  status: "pending" as const,
+                  summary: []
+                },
+                ...prev
+              ]
+        );
+        navigate(`/chat/${matchId}`);
+        return;
+      }
+    } catch (err) {
+      console.error("Could not start chat from saved (run supabase_changes_v3.sql?):", err);
+    }
   };
 
   return (
