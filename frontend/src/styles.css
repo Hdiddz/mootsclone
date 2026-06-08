@@ -1544,6 +1544,10 @@ button:disabled {
   z-index: 1;
   display: grid;
   place-items: center;
+  flex-shrink: 0;
+  overflow: hidden;
+  line-height: 1;
+  text-align: center;
   border: 3px solid rgba(255, 255, 255, 0.74);
   border-radius: 50%;
   color: var(--ink);
@@ -1569,11 +1573,13 @@ img.avatar {
 .avatar-sm {
   width: 46px;
   height: 46px;
+  font-size: 1rem;
 }
 
 .avatar-md {
   width: 58px;
   height: 58px;
+  font-size: 1.2rem;
 }
 
 .avatar-lg {
@@ -1839,6 +1845,27 @@ img.avatar {
 .onboarding-skip-link:disabled {
   opacity: 0.5;
   cursor: default;
+}
+
+/* Skip docked to the top-right corner of the step card itself. */
+.form-panel {
+  position: relative;
+}
+
+.onboarding-skip-corner {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  z-index: 2;
+}
+
+@media (max-width: 600px) {
+  .onboarding-skip-corner {
+    top: 12px;
+    right: 12px;
+    padding: 5px 11px;
+    font-size: 0.8rem;
+  }
 }
 
 .onboarding-grid {
@@ -2841,16 +2868,17 @@ img.avatar {
 
 .toast-stack {
   position: fixed;
-  /* Anchored below the header and to the right so it never covers the logo. */
-  top: 74px !important;
-  right: 16px !important;
-  bottom: auto !important;
-  left: auto !important;
-  transform: none !important;
+  /* Bottom-center: clear of the header/logo and the bottom-right chat/AI
+     bubbles, and unobtrusive on every screen size. */
+  top: auto !important;
+  bottom: 24px !important;
+  left: 50% !important;
+  right: auto !important;
+  transform: translateX(-50%) !important;
   z-index: 500;
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
+  align-items: center;
   width: max-content !important;
   max-width: calc(100vw - 32px) !important;
   gap: 8px;
@@ -3313,9 +3341,11 @@ img.avatar {
   }
 
   .toast-stack {
-    top: 68px !important;
-    right: 12px !important;
+    /* Sit above the mobile bottom nav. */
+    top: auto !important;
+    bottom: 84px !important;
     left: 12px !important;
+    right: 12px !important;
     transform: none !important;
     width: auto !important;
     max-width: none !important;
@@ -4969,6 +4999,77 @@ img.avatar {
   background: var(--primary, #765a00);
   color: #fff;
   cursor: pointer;
+}
+
+/* #7/#14 Settings — menu of sub-windows */
+.settings-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.settings-back-btn {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.settings-back-btn:hover {
+  background: var(--surface-muted, rgba(0, 0, 0, 0.05));
+}
+
+.settings-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.settings-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px 16px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 150ms ease, background 150ms ease, transform 120ms ease;
+}
+
+.settings-menu-item:hover {
+  border-color: var(--ink);
+  background: var(--surface-muted, rgba(0, 0, 0, 0.03));
+}
+
+.settings-menu-item span {
+  flex: 1;
+}
+
+.settings-menu-item .settings-menu-chevron {
+  transform: rotate(-90deg);
+  color: var(--muted);
+}
+
+.settings-menu-item.danger {
+  color: var(--danger);
+}
+
+.settings-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  animation: pageFadeIn 0.25s ease both;
 }
 
 /* #14 Settings — section headers for a clearer, more modern layout. */

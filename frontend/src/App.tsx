@@ -2016,6 +2016,15 @@ function App() {
           navigateRef.current("/login", { replace: true });
         }
       }
+
+      // Only flip authReady AFTER this (authoritative) call has finished its
+      // routing decision. A deduplicated call returns early above and must NOT
+      // mark auth ready, otherwise it could reveal /discover while the real
+      // call is still loading the profile and about to send a new user to
+      // onboarding (the OAuth signup → /discover flash).
+      if (mounted) {
+        setAuthReady(true);
+      }
     };
 
     supabase.auth.getSession().then(async ({ data: { session } }) => {
@@ -2029,10 +2038,7 @@ function App() {
         await applySession(session, false);
       } catch (err) {
         console.error("Session init error:", err);
-      } finally {
-        if (mounted) {
-          setAuthReady(true);
-        }
+        if (mounted) setAuthReady(true);
       }
     });
 
@@ -2041,10 +2047,7 @@ function App() {
         await applySession(session);
       } catch (err) {
         console.error("Auth change error:", err);
-      } finally {
-        if (mounted) {
-          setAuthReady(true);
-        }
+        if (mounted) setAuthReady(true);
       }
     });
 
@@ -2277,24 +2280,12 @@ function App() {
 
       if (user?.id) {
         try {
-          if (action === "interest" && candidate.mutualInterest) {
-            try {
-              await supabase.rpc("simulate_mutual_match", {
-                user_id: user.id,
-                candidate_id: candidate.id
-              });
-              await supabase
-                .from("swipes")
-                .upsert({
-                  swiper_id: candidate.id,
-                  swiped_id: user.id,
-                  action: "interest"
-                });
-            } catch (err) {
-              console.warn("Error simulating mutual match for mock candidate:", err);
-            }
-          }
-
+          // NOTE: We intentionally do NOT auto-reciprocate interest here.
+          // Previously a mock "simulate_mutual_match" inserted a reverse swipe
+          // (candidate -> me), which fired the match trigger and sent the
+          // "Someone wants to match with you" notification back to the follower
+          // (me) and created a fake match. Real follows must wait for the other
+          // person to approve (#17): only their side gets the request.
           const { error } = await supabase
             .from("swipes")
             .upsert({
@@ -4410,8 +4401,14 @@ function SettingsDrawer({
     currentPassword: "",
     newPassword: "",
     confirmPassword: "",
-    language
+    language,
+    skills: profile.skills,
+    experiences: profile.experiences.length ? profile.experiences : [emptyExperience],
+    portfolioLinks: profile.portfolioLinks.length
+      ? profile.portfolioLinks
+      : [{ label: "GitHub", url: "" }, { label: "Portfolio", url: "" }]
   });
+  const [activeSection, setActiveSection] = useState<null | "profile" | "account" | "preferences" | "privacy" | "danger">(null);
   const [settingsError, setSettingsError] = useState("");
   const [confirmConfig, setConfirmConfig] = useState<{
     title: string;
@@ -4455,7 +4452,10 @@ function SettingsDrawer({
       role: draft.role.trim(),
       mainSkill: draft.mainSkill.trim(),
       profileSummary: draft.bio.trim(),
-      statusLabel: draft.statusLabel.trim()
+      statusLabel: draft.statusLabel.trim(),
+      skills: draft.skills,
+      experiences: draft.experiences.filter((exp) => (exp.title || exp.organization || exp.description)),
+      portfolioLinks: draft.portfolioLinks.filter((link) => link.url || link.label)
     }));
     setLanguage(draft.language);
     addToast(t.settingsSavedTitle, t.settingsSavedBody);
@@ -4507,148 +4507,209 @@ function SettingsDrawer({
           onClick={(event) => event.stopPropagation()}
         >
           <header className="settings-drawer-header">
-            <div>
-              <p className="eyebrow">{t.settings}</p>
-              <h2>{t.settingsDrawerTitle}</h2>
+            <div className="settings-header-left">
+              {activeSection ? (
+                <button type="button" className="settings-back-btn" aria-label={t.back} onClick={() => { setActiveSection(null); setSettingsError(""); }}>
+                  <ArrowLeft size={18} aria-hidden="true" />
+                </button>
+              ) : null}
+              <div>
+                <p className="eyebrow">{t.settings}</p>
+                <h2>
+                  {activeSection === "profile" ? t.settingsSectionProfile
+                    : activeSection === "account" ? t.settingsSectionAccount
+                    : activeSection === "preferences" ? t.settingsSectionPreferences
+                    : activeSection === "privacy" ? t.settingsSectionPrivacy
+                    : activeSection === "danger" ? t.settingsSectionDanger
+                    : t.settingsDrawerTitle}
+                </h2>
+              </div>
             </div>
             <Button variant="circle" aria-label="Close settings" onClick={onClose}>
               <X size={18} aria-hidden="true" />
             </Button>
           </header>
 
-          <div className="settings-note">
-            <strong>{t.settingsRulesTitle}</strong>
-            <p>{t.settingsRulesBody}</p>
-          </div>
-
-          <div className="settings-section-title">{t.settingsSectionProfile}</div>
-          <div className="settings-form-grid">
-            <TextField label={t.name} value={draft.name} onChange={(value) => updateDraft("name", value)} />
-            <PhotoUploadField
-              label={t.profilePhoto}
-              value={draft.avatarUrl}
-              position={draft.avatarPosition}
-              onChange={(value) => updateDraft("avatarUrl", value)}
-              onPositionChange={(value) => updateDraft("avatarPosition", value)}
-            />
-            <TextField label={t.campus} value={draft.campus} onChange={(value) => updateDraft("campus", value)} />
-            <TextField label={t.program} value={draft.program} onChange={(value) => updateDraft("program", value)} />
-            <TextField label={t.roleMain} value={draft.role} onChange={(value) => updateDraft("role", value)} />
-            <TextField label={t.mainSkill} value={draft.mainSkill} onChange={(value) => updateDraft("mainSkill", value)} />
-            <label className="field settings-select-field">
-              <span>{t.statusBadge}</span>
-              <select
-                value={draft.statusLabel}
-                onChange={(event) => updateDraft("statusLabel", event.target.value)}
-              >
-                <option value="">{t.defaultStatus}</option>
-                <option value="Looking for project">{t.lookingForProject}</option>
-                <option value="Available this week">{t.availableThisWeek}</option>
-                <option value="Busy, message first">{t.busyMessageFirst}</option>
-              </select>
-            </label>
-            <label className="field settings-select-field">
-              <span>{t.websiteLanguage}</span>
-              <select
-                value={draft.language}
-                onChange={(event) => updateDraft("language", event.target.value)}
-              >
-                <option value="id">{t.indonesian}</option>
-                <option value="en">{t.english}</option>
-              </select>
-            </label>
-            <TextAreaField
-              label={t.aboutProfile}
-              value={draft.bio}
-              onChange={(value) => updateDraft("bio", value)}
-              minRows={4}
-            />
-          </div>
-
-          <div className="settings-section-title">{t.settingsSectionAccount}</div>
-          <div className="settings-security-grid">
-            <TextField
-              label={t.currentPassword}
-              value={draft.currentPassword}
-              onChange={(value) => updateDraft("currentPassword", value)}
-              placeholder={t.optionalDemo}
-              type="password"
-            />
-            <TextField
-              label={t.newPassword}
-              value={draft.newPassword}
-              onChange={(value) => updateDraft("newPassword", value)}
-              placeholder={t.passwordHint}
-              type="password"
-            />
-            <TextField
-              label={t.confirmNewPassword}
-              value={draft.confirmPassword}
-              onChange={(value) => updateDraft("confirmPassword", value)}
-              type="password"
-            />
-          </div>
-          {settingsError ? <div className="error-box"><p>{settingsError}</p></div> : null}
-
-          <div className="settings-section-title">{t.settingsSectionPreferences}</div>
-          <div className="settings-preference-list">
-            <label>
-              <input type="checkbox" defaultChecked />
-              {t.notifyPreference}
-            </label>
-            <label>
-              <input type="checkbox" defaultChecked />
-              {t.chatPreference}
-            </label>
-            <label>
-              <input type="checkbox" />
-              {t.emailPreference}
-            </label>
-          </div>
-
-          <div className="settings-section-title">{t.settingsSectionPrivacy}</div>
-          <div className="settings-blocked">
-            <p className="settings-blocked-desc">{t.blockedUsersDesc}</p>
-            {blockedUsers.length === 0 ? (
-              <p className="muted-text">{t.noBlockedUsers}</p>
-            ) : (
-              <ul className="blocked-user-list">
-                {blockedUsers.map((blocked) => (
-                  <li key={blocked.id} className="blocked-user-row">
-                    <Avatar profile={blocked} size="xs" />
-                    <span className="blocked-user-name">{blocked.name || t.yourName}</span>
-                    <button
-                      type="button"
-                      className="blocked-unblock-btn"
-                      onClick={() => unblockUser(blocked.id)}
-                    >
-                      {t.unblock}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-
-          <div className="settings-section-title settings-section-danger">{t.settingsSectionDanger}</div>
-          <div className="settings-actions">
-            <Button variant="ghostDanger" onClick={() => { onClose(); onLogoutRequest(); }}>
-              <LogOut size={18} aria-hidden="true" />
-              {t.logoutAccount}
-            </Button>
-            <Button variant="ghostDanger" onClick={deleteAccount}>
-              <Trash2 size={18} aria-hidden="true" />
-              {t.deleteAccount}
-            </Button>
-            <div>
-              <Button variant="secondary" onClick={onClose}>
-                {t.cancel}
-              </Button>
-              <Button variant="primary" onClick={saveSettings}>
-                {t.save}
-              </Button>
+          {/* Menu of sub-windows */}
+          {activeSection === null ? (
+            <div className="settings-menu">
+              <button type="button" className="settings-menu-item" onClick={() => setActiveSection("profile")}>
+                <User size={18} aria-hidden="true" />
+                <span><strong>{t.settingsSectionProfile}</strong></span>
+                <ChevronDown size={18} aria-hidden="true" className="settings-menu-chevron" />
+              </button>
+              <button type="button" className="settings-menu-item" onClick={() => setActiveSection("account")}>
+                <Settings size={18} aria-hidden="true" />
+                <span><strong>{t.settingsSectionAccount}</strong></span>
+                <ChevronDown size={18} aria-hidden="true" className="settings-menu-chevron" />
+              </button>
+              <button type="button" className="settings-menu-item" onClick={() => setActiveSection("preferences")}>
+                <SlidersHorizontal size={18} aria-hidden="true" />
+                <span><strong>{t.settingsSectionPreferences}</strong></span>
+                <ChevronDown size={18} aria-hidden="true" className="settings-menu-chevron" />
+              </button>
+              <button type="button" className="settings-menu-item" onClick={() => setActiveSection("privacy")}>
+                <Flag size={18} aria-hidden="true" />
+                <span><strong>{t.settingsSectionPrivacy}</strong></span>
+                <ChevronDown size={18} aria-hidden="true" className="settings-menu-chevron" />
+              </button>
+              <button type="button" className="settings-menu-item danger" onClick={() => setActiveSection("danger")}>
+                <Trash2 size={18} aria-hidden="true" />
+                <span><strong>{t.settingsSectionDanger}</strong></span>
+                <ChevronDown size={18} aria-hidden="true" className="settings-menu-chevron" />
+              </button>
             </div>
-          </div>
+          ) : null}
+
+          {activeSection === "profile" ? (
+            <div className="settings-panel">
+              <div className="settings-form-grid">
+                <TextField label={t.name} value={draft.name} onChange={(value) => updateDraft("name", value)} />
+                <PhotoUploadField
+                  label={t.profilePhoto}
+                  value={draft.avatarUrl}
+                  position={draft.avatarPosition}
+                  onChange={(value) => updateDraft("avatarUrl", value)}
+                  onPositionChange={(value) => updateDraft("avatarPosition", value)}
+                />
+                <TextField label={t.campus} value={draft.campus} onChange={(value) => updateDraft("campus", value)} />
+                <label className="field settings-select-field">
+                  <span>{t.facultyProgram}</span>
+                  <select value={facultyOptions.includes(draft.program) ? draft.program : ""} onChange={(event) => updateDraft("program", event.target.value)}>
+                    <option value="">{draft.program && !facultyOptions.includes(draft.program) ? draft.program : (language === "id" ? "Pilih fakultas" : "Select faculty")}</option>
+                    {facultyOptions.map((faculty) => (
+                      <option key={faculty} value={faculty}>{faculty}</option>
+                    ))}
+                  </select>
+                </label>
+                <TextField label={t.roleMain} value={draft.role} onChange={(value) => updateDraft("role", value)} />
+                <TextField label={t.mainSkill} value={draft.mainSkill} onChange={(value) => updateDraft("mainSkill", value)} />
+                <label className="field settings-select-field">
+                  <span>{t.statusBadge}</span>
+                  <select value={draft.statusLabel} onChange={(event) => updateDraft("statusLabel", event.target.value)}>
+                    <option value="">{t.defaultStatus}</option>
+                    <option value="Looking for project">{t.lookingForProject}</option>
+                    <option value="Available this week">{t.availableThisWeek}</option>
+                    <option value="Busy, message first">{t.busyMessageFirst}</option>
+                  </select>
+                </label>
+                <TextAreaField
+                  label={t.aboutProfile}
+                  value={draft.bio}
+                  onChange={(value) => updateDraft("bio", value)}
+                  minRows={4}
+                />
+              </div>
+
+              <div className="settings-section-title">{t.mainSkillsTitle}</div>
+              <SkillChecklist
+                selected={draft.skills}
+                onChange={(skills) => setDraft((current) => ({ ...current, skills }))}
+                helper={t.skillHelper}
+              />
+
+              <div className="settings-section-title">{t.experienceTitle}</div>
+              <ExperienceEditor
+                experience={draft.experiences[0] ?? emptyExperience}
+                onChange={(experience) => setDraft((current) => ({ ...current, experiences: [{ ...experience, id: current.experiences[0]?.id || "edit-exp-1" }] }))}
+              />
+
+              <div className="settings-section-title">{t.portfolioTitle}</div>
+              <PortfolioEditor
+                links={draft.portfolioLinks}
+                onChange={(portfolioLinks) => setDraft((current) => ({ ...current, portfolioLinks }))}
+              />
+
+              <div className="settings-actions">
+                <div>
+                  <Button variant="secondary" onClick={() => setActiveSection(null)}>{t.back}</Button>
+                  <Button variant="primary" onClick={saveSettings}>{t.save}</Button>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {activeSection === "account" ? (
+            <div className="settings-panel">
+              <div className="settings-security-grid">
+                <TextField label={t.currentPassword} value={draft.currentPassword} onChange={(value) => updateDraft("currentPassword", value)} placeholder={t.optionalDemo} type="password" />
+                <TextField label={t.newPassword} value={draft.newPassword} onChange={(value) => updateDraft("newPassword", value)} placeholder={t.passwordHint} type="password" />
+                <TextField label={t.confirmNewPassword} value={draft.confirmPassword} onChange={(value) => updateDraft("confirmPassword", value)} type="password" />
+              </div>
+              {settingsError ? <div className="error-box"><p>{settingsError}</p></div> : null}
+              <div className="settings-actions">
+                <div>
+                  <Button variant="secondary" onClick={() => setActiveSection(null)}>{t.back}</Button>
+                  <Button variant="primary" onClick={saveSettings}>{t.save}</Button>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {activeSection === "preferences" ? (
+            <div className="settings-panel">
+              <label className="field settings-select-field">
+                <span>{t.websiteLanguage}</span>
+                <select value={draft.language} onChange={(event) => updateDraft("language", event.target.value)}>
+                  <option value="id">{t.indonesian}</option>
+                  <option value="en">{t.english}</option>
+                </select>
+              </label>
+              <div className="settings-preference-list">
+                <label><input type="checkbox" defaultChecked />{t.notifyPreference}</label>
+                <label><input type="checkbox" defaultChecked />{t.chatPreference}</label>
+                <label><input type="checkbox" />{t.emailPreference}</label>
+              </div>
+              <div className="settings-actions">
+                <div>
+                  <Button variant="secondary" onClick={() => setActiveSection(null)}>{t.back}</Button>
+                  <Button variant="primary" onClick={saveSettings}>{t.save}</Button>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {activeSection === "privacy" ? (
+            <div className="settings-panel">
+              <div className="settings-blocked">
+                <p className="settings-blocked-desc">{t.blockedUsersDesc}</p>
+                {blockedUsers.length === 0 ? (
+                  <p className="muted-text">{t.noBlockedUsers}</p>
+                ) : (
+                  <ul className="blocked-user-list">
+                    {blockedUsers.map((blocked) => (
+                      <li key={blocked.id} className="blocked-user-row">
+                        <Avatar profile={blocked} size="xs" />
+                        <span className="blocked-user-name">{blocked.name || t.yourName}</span>
+                        <button type="button" className="blocked-unblock-btn" onClick={() => unblockUser(blocked.id)}>
+                          {t.unblock}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          ) : null}
+
+          {activeSection === "danger" ? (
+            <div className="settings-panel">
+              <div className="settings-note">
+                <strong>{t.settingsRulesTitle}</strong>
+                <p>{t.settingsRulesBody}</p>
+              </div>
+              <div className="settings-actions">
+                <Button variant="ghostDanger" onClick={() => { onClose(); onLogoutRequest(); }}>
+                  <LogOut size={18} aria-hidden="true" />
+                  {t.logoutAccount}
+                </Button>
+                <Button variant="ghostDanger" onClick={deleteAccount}>
+                  <Trash2 size={18} aria-hidden="true" />
+                  {t.deleteAccount}
+                </Button>
+              </div>
+            </div>
+          ) : null}
         </aside>
       </div>
       {confirmConfig && (
@@ -4749,9 +4810,6 @@ function ProfileQrModal({ profile, onClose }: { profile: CandidateProfile; onClo
         <h2>{t.qrTitle}</h2>
         <p>{t.qrBody} {profile.name}.</p>
         <img src={qrUrl} alt={`QR code for ${profile.name} profile`} />
-        <a href={profileUrl} className="profile-url" target="_blank" rel="noreferrer">
-          {profileUrl}
-        </a>
         <div className="modal-actions">
           <Button variant="secondary" onClick={copyLink}>
             {t.copyLink}
@@ -5810,17 +5868,6 @@ function OnboardingPage() {
           Moots <span>✦</span>
         </Link>
         <div className="onboarding-top-actions">
-          {canSkip ? (
-            <button
-              type="button"
-              onClick={skipStep}
-              disabled={saving}
-              className="onboarding-skip-link"
-            >
-              {t.skip}
-              <ArrowRight size={15} aria-hidden="true" />
-            </button>
-          ) : null}
           <button
             onClick={async () => {
               await logout();
@@ -5851,6 +5898,17 @@ function OnboardingPage() {
         <section className="onboarding-form">
           <StepProgress steps={steps} activeStep={step} />
           <div className="form-panel">
+            {canSkip ? (
+              <button
+                type="button"
+                onClick={skipStep}
+                disabled={saving}
+                className="onboarding-skip-link onboarding-skip-corner"
+              >
+                {t.skip}
+                <ArrowRight size={15} aria-hidden="true" />
+              </button>
+            ) : null}
             <p className="eyebrow">{t.stepOf} {step + 1} {t.of} 10</p>
             <h1>{steps[step]}</h1>
             <OnboardingStep step={step} draft={draft} setDraft={setDraft} />
@@ -6159,10 +6217,12 @@ type ActivityPost = {
 // #9 Activity feed — LinkedIn-style posts with image, likes and comments.
 // Data is loaded on mount (and after each create), satisfying the
 // "refresh on navigation rather than strict realtime" requirement.
-function ProfileActivity({ userId, authorProfile }: { userId?: string; authorProfile: CandidateProfile }) {
+function ProfileActivity({ userId, authorProfile, readOnly = false }: { userId?: string; authorProfile: CandidateProfile; readOnly?: boolean }) {
   const t = useTranslations();
-  const { addToast } = useSymbio();
+  const { addToast, user } = useSymbio();
   const id = t.language === "id";
+  const meId = user?.id;
+  const isOwnFeed = !readOnly && meId === userId;
   const [posts, setPosts] = useState<ActivityPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [caption, setCaption] = useState("");
@@ -6207,16 +6267,18 @@ function ProfileActivity({ userId, authorProfile }: { userId?: string; authorPro
         imageUrl: p.image_url ?? null,
         createdAt: new Date(p.created_at).toLocaleDateString(),
         likeCount: likesRows.filter((l) => l.post_id === p.id).length,
-        likedByMe: likesRows.some((l) => l.post_id === p.id && l.user_id === userId),
+        likedByMe: likesRows.some((l) => l.post_id === p.id && l.user_id === meId),
         comments: commentRows
           .filter((c) => c.post_id === p.id)
           .map((c) => ({
             id: c.id,
             authorId: c.author_id,
             authorName:
-              c.author_id === userId
-                ? authorProfile.name || (id ? "Anda" : "You")
-                : candidateLookup.get(c.author_id)?.name || (id ? "Anggota" : "Member"),
+              c.author_id === meId
+                ? (id ? "Anda" : "You")
+                : c.author_id === userId
+                  ? authorProfile.name || (id ? "Anggota" : "Member")
+                  : candidateLookup.get(c.author_id)?.name || (id ? "Anggota" : "Member"),
             text: c.text
           }))
       }));
@@ -6226,7 +6288,7 @@ function ProfileActivity({ userId, authorProfile }: { userId?: string; authorPro
     } finally {
       setLoading(false);
     }
-  }, [userId, authorProfile.name, id]);
+  }, [userId, meId, authorProfile.name, id]);
 
   useEffect(() => {
     loadPosts();
@@ -6279,7 +6341,7 @@ function ProfileActivity({ userId, authorProfile }: { userId?: string; authorPro
   };
 
   const toggleLike = async (post: ActivityPost) => {
-    if (!userId) return;
+    if (!meId) return;
     const liked = post.likedByMe;
     setPosts((current) =>
       current.map((p) =>
@@ -6290,9 +6352,9 @@ function ProfileActivity({ userId, authorProfile }: { userId?: string; authorPro
     );
     try {
       if (liked) {
-        await supabase.from("post_likes").delete().eq("post_id", post.id).eq("user_id", userId);
+        await supabase.from("post_likes").delete().eq("post_id", post.id).eq("user_id", meId);
       } else {
-        await supabase.from("post_likes").upsert({ post_id: post.id, user_id: userId });
+        await supabase.from("post_likes").upsert({ post_id: post.id, user_id: meId });
       }
     } catch (err) {
       console.error("Error toggling like:", err);
@@ -6301,18 +6363,18 @@ function ProfileActivity({ userId, authorProfile }: { userId?: string; authorPro
 
   const addComment = async (post: ActivityPost) => {
     const text = (commentDrafts[post.id] || "").trim();
-    if (!userId || !text) return;
+    if (!meId || !text) return;
     try {
       const { data, error } = await supabase
         .from("post_comments")
-        .insert({ post_id: post.id, author_id: userId, text })
+        .insert({ post_id: post.id, author_id: meId, text })
         .select("id")
         .single();
       if (error) throw error;
       const newComment: ActivityComment = {
         id: data?.id || `local-${Date.now()}`,
-        authorId: userId,
-        authorName: authorProfile.name || (id ? "Anda" : "You"),
+        authorId: meId,
+        authorName: id ? "Anda" : "You",
         text
       };
       setPosts((current) =>
@@ -6337,6 +6399,7 @@ function ProfileActivity({ userId, authorProfile }: { userId?: string; authorPro
     <section className="profile-info-panel activity-panel">
       <h2>{id ? "Aktivitas" : "Activity"}</h2>
 
+      {isOwnFeed ? (
       <div className="activity-composer">
         <Avatar profile={authorProfile} size="sm" />
         <div className="activity-composer-body">
@@ -6376,11 +6439,16 @@ function ProfileActivity({ userId, authorProfile }: { userId?: string; authorPro
           </div>
         </div>
       </div>
+      ) : null}
 
       {loading ? (
         <p className="muted-text">{id ? "Memuat aktivitas…" : "Loading activity…"}</p>
       ) : posts.length === 0 ? (
-        <p className="muted-text">{id ? "Belum ada aktivitas. Buat postingan pertama Anda!" : "No activity yet. Create your first post!"}</p>
+        <p className="muted-text">
+          {isOwnFeed
+            ? (id ? "Belum ada aktivitas. Buat postingan pertama Anda!" : "No activity yet. Create your first post!")
+            : (id ? "Belum ada aktivitas." : "No activity yet.")}
+        </p>
       ) : (
         <div className="activity-feed">
           {posts.map((post) => (
@@ -6391,14 +6459,16 @@ function ProfileActivity({ userId, authorProfile }: { userId?: string; authorPro
                   <strong>{authorProfile.name || (id ? "Anda" : "You")}</strong>
                   <small>{post.createdAt}</small>
                 </div>
-                <button
-                  type="button"
-                  className="activity-delete-btn"
-                  aria-label={id ? "Hapus postingan" : "Delete post"}
-                  onClick={() => deletePost(post.id)}
-                >
-                  <Trash2 size={15} />
-                </button>
+                {isOwnFeed ? (
+                  <button
+                    type="button"
+                    className="activity-delete-btn"
+                    aria-label={id ? "Hapus postingan" : "Delete post"}
+                    onClick={() => deletePost(post.id)}
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                ) : null}
               </header>
               {post.caption ? <p className="activity-caption">{post.caption}</p> : null}
               {post.imageUrl ? <img className="activity-post-image" src={post.imageUrl} alt="" /> : null}
@@ -6507,6 +6577,8 @@ function ProfilePage() {
         </Button>
       </section>
 
+      <ProfileActivity userId={user?.id} authorProfile={profile} />
+
       <div className="profile-detail-grid">
         <section className="profile-info-panel">
           <div className="rail-heading">
@@ -6557,8 +6629,6 @@ function ProfilePage() {
           </div>
         </section>
       </div>
-
-      <ProfileActivity userId={user?.id} authorProfile={profile} />
 
       {false && settingsOpen ? (
         <div className="overlay" role="presentation" onClick={() => setSettingsOpen(false)}>
@@ -8014,6 +8084,8 @@ export function CandidateDetailSheet({
               ))}
             </div>
           </DetailSection>
+
+          <ProfileActivity userId={profile.id} authorProfile={profile} readOnly />
         </div>
       </aside>
     </div>
