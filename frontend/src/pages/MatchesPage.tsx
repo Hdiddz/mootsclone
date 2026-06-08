@@ -15,7 +15,7 @@ import {
 } from "../App";
 
 export default function MatchesPage() {
-  const { matches, removeMatch, createGroupChat, fetchDiscoverAndMatches, user, interestedIds, incomingInterests, reportUser, blockUser } = useSymbio();
+  const { matches, removeMatch, createGroupChat, fetchDiscoverAndMatches, user, interestedIds, incomingInterests, reportUser, blockUser, actOnCandidate } = useSymbio();
   const t = useTranslations();
   const navigate = useNavigate();
   const [openMenuId, setOpenMenuId] = useState("");
@@ -147,6 +147,21 @@ export default function MatchesPage() {
                 </span>
                 {match.unread ? <b>{match.unread}</b> : null}
                 <div className="match-quick-actions">
+                  {candidate &&
+                  match.status === "pending" &&
+                  (incomingInterests || []).includes(match.candidateId) &&
+                  !(interestedIds || []).includes(match.candidateId) ? (
+                    <button
+                      type="button"
+                      className="match-followback-button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        actOnCandidate(candidate, "interest");
+                      }}
+                    >
+                      {t.language === "id" ? "Ikuti balik" : "Follow back"}
+                    </button>
+                  ) : null}
                   <Link
                     className="match-chat-button"
                     to={`/chat/${match.id}`}
