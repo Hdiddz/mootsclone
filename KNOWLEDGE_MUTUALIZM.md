@@ -16,7 +16,7 @@ Konsep "mutualisme" diambil dari hubungan simbiosis yang saling menguntungkan �
 
 ## 🎯 Untuk Siapa?
 
-| Pengguna | Kebutuhan |
+| Pengguna | Kebutuhan ||
 |---|---|
 | 🎓 **Mahasiswa Telkom University** | Mencari partner hackathon, tugas akhir, atau side project |
 | 🚀 **Startup Founder Kampus** | Mencari co-founder atau anggota tim untuk startup |
