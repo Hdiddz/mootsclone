@@ -856,6 +856,78 @@ function App() {
       profileRef.current = formattedProfile;
       return formattedProfile;
     }
+
+    // Profile row not found — this can happen for Google OAuth users if the
+    // Supabase `handle_new_user` trigger hasn't run yet or is missing.
+    // Upsert a minimal row from auth session metadata so the user lands on
+    // onboarding instead of getting stuck on the loading screen.
+    if (error?.code === "PGRST116" || !data) {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const authUser = sessionData?.session?.user;
+      if (authUser) {
+        const fallbackEmail = authUser.email || "";
+        const fallbackName =
+          authUser.user_metadata?.full_name ||
+          authUser.user_metadata?.name ||
+          fallbackEmail.split("@")[0] ||
+          "";
+        const fallbackAvatar =
+          authUser.user_metadata?.avatar_url ||
+          authUser.user_metadata?.picture ||
+          undefined;
+
+        await supabase.from("profiles").upsert(
+          {
+            id: userId,
+            email: fallbackEmail,
+            name: fallbackName,
+            avatar_url: fallbackAvatar ?? null,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "id" }
+        );
+
+        // Re-fetch after upsert
+        const { data: retryData } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", userId)
+          .single();
+
+        if (retryData) {
+          const formattedProfile: CandidateProfile = {
+            id: retryData.id,
+            name: retryData.name || fallbackName,
+            campus: retryData.campus || "",
+            program: retryData.program || "",
+            role: retryData.role || "",
+            mainSkill: retryData.main_skill || "",
+            skills: Array.isArray(retryData.skills) ? retryData.skills : [],
+            profileSummary: retryData.profile_summary || "",
+            experienceSummary: retryData.experience_summary || "",
+            experiences: Array.isArray(retryData.experiences) ? retryData.experiences : [],
+            lookingFor: Array.isArray(retryData.looking_for) ? retryData.looking_for : [],
+            availability: (retryData.availability as any) || "available",
+            availabilityDetail: retryData.availability_detail || "",
+            collaborationGoals: Array.isArray(retryData.collaboration_goals) ? retryData.collaboration_goals : [],
+            portfolioLinks: Array.isArray(retryData.portfolio_links) ? retryData.portfolio_links : [],
+            preferredRole: retryData.preferred_role || "",
+            suggestedMessage: retryData.suggested_message || "",
+            accent: retryData.accent || "accent-indigo",
+            avatarUrl: retryData.avatar_url || fallbackAvatar,
+            avatarPosition: retryData.avatar_position || undefined,
+            statusLabel: retryData.status_label || undefined,
+            online: isProfileOnline(retryData),
+            mutualInterest: retryData.mutual_interest !== false
+          };
+          setProfileState(formattedProfile);
+          profileRef.current = formattedProfile;
+          return formattedProfile;
+        }
+      }
+    }
+
     return null;
   }, []);
 

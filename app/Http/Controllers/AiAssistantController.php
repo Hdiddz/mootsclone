@@ -40,9 +40,6 @@ class AiAssistantController extends Controller
 
         // Prioritize Gemini since the user requested it specifically for Vercel deployment
         $geminiKey = config('services.gemini.key');
-        if (empty($geminiKey) || strlen($geminiKey) < 10) {
-            $geminiKey = 'AIzaSyDjZT3eKW0Z9VzNNpXiJ4eUEZEXmS51WOk';
-        }
 
         if ($geminiKey) {
             try {
