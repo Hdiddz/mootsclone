@@ -1991,27 +1991,24 @@ function App() {
 
       if (user?.id) {
         try {
-          const { data: groupData, error: groupError } = await supabase
-            .from("chat_groups")
-            .insert({
-              title: groupTitle,
-              created_by: user.id
-            })
-            .select("id, created_at")
-            .single();
-          if (groupError) throw groupError;
-
-          const dbGroupId = groupData.id;
           const allMemberIds = Array.from(new Set([user.id, ...cleanMemberIds]));
-          const { error: memberError } = await supabase
-            .from("chat_group_members")
-            .insert(allMemberIds.map((memberId) => ({ group_id: dbGroupId, user_id: memberId })));
-          if (memberError) throw memberError;
+
+          // Use SECURITY DEFINER function to bypass RLS issues with batch member insertion
+          const { data: newGroupId, error: rpcError } = await supabase
+            .rpc("create_group_with_members", {
+              p_title: groupTitle,
+              p_created_by: user.id,
+              p_member_ids: allMemberIds
+            });
+
+          if (rpcError) throw rpcError;
+
+          const dbGroupId = newGroupId as string;
 
           const groupMatch: MatchRecord = {
             id: dbGroupId,
             candidateId: cleanMemberIds[0] || user.id,
-            createdAt: new Date(groupData.created_at).toLocaleDateString(),
+            createdAt: new Date().toLocaleDateString(),
             skillOverlap: [],
             latestMessage: "",
             unread: 0,
@@ -2446,12 +2443,12 @@ function App() {
         {
           event: "INSERT",
           schema: "public",
-          table: "chat_group_members"
+          table: "chat_group_members",
+          filter: `user_id=eq.${user.id}`
         },
-        (payload) => {
-          if (payload.new && payload.new.user_id === user.id) {
-            fetchDiscoverAndMatches(user.id);
-          }
+        (_payload) => {
+          // This user was just added to a new group — reload matches so the group appears
+          fetchDiscoverAndMatches(user.id);
         }
       )
       .on(
@@ -5571,8 +5568,6 @@ function OnboardingStep({
   }
 
   if (step === 1) {
-    const facultyPool = facultyConfig[draft.program]?.skills ?? [];
-    const facultyPoolNames = facultyPool.map((s) => s.name);
     return (
       <div className="field-grid">
         <TextField
@@ -5585,68 +5580,37 @@ function OnboardingStep({
           label={t.facultyProgram}
           value={facultyOptions.includes(draft.program) ? draft.program : ""}
           onChange={(value) =>
-            setDraft((current) => {
-              const nextPool = facultyConfig[value]?.skills ?? [];
-              const nextPoolNames = nextPool.map((s) => s.name);
-              const nextRoles = facultyConfig[value]?.roles ?? [];
-              return {
-                ...current,
-                program: value,
-                // Cascade: drop role/skills that don't belong to the new faculty.
-                role: nextRoles.includes(current.role) ? current.role : "",
-                mainSkill: nextPoolNames.includes(current.mainSkill) ? current.mainSkill : "",
-                skills: current.skills.filter((s) => nextPoolNames.includes(s.name))
-              };
-            })
+            setDraft((current) => ({
+              ...current,
+              program: value
+            }))
           }
           options={[
             { label: t.language === "id" ? "Pilih fakultas" : "Select faculty", value: "" },
             ...facultyOptions.map((faculty) => ({ label: faculty, value: faculty }))
           ]}
         />
-        {facultyPoolNames.length === 0 ? (
-          <p className="muted-text" style={{ fontSize: "0.82rem" }}>
-            {t.language === "id"
-              ? "Pilih fakultas untuk menyesuaikan pilihan peran dan skill berikutnya."
-              : "Pick a faculty to tailor the role and skill options in the next steps."}
-          </p>
-        ) : null}
       </div>
     );
   }
 
   if (step === 2) {
-    const faculty = facultyConfig[draft.program];
-    const facultyRoles = faculty?.roles ?? [];
-    const facultySkills = faculty?.skills ?? [];
     const optionalHint = t.language === "id" ? " (opsional)" : " (optional)";
-
-    if (!faculty) {
-      return (
-        <div className="field-grid">
-          <p className="muted-text">
-            {t.language === "id"
-              ? "Silakan pilih fakultas di langkah sebelumnya agar pilihan peran & skill muncul di sini."
-              : "Please choose a faculty in the previous step so the role & skill options appear here."}
-          </p>
-        </div>
-      );
-    }
 
     return (
       <div className="field-grid">
         <SelectField
           label={`${t.mainRole}${optionalHint}`}
-          value={facultyRoles.includes(draft.role) ? draft.role : ""}
+          value={roleOptions.includes(draft.role) ? draft.role : ""}
           onChange={(value) => update({ role: value })}
           options={[
             { label: t.language === "id" ? "Pilih peran" : "Select role", value: "" },
-            ...facultyRoles.map((role) => ({ label: localizeRoleLabel(role, t), value: role }))
+            ...roleOptions.map((role) => ({ label: localizeRoleLabel(role, t), value: role }))
           ]}
         />
         <SelectField
           label={`${t.mainSkillLabel}${optionalHint}`}
-          value={facultySkills.some((s) => s.name === draft.mainSkill) ? draft.mainSkill : ""}
+          value={allSkills.some((s) => s.name === draft.mainSkill) ? draft.mainSkill : ""}
           onChange={(value) =>
             setDraft((current) => ({
               ...current,
@@ -5656,7 +5620,7 @@ function OnboardingStep({
           }
           options={[
             { label: t.language === "id" ? "Pilih skill utama" : "Select main skill", value: "" },
-            ...facultySkills.map((s) => ({ label: s.name, value: s.name }))
+            ...allSkills.map((s) => ({ label: s.name, value: s.name }))
           ]}
         />
         <MultiChipField
@@ -5670,14 +5634,13 @@ function OnboardingStep({
   }
 
   if (step === 3) {
-    const facultyPool = facultyConfig[draft.program]?.skills;
     return (
       <div className="field-grid">
         <SkillChecklist
           selected={draft.skills}
           onChange={(skills) => update({ skills })}
           helper={t.skillHelper}
-          pool={facultyPool}
+          pool={allSkills}
         />
       </div>
     );
@@ -5713,9 +5676,9 @@ function OnboardingStep({
 
   if (step === 6) {
     return (
-      <ExperienceEditor
-        experience={draft.experiences[0] ?? emptyExperience}
-        onChange={(experience) => update({ experiences: [{ ...experience, id: "draft-exp-1" }] })}
+      <MultiExperienceEditor
+        experiences={draft.experiences.length ? draft.experiences : [emptyExperience]}
+        onChange={(experiences) => update({ experiences })}
       />
     );
   }

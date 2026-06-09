@@ -1264,8 +1264,8 @@ button:disabled {
   z-index: 2;
   display: flex;
   width: min(100%, 520px);
-  min-height: 0;
-  height: min(620px, calc(100vh - 270px));
+  min-height: 480px;
+  height: min(620px, calc(100vh - 220px));
   max-height: 620px;
   flex-direction: column;
   overflow: hidden;
