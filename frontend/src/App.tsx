@@ -350,13 +350,13 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
 }
 
 function RootRoute() {
-  const { authReady, isAuthenticated } = useSymbio();
+  const { authReady } = useSymbio();
 
   if (!authReady) {
     return <ScreenLoader />;
   }
 
-  return isAuthenticated ? <Navigate to="/discover" replace /> : <LandingPage />;
+  return <LandingPage />;
 }
 
 function ScreenLoader() {
@@ -2930,8 +2930,6 @@ function LandingPage() {
 
   return (
     <div className="landing-shell page-transition">
-      <div className="auth-bg-blob-1" />
-      <div className="auth-bg-blob-2" />
 
       <header className="landing-nav">
         <Link to="/" className="brand-mark" aria-label="Moots home" style={{ display: "flex", alignItems: "center", gap: "8px", fontWeight: "700", fontSize: "1.25rem" }}>
@@ -3058,6 +3056,127 @@ function LandingPage() {
           </div>
         </section>
 
+
+
+        {/* --- Matches & Real-time Chat Section --- */}
+        <section className="section-band" id="chat-section" style={{ borderTop: "1px solid var(--border)" }}>
+          <div className="section-heading" style={{ textAlign: "center", margin: "0 auto 48px" }}>
+            <p className="eyebrow" style={{ color: "var(--accent)", fontWeight: "700", letterSpacing: "0.05em" }}>
+              {t.language === "id" ? "KONEKSI" : "CONNECTIONS"}
+            </p>
+            <h2 style={{ fontFamily: "Montserrat, sans-serif", fontWeight: "700", fontSize: "2.2rem", color: "var(--ink)" }}>
+              {t.language === "id" ? "Matches & Real-time Chat" : "Matches & Real-time Chat"}
+            </h2>
+            <p style={{ color: "var(--muted)", fontSize: "1.05rem", maxWidth: "640px", margin: "12px auto 0", lineHeight: "1.6" }}>
+              {t.language === "id"
+                ? "Setelah saling follow, langsung chat dan mulai kolaborasi. Semua pesan real-time dengan notifikasi langsung."
+                : "After mutual follows, chat instantly and start collaborating. All messages are real-time with instant notifications."}
+            </p>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "20px", maxWidth: "820px", margin: "0 auto" }}>
+            <div style={{ border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "24px", background: "var(--surface)", textAlign: "center" }}>
+              <MessageCircle size={32} style={{ color: "var(--primary)", marginBottom: "12px" }} aria-hidden="true" />
+              <h3 style={{ margin: "0 0 8px", fontSize: "1.1rem" }}>{t.language === "id" ? "Chat 1-on-1" : "1-on-1 Chat"}</h3>
+              <p style={{ margin: 0, color: "var(--muted)", fontSize: "0.92rem", lineHeight: "1.5" }}>
+                {t.language === "id" ? "Diskusi langsung dengan match kamu secara privat." : "Private direct messages with your matches."}
+              </p>
+            </div>
+            <div style={{ border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "24px", background: "var(--surface)", textAlign: "center" }}>
+              <Users size={32} style={{ color: "var(--accent)", marginBottom: "12px" }} aria-hidden="true" />
+              <h3 style={{ margin: "0 0 8px", fontSize: "1.1rem" }}>{t.language === "id" ? "Group Chat" : "Group Chat"}</h3>
+              <p style={{ margin: 0, color: "var(--muted)", fontSize: "0.92rem", lineHeight: "1.5" }}>
+                {t.language === "id" ? "Buat grup kolaborasi untuk proyek bersama." : "Create collaboration groups for team projects."}
+              </p>
+            </div>
+            <div style={{ border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "24px", background: "var(--surface)", textAlign: "center" }}>
+              <Bell size={32} style={{ color: "var(--primary)", marginBottom: "12px" }} aria-hidden="true" />
+              <h3 style={{ margin: "0 0 8px", fontSize: "1.1rem" }}>{t.language === "id" ? "Notifikasi Langsung" : "Instant Alerts"}</h3>
+              <p style={{ margin: 0, color: "var(--muted)", fontSize: "0.92rem", lineHeight: "1.5" }}>
+                {t.language === "id" ? "Dapatkan notifikasi real-time untuk match, pesan, dan undangan." : "Get real-time notifications for matches, messages, and invitations."}
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* --- AI Assistant Section --- */}
+        <section className="section-band" id="ai-section" style={{ borderTop: "1px solid var(--border)", background: "var(--surface)" }}>
+          <div className="section-heading" style={{ textAlign: "center", margin: "0 auto 48px" }}>
+            <p className="eyebrow" style={{ color: "var(--primary)", fontWeight: "700", letterSpacing: "0.05em" }}>AI ASSISTANT</p>
+            <h2 style={{ fontFamily: "Montserrat, sans-serif", fontWeight: "700", fontSize: "2.2rem", color: "var(--ink)" }}>
+              {t.language === "id" ? "Asisten AI Berbasis Gemini" : "Gemini-Powered AI Assistant"}
+            </h2>
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "16px", maxWidth: "700px", margin: "0 auto" }}>
+            {[
+              { icon: "✓", text: t.language === "id" ? "Analisis kecocokan skill" : "Skill-fit analysis" },
+              { icon: "✓", text: t.language === "id" ? "Saran teman setim" : "Teammate suggestions" },
+              { icon: "✓", text: t.language === "id" ? "Otomatisasi pesan perkenalan" : "Icebreaker automations" },
+              { icon: "✓", text: t.language === "id" ? "Ide proyek kolaborasi" : "Collaboration project ideas" }
+            ].map((item, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: "10px", background: "var(--primary-soft)", border: "1px solid var(--border)", borderRadius: "999px", padding: "10px 20px" }}>
+                <span style={{ color: "var(--primary)", fontWeight: "900" }}>{item.icon}</span>
+                <span style={{ fontWeight: "700", color: "var(--ink)", fontSize: "0.92rem" }}>{item.text}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* --- Projects Section --- */}
+        <section className="section-band" id="projects" style={{ borderTop: "1px solid var(--border)" }}>
+          <div className="section-heading" style={{ textAlign: "center", margin: "0 auto 48px" }}>
+            <p className="eyebrow" style={{ color: "var(--accent)", fontWeight: "700", letterSpacing: "0.05em" }}>
+              {t.language === "id" ? "PROYEK" : "PROJECTS"}
+            </p>
+            <h2 style={{ fontFamily: "Montserrat, sans-serif", fontWeight: "700", fontSize: "2.2rem", color: "var(--ink)" }}>
+              {t.language === "id" ? "Temukan & Buat Proyek Kolaborasi" : "Find & Create Collaboration Projects"}
+            </h2>
+            <p style={{ color: "var(--muted)", fontSize: "1.05rem", maxWidth: "640px", margin: "12px auto 0", lineHeight: "1.6" }}>
+              {t.language === "id"
+                ? "Posting proyek, tentukan peran yang dibutuhkan, dan undang teman setim yang cocok dengan keahlian mereka."
+                : "Post projects, define needed roles, and invite teammates matched by their skills."}
+            </p>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "20px", maxWidth: "900px", margin: "0 auto" }}>
+            {[
+              {
+                title: t.language === "id" ? "Project Designer" : "Project Designer",
+                desc: t.language === "id" ? "Desain antarmuka dan pengalaman pengguna untuk aplikasi kolaborasi." : "Design user interfaces and experiences for collaboration apps.",
+                roles: ["UI/UX Designer", "Frontend Developer"]
+              },
+              {
+                title: t.language === "id" ? "Tim Lomba" : "Competition Team",
+                desc: t.language === "id" ? "Cari anggota tim untuk hackathon atau kompetisi kampus." : "Find team members for hackathons or campus competitions.",
+                roles: ["Backend Developer", "Data Analyst"]
+              },
+              {
+                title: t.language === "id" ? "Startup MVP" : "Startup MVP",
+                desc: t.language === "id" ? "Bangun Minimum Viable Product bersama co-founder potensial." : "Build a Minimum Viable Product with potential co-founders.",
+                roles: ["Fullstack Developer", "Product Manager"]
+              },
+              {
+                title: t.language === "id" ? "Proyek Riset" : "Research Project",
+                desc: t.language === "id" ? "Kolaborasi riset antar program studi." : "Cross-program collaborative research.",
+                roles: ["Data Scientist", "ML Engineer"]
+              }
+            ].map((project, i) => (
+              <article key={i} style={{ border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "20px", background: "var(--surface)" }}>
+                <h3 style={{ margin: "0 0 8px", fontSize: "1.05rem", color: "var(--ink)" }}>{project.title}</h3>
+                <p style={{ margin: "0 0 12px", color: "var(--muted)", fontSize: "0.88rem", lineHeight: "1.5" }}>{project.desc}</p>
+                <p style={{ margin: "0 0 8px", fontSize: "0.78rem", fontWeight: "700", color: "var(--ink)" }}>
+                  {t.language === "id" ? "Peran yang dibutuhkan" : "Roles needed"}
+                </p>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                  {project.roles.map((role) => (
+                    <span key={role} style={{ display: "inline-block", padding: "4px 10px", borderRadius: "6px", background: "var(--primary)", color: "#fff", fontSize: "0.75rem", fontWeight: "700" }}>
+                      {role}
+                    </span>
+                  ))}
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+
         <section className="cta-band">
           <h2 style={{ fontFamily: "Montserrat, sans-serif", fontWeight: "700", fontSize: "2.2rem", color: "var(--ink)", margin: 0 }}>{t.landingCtaTitle}</h2>
           <p style={{ color: "var(--on-surface-variant)", fontSize: "1.1rem", margin: "14px 0 32px" }}>{t.landingCtaBody}</p>
@@ -3071,6 +3190,51 @@ function LandingPage() {
           </div>
         </section>
       </main>
+
+      {/* Footer */}
+      <footer style={{ borderTop: "1px solid var(--border)", background: "var(--surface-container)", padding: "48px 24px 24px", marginTop: 0 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "32px", maxWidth: "1000px", margin: "0 auto" }}>
+          <div>
+            <h4 style={{ margin: "0 0 12px", fontSize: "0.95rem", color: "var(--ink)" }}>
+              {t.language === "id" ? "Tentang Moots" : "About Moots"}
+            </h4>
+            <p style={{ margin: 0, color: "var(--muted)", fontSize: "0.85rem", lineHeight: "1.6" }}>
+              {t.language === "id"
+                ? "Moots membantu mahasiswa Telkom University menemukan kolaborator berdasarkan keahlian untuk proyek, lomba, dan startup."
+                : "Moots helps Telkom University students find collaborators by skill for projects, competitions, and startups."}
+            </p>
+          </div>
+          <div>
+            <h4 style={{ margin: "0 0 12px", fontSize: "0.95rem", color: "var(--ink)" }}>
+              {t.language === "id" ? "Komunitas" : "Community"}
+            </h4>
+            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+              <Link to="/#features" style={{ color: "var(--muted)", fontSize: "0.85rem", textDecoration: "none" }}>{t.landingFeatures}</Link>
+              <Link to="/#projects" style={{ color: "var(--muted)", fontSize: "0.85rem", textDecoration: "none" }}>
+                {t.language === "id" ? "Proyek" : "Projects"}
+              </Link>
+              <Link to="/terms" style={{ color: "var(--muted)", fontSize: "0.85rem", textDecoration: "none" }}>
+                {t.language === "id" ? "Ketentuan Layanan" : "Terms of Service"}
+              </Link>
+              <Link to="/privacy" style={{ color: "var(--muted)", fontSize: "0.85rem", textDecoration: "none" }}>
+                {t.language === "id" ? "Kebijakan Privasi" : "Privacy Policy"}
+              </Link>
+            </div>
+          </div>
+          <div>
+            <h4 style={{ margin: "0 0 12px", fontSize: "0.95rem", color: "var(--ink)" }}>
+              {t.language === "id" ? "Hubungi Kami" : "Contact Us"}
+            </h4>
+            <p style={{ margin: "0 0 6px", color: "var(--muted)", fontSize: "0.85rem" }}>mootsindonesia@gmail.com</p>
+            <p style={{ margin: 0, color: "var(--muted)", fontSize: "0.85rem" }}>
+              {t.language === "id" ? "Dukungan & saran" : "Support & feedback"}
+            </p>
+          </div>
+        </div>
+        <div style={{ textAlign: "center", marginTop: "32px", paddingTop: "16px", borderTop: "1px solid var(--border)" }}>
+          <p style={{ margin: 0, color: "var(--muted)", fontSize: "0.82rem" }}>© 2026 Moots. All rights reserved.</p>
+        </div>
+      </footer>
     </div>
   );
 }
@@ -5557,10 +5721,10 @@ function OnboardingStep({
           value={draft.accent}
           onChange={(value) => update({ accent: value })}
           options={[
-            { label: t.referenceYellow, value: "#ffc629" },
-            { label: t.softHoney, value: "#ffe48a" },
-            { label: t.warmCream, value: "#fff3c4" },
-            { label: t.neutralGray, value: "#777777" }
+            { label: t.language === "id" ? "Biru Navy" : "Navy Blue", value: "#0D47A1" },
+            { label: t.language === "id" ? "Biru Teal" : "Teal Blue", value: "#00ACC1" },
+            { label: t.language === "id" ? "Biru Langit" : "Sky Blue", value: "#42a5f5" },
+            { label: t.neutralGray, value: "#546e7a" }
           ]}
         />
       </div>
