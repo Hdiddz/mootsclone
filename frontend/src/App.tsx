@@ -4582,12 +4582,13 @@ function AiAssistantBubble({ isOpen, onToggle }: { isOpen: boolean; onToggle: (o
     setResults(findCandidatesForQuery(prompt).slice(0, 3));
 
     const allProfiles = candidateLookup.size > 0 ? Array.from(candidateLookup.values()) : candidates;
+    const otherProfiles = user?.id ? allProfiles.filter(p => p.id !== user.id && p.id !== "me") : allProfiles;
     const siteContext = `
 You are Moots AI, a website assistant for Moots.
 Your job is not to interrupt chats. Help the user search for collaborators by skill, role, program, availability, and project goal.
 Reply in ${language === "id" ? "Indonesian" : "English"}.
 Available demo candidates:
-${allProfiles.map((candidate) => {
+${otherProfiles.map((candidate) => {
   const skillsStr = (candidate.skills || []).map((skillItem: any) => typeof skillItem === 'string' ? skillItem : (skillItem?.name || "")).filter(Boolean).join(", ");
   const goalsStr = (candidate.collaborationGoals || []).map((g: any) => typeof g === 'string' ? g : (g?.name || "")).filter(Boolean).join(", ");
   return `- ${candidate.name}: ${candidate.role}, main skill ${candidate.mainSkill}, skills ${skillsStr}, goals ${goalsStr}, availability ${candidate.availabilityDetail || candidate.availability || ""}`;
@@ -5150,7 +5151,7 @@ function DiscoverPage() {
         skills?: string[];
         role?: string;
       };
-      const bestCandidate = findBestSuggestion(suggestion);
+      const bestCandidate = findBestSuggestion(suggestion, user?.id);
       if (bestCandidate) {
         setSuggestedProfile(bestCandidate);
       }
@@ -9509,7 +9510,7 @@ function usePrefersReducedMotion() {
 // Re-exported for pages that import them from App (e.g. MatchesPage).
 export { localizeRoleLabel, localizeMatchMessage };
 
-function findBestSuggestion(suggestion: { mainSkill?: string; skills?: string[]; role?: string }) {
+function findBestSuggestion(suggestion: { mainSkill?: string; skills?: string[]; role?: string }, currentUserId?: string) {
   const normalizedSkills = new Set(
     [suggestion.mainSkill, ...(suggestion.skills ?? [])]
       .filter(Boolean)
@@ -9518,8 +9519,9 @@ function findBestSuggestion(suggestion: { mainSkill?: string; skills?: string[];
   const role = suggestion?.role?.toLowerCase() ?? "";
 
   const allProfiles = candidateLookup.size > 0 ? Array.from(candidateLookup.values()) : candidates;
+  const otherProfiles = currentUserId ? allProfiles.filter(p => p.id !== currentUserId && p.id !== "me") : allProfiles;
 
-  const ranked = allProfiles
+  const ranked = otherProfiles
     .map((candidate) => {
       if (!candidate) return { candidate, score: 0 };
       const skillsArray = Array.isArray(candidate.skills) ? candidate.skills : [];
@@ -9538,7 +9540,7 @@ function findBestSuggestion(suggestion: { mainSkill?: string; skills?: string[];
     })
     .sort((left, right) => right.score - left.score);
 
-  return ranked[0]?.candidate ?? allProfiles[0] ?? null;
+  return ranked[0]?.candidate ?? otherProfiles[0] ?? null;
 }
 
 function findCandidatesForQuery(query: string) {

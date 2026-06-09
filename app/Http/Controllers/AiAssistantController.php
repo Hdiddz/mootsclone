@@ -89,9 +89,13 @@ class AiAssistantController extends Controller
      */
     public function chatHistory(Request $request)
     {
-        $user = $request->user();
+        $userId = $request->query('user_id');
 
-        $conversations = AiConversation::where('user_id', $user->id)
+        if (!$userId) {
+            return response()->json(['error' => 'user_id is required'], 400);
+        }
+
+        $conversations = AiConversation::where('user_id', $userId)
             ->orderBy('created_at', 'asc')
             ->get(['id', 'role', 'message', 'created_at']);
 
@@ -105,8 +109,13 @@ class AiAssistantController extends Controller
      */
     public function clearHistory(Request $request)
     {
-        $user = $request->user();
-        AiConversation::where('user_id', $user->id)->delete();
+        $userId = $request->query('user_id');
+
+        if (!$userId) {
+            return response()->json(['error' => 'user_id is required'], 400);
+        }
+
+        AiConversation::where('user_id', $userId)->delete();
 
         return response()->json([
             'message' => 'Chat history cleared.',
