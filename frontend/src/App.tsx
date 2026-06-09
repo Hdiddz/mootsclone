@@ -8485,7 +8485,9 @@ function PhotoUploadField({
   onPositionChange: (value: string) => void;
 }) {
   const t = useTranslations();
+  const { user, addToast } = useSymbio();
   const [isCroppingModalOpen, setIsCroppingModalOpen] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [tempPhotoUrl, setTempPhotoUrl] = useState("");
   const [scale, setScale] = useState(1.0);
   const [panX, setPanX] = useState(0);
@@ -8748,7 +8750,7 @@ function PhotoUploadField({
   const handleSave = () => {
     const image = new Image();
     image.src = tempPhotoUrl;
-    image.onload = () => {
+    image.onload = async () => {
       const canvas = document.createElement("canvas");
       const canvasW = 400;
       const canvasH = 500;
@@ -8773,10 +8775,32 @@ function PhotoUploadField({
       );
 
       const croppedDataUrl = canvas.toDataURL("image/jpeg", 0.9);
-      onChange(croppedDataUrl);
-      onPositionChange("center");
-      setIsCroppingModalOpen(false);
-      setTempPhotoUrl("");
+      
+      setIsUploading(true);
+      try {
+        const response = await fetch(croppedDataUrl);
+        const blob = await response.blob();
+        const userId = user?.id || "anon";
+        const path = `${userId}/avatar-${Date.now()}.jpg`;
+
+        const { error: upErr } = await supabase.storage.from("avatars").upload(path, blob, {
+          contentType: "image/jpeg",
+          cacheControl: "3600",
+          upsert: true
+        });
+        if (upErr) throw upErr;
+
+        const { data: pub } = supabase.storage.from("avatars").getPublicUrl(path);
+        onChange(pub.publicUrl);
+        onPositionChange("center");
+        setIsCroppingModalOpen(false);
+        setTempPhotoUrl("");
+      } catch (error: any) {
+        console.error("Upload error:", error);
+        addToast(t.language === "id" ? "Gagal mengunggah foto profil" : "Failed to upload profile photo", "error");
+      } finally {
+        setIsUploading(false);
+      }
     };
   };
 
@@ -8927,6 +8951,7 @@ function PhotoUploadField({
               <Button
                 variant="secondary"
                 type="button"
+                disabled={isUploading}
                 onClick={() => {
                   setIsCroppingModalOpen(false);
                   setTempPhotoUrl("");
@@ -8938,10 +8963,13 @@ function PhotoUploadField({
               <Button
                 variant="primary"
                 type="button"
+                disabled={isUploading}
                 onClick={handleSave}
                 style={{ flex: 1 }}
               >
-                {t.language === "id" ? "Simpan" : "Save Changes"}
+                {isUploading 
+                  ? (t.language === "id" ? "Mengunggah..." : "Uploading...") 
+                  : (t.language === "id" ? "Simpan" : "Save Changes")}
               </Button>
             </div>
           </div>
