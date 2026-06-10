@@ -6006,7 +6006,7 @@ img.avatar {
   background: #ffffff;
 }
 
-.chat-header > div {
+.chat-header > div:not(.chat-header-menu):not(.avatar) {
   flex: 1;
   min-width: 0;
 }
@@ -9004,9 +9004,13 @@ body {
     flex-shrink: 0 !important;
   }
 
-  .chat-header > div {
+  .chat-header > div:not(.chat-header-menu):not(.avatar) {
     flex: 1 !important;
     min-width: 0 !important;
+  }
+
+  .chat-header-menu {
+    flex: 0 0 auto !important;
   }
 
   .chat-header h2 {
