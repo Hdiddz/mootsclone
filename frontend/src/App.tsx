@@ -45,7 +45,8 @@ import {
   Upload,
   Crop,
   ZoomIn,
-  ZoomOut
+  ZoomOut,
+  FolderOpen
 } from "lucide-react";
 import {
   createContext,
@@ -265,6 +266,7 @@ const candidateLookup = new Map<string, CandidateProfile>();
 
 const navItems = [
   { to: "/discover", label: "Discover", icon: Compass },
+  { to: "/projects", label: "Projects", icon: FolderOpen },
   { to: "/matches", label: "Matches", icon: Users },
   { to: "/saved", label: "Saved", icon: User },
   { to: "/notifications", label: "Alerts", icon: Bell },
@@ -676,6 +678,7 @@ function AuthPage() {
 }
 
 import MatchesPage from "./pages/MatchesPage";
+import ProjectsPage from "./pages/ProjectsPage";
 
 function App() {
   const navigate = useNavigate();
@@ -1179,17 +1182,23 @@ function App() {
     }
 
     setChats((current) => {
-      const localGroupChats = Object.fromEntries(
-        Object.entries(current).filter(([chatId]) => chatId.startsWith("group-"))
-      );
-      return { ...localGroupChats, ...nextChats };
+      // Keep existing chat state and merge with fresh chats from DB
+      return { ...current, ...nextChats };
     });
 
-    setMatches((current) => [
-      ...current.filter((match) => match.isGroup && match.id.startsWith("group-")),
-      ...groupMatches,
-      ...mappedMatches.filter((match) => !blockedSet.has(match.candidateId))
-    ]);
+    setMatches((current) => {
+      // Keep existing groups that are not in the new groupMatches (in case of query failure)
+      const newGroupIds = new Set(groupMatches.map(m => m.id));
+      const existingGroupsToKeep = current.filter(match => 
+        match.isGroup && (!newGroupIds.has(match.id))
+      );
+      
+      return [
+        ...existingGroupsToKeep,
+        ...groupMatches,
+        ...mappedMatches.filter((match) => !blockedSet.has(match.candidateId))
+      ];
+    });
 
     const { data: notificationsData } = await supabase
       .from("notifications")
@@ -2030,51 +2039,17 @@ function App() {
           );
 
           return dbGroupId;
-        } catch (err) {
-          console.warn("Falling back to local group chat:", err);
+        } catch (err: any) {
+          console.error("Failed to create group chat:", err);
+          addToast(
+            language === "id" ? "Gagal membuat grup" : "Failed to create group",
+            err?.message || "Internal server error",
+            "error"
+          );
+          return "";
         }
       }
-
-      const id = `group-${Date.now()}`;
-      const groupMatch: MatchRecord = {
-        id,
-        candidateId: cleanMemberIds[0] || "group",
-        createdAt: new Date().toLocaleDateString(),
-        skillOverlap: [],
-        latestMessage: "",
-        unread: 0,
-        summary: cleanMemberIds
-          .map((memberId) => getCandidate(memberId)?.name)
-          .filter((name): name is string => Boolean(name)),
-        isGroup: true,
-        title: groupTitle,
-        memberIds: cleanMemberIds
-      };
-
-      setMatches((current) => [groupMatch, ...current]);
-      setChats((current) => ({
-        ...current,
-        [id]: [
-          {
-            id: `group-init-${Date.now()}`,
-            sender: "them",
-            senderName: "Moots",
-            text:
-              language === "id"
-                ? `Grup "${groupTitle}" dibuat. Mulai diskusi kolaborasi di sini.`
-                : `Group "${groupTitle}" was created. Start your collaboration discussion here.`,
-            timestamp: "Just now"
-          }
-        ]
-      }));
-
-      addToast(
-        language === "id" ? translations.id.groupCreatedTitle : translations.en.groupCreatedTitle,
-        language === "id" ? translations.id.groupCreatedBody : translations.en.groupCreatedBody,
-        "success"
-      );
-
-      return id;
+      return "";
     },
     [addToast, language, setChats, setMatches, user?.id]
   );
@@ -2904,6 +2879,7 @@ function App() {
           }
         >
           <Route path="/discover" element={<DiscoverPage />} />
+          <Route path="/projects" element={<ProjectsPage />} />
           <Route path="/matches" element={<MatchesPage />} />
           <Route path="/chat/:matchId" element={<ChatPage />} />
           <Route path="/saved" element={<SavedPage />} />
@@ -4775,14 +4751,19 @@ ${otherProfiles.map((candidate) => {
       const aiReply = data.message || "";
       setHistory(prev => [...prev, { role: "assistant", message: aiReply }]);
 
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        await supabase.from("ai_conversations").insert([
-          { user_id: user.id, role: "user", message: prompt },
-          { user_id: user.id, role: "assistant", message: aiReply }
-        ]);
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          await supabase.from("ai_conversations").insert([
+            { user_id: user.id, role: "user", message: prompt },
+            { user_id: user.id, role: "assistant", message: aiReply }
+          ]);
+        }
+      } catch (dbErr) {
+        console.warn("Failed to save AI conversation to database:", dbErr);
       }
-    } catch {
+    } catch (err) {
+      console.error("AI Request Error:", err);
       setHistory(prev => [...prev, { role: "assistant", message: t.aiError }]);
     } finally {
       setLoading(false);
@@ -5008,11 +4989,14 @@ function RightRail() {
           <Link to="/matches">{t.view}</Link>
         </div>
         <div className="compact-list">
-          {matches.slice(0, 3).map((match) => {
-            const candidate = getCandidate(match.candidateId);
-            return candidate ? (
-              <Link className="compact-row" to={`/chat/${match.id}`} key={match.id}>
-                <Avatar profile={candidate} size="xs" />
+          {matches
+            .filter((match) => !match.isGroup)
+            .slice(0, 3)
+            .map((match) => {
+              const candidate = getCandidate(match.candidateId);
+              return candidate ? (
+                <Link className="compact-row" to={`/chat/${match.id}`} key={match.id}>
+                  <Avatar profile={candidate} size="xs" />
                 <span>
                   <strong>{candidate.name}</strong>
                   <small>{candidate.mainSkill}</small>
@@ -8410,7 +8394,7 @@ function ClearFiltersButton() {
   );
 }
 
-function PageHeader({
+export function PageHeader({
   eyebrow,
   title,
   action

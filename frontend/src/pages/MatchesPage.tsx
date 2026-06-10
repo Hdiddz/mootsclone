@@ -95,10 +95,12 @@ export default function MatchesPage() {
     }
 
     const groupId = await createGroupChat(groupTitle, groupMemberIds);
-    setGroupModalOpen(false);
-    setGroupTitle("");
-    setGroupMemberIds([]);
-    navigate(`/chat/${groupId}`);
+    if (groupId) {
+      setGroupModalOpen(false);
+      setGroupTitle("");
+      setGroupMemberIds([]);
+      navigate(`/chat/${groupId}`);
+    }
   };
 
   return (
