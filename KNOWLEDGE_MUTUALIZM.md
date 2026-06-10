@@ -14,7 +14,7 @@ Konsep "mutualisme" diambil dari hubungan simbiosis yang saling menguntungkan �
 
 ---
 
-## 🎯 Untuk Siapa?
+## 🎯 Untuk Siapua?
 
 | Pengguna | Kebutuhan ||
 |---|---|
