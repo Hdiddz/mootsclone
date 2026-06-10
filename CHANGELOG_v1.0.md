@@ -19,7 +19,7 @@
 ```
 
 > [!NOTE]
-> Project ini masih dalam tahap **v1.0 (Beta)**. Fitur-fitur yang ada mungkin masih mengalami perubahan dan penyempurnaan berdasarkan feedback pengguna.
+> Project ini masih dalam tahap **v1.0 (Beta)**. Fitur-fitur yang ada mungkin masih mengalami perubahan dan penyempurnaan berdasarkan feedback pengguna..
 
 ---
 
