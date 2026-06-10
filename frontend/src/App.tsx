@@ -5431,6 +5431,7 @@ function DiscoverPage() {
       {matchedProfile ? (
         <MatchModal
           candidate={matchedProfile}
+          matches={matches}
           onClose={() => setMatchedProfile(null)}
           onContinue={() => setMatchedProfile(null)}
         />
@@ -8158,16 +8159,19 @@ export function CandidateDetailSheet({
 
 function MatchModal({
   candidate,
+  matches,
   onClose,
   onContinue
 }: {
   candidate: CandidateProfile;
+  matches: MatchRecord[];
   onClose: () => void;
   onContinue: () => void;
 }) {
   const navigate = useNavigate();
   const t = useTranslations();
-  const match = createMatchFor(candidate);
+  const realMatch = matches.find((m) => !m.isGroup && m.candidateId === candidate.id);
+  const match = realMatch || createMatchFor(candidate);
 
   return createPortal(
     <div className="overlay" role="presentation" onClick={onClose}>
