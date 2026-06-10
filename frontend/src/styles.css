@@ -6248,9 +6248,9 @@ img.avatar {
   }
 
   .candidate-body {
-    padding: 36px 16px 84px !important;
+    padding: 36px 16px 108px !important;
     gap: 7px !important;
-    max-height: 46% !important;
+    max-height: 58% !important;
   }
 
   .candidate-body.expanded {
