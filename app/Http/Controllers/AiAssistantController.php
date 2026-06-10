@@ -13,9 +13,9 @@ class AiAssistantController extends Controller
     public function suggest(Request $request)
     {
         $data = $request->validate([
-            'prompt' => ['required', 'string', 'max:1400'],
+            'prompt' => ['required', 'string', 'max:8000'],
             'candidate' => ['nullable', 'array'],
-            'context' => ['nullable', 'string', 'max:5000'],
+            'context' => ['nullable', 'string', 'max:100000'],
             'history' => ['nullable', 'array'],
         ]);
 
