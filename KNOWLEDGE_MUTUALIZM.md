@@ -1,12 +1,12 @@
-# 🤝 Knowledge Mutualizm
+# 🤝 Knowledge Moots
 
-> **Mutualizm** — Platform kolaborasi kampus berbasis kecocokan skill dan minat untuk mahasiswa Telkom University.
+> **Moots** — Platform kolaborasi kampus berbasis kecocokan skill dan minat untuk mahasiswa Telkom University.
 
 ---
 
-## 📖 Tentang Mutualizm
+## 📖 Tentang Moots
 
-**Mutualizm** adalah platform web kolaborasi kampus yang dirancang khusus untuk mahasiswa **Telkom University**. Platform ini membantu mahasiswa menemukan kolaborator untuk kompetisi, proyek startup, tugas kuliah, riset, dan acara organisasi melalui **skill-based discovery**.
+**Moots** adalah platform web kolaborasi kampus yang dirancang khusus untuk mahasiswa **Telkom University**. Platform ini membantu mahasiswa menemukan kolaborator untuk kompetisi, proyek startup, tugas kuliah, riset, dan acara organisasi melalui **skill-based discovery**.
 
 Platform ini menggunakan mekanisme **swipe interaktif** (mirip dating app tetapi berfokus pada kolaborasi profesional) untuk mempertemukan pengguna dengan kandidat yang memiliki potensi kolaborasi tinggi. Setiap pengguna dapat menunjukkan ketertarikan, membangun koneksi, berkomunikasi secara real-time, mendapatkan saran dari **AI Assistant**, dan membangun proyek bersama.
 
@@ -96,7 +96,7 @@ Proses pembuatan profil yang dipandu melalui 10 langkah:
 | **Tahap 9** | Ketersediaan kolaborasi |
 | **Tahap 10** | Preview profil lengkap |
 
-- Dilengkapi **logo Mutualizm** di pojok kiri atas
+- Dilengkapi **logo Moots** di pojok kiri atas
 - Indikator progres tahap ("Tahap 1 dari 10") untuk memandu pengguna
 - Setelah selesai, langsung diarahkan ke Discover dengan pre-loading data kandidat
 
@@ -302,7 +302,7 @@ Tabel yang terpublish ke Supabase Realtime: `matches`, `messages`, `notification
 
 ### Langkah-langkah:
 
-1. **Buka website** → Muncul Landing Page dengan informasi tentang Mutualizm
+1. **Buka website** → Muncul Landing Page dengan informasi tentang Moots
 2. **Login/Register** → Pilih Google OAuth atau Email/Password
 3. **Onboarding** (pengguna baru) → Isi 10 tahap profil lengkap
 4. **Discover** → Lihat kandidat, swipe untuk interest, skip, atau save
@@ -341,7 +341,7 @@ Tabel yang terpublish ke Supabase Realtime: `matches`, `messages`, `notification
 ### Environment Variables
 | Variable | Deskripsi |
 |---|---|
-| `APP_NAME` | Nama aplikasi (Mutualizm) |
+| `APP_NAME` | Nama aplikasi (Moots) |
 | `APP_ENV` | Environment (production/local) |
 | `APP_KEY` | Laravel application key |
 | `DATABASE_URL` | PostgreSQL connection string |
@@ -366,7 +366,7 @@ Tabel yang terpublish ke Supabase Realtime: `matches`, `messages`, `notification
 
 ## 📞 Kontak & Kontribusi
 
-Mutualizm dikembangkan sebagai bagian dari proyek kolaborasi mahasiswa Telkom University. Untuk berkontribusi:
+Moots dikembangkan sebagai bagian dari proyek kolaborasi mahasiswa Telkom University. Untuk berkontribusi:
 
 1. Fork repository
 2. Buat branch fitur baru (`git checkout -b feature/nama-fitur`)
