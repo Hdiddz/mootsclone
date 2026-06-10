@@ -7600,12 +7600,12 @@ img.avatar {
      chat bubble so they no longer collide. They sit just above the bottom nav. */
   .chat-bubble {
     right: 16px;
-    bottom: max(74px, calc(env(safe-area-inset-bottom) + 66px));
+    bottom: max(96px, calc(env(safe-area-inset-bottom) + 88px));
   }
 
   .ai-assistant-bubble {
     right: 16px;
-    bottom: max(140px, calc(env(safe-area-inset-bottom) + 132px));
+    bottom: max(164px, calc(env(safe-area-inset-bottom) + 156px));
   }
 
   .chat-bubble.open {
@@ -8183,7 +8183,7 @@ img.avatar {
 @media (max-width: 767px) {
   .ai-assistant-bubble {
     right: 16px;
-    bottom: max(160px, calc(env(safe-area-inset-bottom) + 152px));
+    bottom: max(164px, calc(env(safe-area-inset-bottom) + 156px));
   }
 
   .ai-assistant-bubble.open {
