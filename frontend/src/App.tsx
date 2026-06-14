@@ -2391,6 +2391,12 @@ function App() {
     const unfollowCandidate = useCallback(
         async (candidateId: string) => {
             if (!user?.id) return;
+            const relatedMatch = matches.find(
+                (match) => !match.isGroup && match.candidateId === candidateId,
+            );
+            const isIncomingPending =
+                relatedMatch?.status === "pending" &&
+                !interestedIds.includes(candidateId);
             setInterestedIds((current) =>
                 current.filter((id) => id !== candidateId),
             );
@@ -2408,6 +2414,28 @@ function App() {
                 ),
             );
             try {
+                if (isIncomingPending) {
+                    const { error } = await supabase.rpc(
+                        "respond_to_match_request",
+                        {
+                            target: candidateId,
+                            approved: false,
+                        },
+                    );
+                    if (error) throw error;
+
+                    setNotifications((current) =>
+                        current.filter(
+                            (item) =>
+                                !(
+                                    item.type === "match_request" &&
+                                    item.actorId === candidateId
+                                ),
+                        ),
+                    );
+                    return;
+                }
+
                 await supabase.from("swipes").upsert(
                     {
                         swiper_id: user.id,
@@ -2427,7 +2455,16 @@ function App() {
                 console.warn("Error unfollowing candidate:", err);
             }
         },
-        [user?.id, setInterestedIds, setSavedIds, setPassedIds, setMatches],
+        [
+            user?.id,
+            matches,
+            interestedIds,
+            setInterestedIds,
+            setSavedIds,
+            setPassedIds,
+            setMatches,
+            setNotifications,
+        ],
     );
 
     const removeSaved = useCallback(
@@ -2519,22 +2556,14 @@ function App() {
                         ),
                     );
 
-                    const { error } = await supabase.from("swipes").upsert(
+                    const { error } = await supabase.rpc(
+                        "respond_to_match_request",
                         {
-                            swiper_id: user.id,
-                            swiped_id: candidate.id,
-                            action: "interest",
+                            target: candidate.id,
+                            approved: true,
                         },
-                        { onConflict: "swiper_id,swiped_id" },
                     );
                     if (error) throw error;
-                    try {
-                        await supabase.rpc("create_pending_match", {
-                            target: candidate.id,
-                        });
-                    } catch {
-                        // optional
-                    }
 
                     addToast(
                         language === "id"
@@ -2559,22 +2588,14 @@ function App() {
                         ),
                     );
 
-                    const { error } = await supabase.from("swipes").upsert(
+                    const { error } = await supabase.rpc(
+                        "respond_to_match_request",
                         {
-                            swiper_id: user.id,
-                            swiped_id: candidate.id,
-                            action: "pass",
+                            target: candidate.id,
+                            approved: false,
                         },
-                        { onConflict: "swiper_id,swiped_id" },
                     );
                     if (error) throw error;
-                    const a = user.id < candidate.id ? user.id : candidate.id;
-                    const b = user.id > candidate.id ? user.id : candidate.id;
-                    await supabase
-                        .from("matches")
-                        .delete()
-                        .eq("user_a_id", a)
-                        .eq("user_b_id", b);
 
                     addToast(
                         language === "id"
@@ -2587,16 +2608,14 @@ function App() {
                     );
                 }
 
-                await supabase
-                    .from("notifications")
-                    .update({ read: true })
-                    .eq("id", notification.id);
-
                 setNotifications((current) =>
-                    current.map((item) =>
-                        item.id === notification.id
-                            ? { ...item, read: true }
-                            : item,
+                    current.filter(
+                        (item) =>
+                            item.id !== notification.id &&
+                            !(
+                                item.type === "match_request" &&
+                                item.actorId === candidate.id
+                            ),
                     ),
                 );
             } catch (err) {
@@ -6985,6 +7004,10 @@ function AiAssistantBubble({
     const [detailProfile, setDetailProfile] = useState<CandidateProfile | null>(
         null,
     );
+    const [suggestionCanvas, setSuggestionCanvas] = useState<{
+        title: string;
+        candidates: CandidateProfile[];
+    } | null>(null);
     const [confirmConfig, setConfirmConfig] = useState<{
         title: string;
         message: string;
@@ -7152,6 +7175,22 @@ function AiAssistantBubble({
         },
     ];
 
+    const previewLimit = 2;
+
+    const openSuggestionCanvas = (
+        title: string,
+        candidateList: CandidateProfile[],
+    ) => {
+        const uniqueCandidates = Array.from(
+            new Map(candidateList.map((candidate) => [candidate.id, candidate]))
+                .values(),
+        );
+        setSuggestionCanvas({
+            title,
+            candidates: uniqueCandidates,
+        });
+    };
+
     const askAssistant = async (promptOverride?: string) => {
         const prompt = (promptOverride ?? query).trim();
         if (!prompt) {
@@ -7165,7 +7204,7 @@ function AiAssistantBubble({
         const currentHistory = [...history];
 
         setHistory((prev) => [...prev, { role: "user", message: prompt }]);
-        setResults(findCandidatesForQuery(prompt).slice(0, 3));
+        setResults(findCandidatesForQuery(prompt));
 
         const allProfiles =
             candidateLookup.size > 0
@@ -7307,6 +7346,13 @@ ${otherProfiles
                                               .includes(c.name.toLowerCase()),
                                       )
                                     : [];
+                                const previewCandidates =
+                                    mentionedCandidates.slice(0, previewLimit);
+                                const remainingCandidateCount = Math.max(
+                                    0,
+                                    mentionedCandidates.length -
+                                        previewCandidates.length,
+                                );
 
                                 return (
                                     <div
@@ -7320,7 +7366,7 @@ ${otherProfiles
                                         </div>
                                         {mentionedCandidates.length > 0 && (
                                             <div className="ai-mentioned-cards">
-                                                {mentionedCandidates.map(
+                                                {previewCandidates.map(
                                                     (candidate) => {
                                                         const isFollowed =
                                                             interestedIds.includes(
@@ -7433,6 +7479,31 @@ ${otherProfiles
                                                         );
                                                     },
                                                 )}
+                                                {remainingCandidateCount > 0 ? (
+                                                    <button
+                                                        type="button"
+                                                        className="ai-see-more-btn"
+                                                        onClick={() =>
+                                                            openSuggestionCanvas(
+                                                                t.aiRelatedProfiles,
+                                                                mentionedCandidates,
+                                                            )
+                                                        }
+                                                    >
+                                                        <span>
+                                                            {t.aiSeeMore}
+                                                        </span>
+                                                        <small>
+                                                            +{
+                                                                remainingCandidateCount
+                                                            }
+                                                        </small>
+                                                        <ArrowRight
+                                                            size={15}
+                                                            aria-hidden="true"
+                                                        />
+                                                    </button>
+                                                ) : null}
                                             </div>
                                         )}
                                     </div>
@@ -7453,7 +7524,10 @@ ${otherProfiles
                             <div className="ai-result-list">
                                 <strong>{t.aiMatches}</strong>
                                 {results.length ? (
-                                    results.map((candidate) => (
+                                    <>
+                                        {results
+                                        .slice(0, previewLimit)
+                                        .map((candidate) => (
                                         <article
                                             className="ai-result-card"
                                             key={candidate.id}
@@ -7476,7 +7550,31 @@ ${otherProfiles
                                                 </small>
                                             </span>
                                         </article>
-                                    ))
+                                    ))}
+                                    {results.length > previewLimit ? (
+                                        <Button
+                                            variant="ghost"
+                                            className="ai-result-more-btn"
+                                            onClick={() =>
+                                                openSuggestionCanvas(
+                                                    t.aiMatches,
+                                                    results,
+                                                )
+                                            }
+                                        >
+                                            {t.aiSeeMore}
+                                            <span className="ai-result-more-count">
+                                                +
+                                                {results.length -
+                                                    previewLimit}
+                                            </span>
+                                            <ArrowRight
+                                                size={15}
+                                                aria-hidden="true"
+                                            />
+                                        </Button>
+                                    ) : null}
+                                    </>
                                 ) : (
                                     <small className="muted-text">
                                         {t.aiNoMatches}
@@ -7525,6 +7623,19 @@ ${otherProfiles
                 />
             ) : null}
 
+            {suggestionCanvas ? (
+                <AiSuggestionCanvas
+                    title={suggestionCanvas.title}
+                    candidates={suggestionCanvas.candidates}
+                    interestedIds={interestedIds}
+                    language={language}
+                    onClose={() => setSuggestionCanvas(null)}
+                    onViewProfile={(candidate) => setDetailProfile(candidate)}
+                    onFollow={handleFollow}
+                    onChat={startChat}
+                />
+            ) : null}
+
             {confirmConfig && (
                 <ConfirmModal
                     title={confirmConfig.title}
@@ -7534,6 +7645,134 @@ ${otherProfiles
                 />
             )}
         </div>
+    );
+}
+
+function AiSuggestionCanvas({
+    title,
+    candidates,
+    interestedIds,
+    language,
+    onClose,
+    onViewProfile,
+    onFollow,
+    onChat,
+}: {
+    title: string;
+    candidates: CandidateProfile[];
+    interestedIds: string[];
+    language: "en" | "id";
+    onClose: () => void;
+    onViewProfile: (candidate: CandidateProfile) => void;
+    onFollow: (candidate: CandidateProfile) => void;
+    onChat: (candidate: CandidateProfile) => void;
+}) {
+    const t = useTranslations();
+
+    return createPortal(
+        <div className="overlay" role="presentation" onClick={onClose}>
+            <section
+                className="ai-suggestion-canvas"
+                role="dialog"
+                aria-modal="true"
+                aria-label={title}
+                onClick={(event) => event.stopPropagation()}
+            >
+                <div className="ai-suggestion-canvas-header">
+                    <div>
+                        <p className="eyebrow">{title}</p>
+                        <h2>
+                            {candidates.length} {t.aiMatches.toLowerCase()}
+                        </h2>
+                    </div>
+                    <Button
+                        variant="circle"
+                        className="modal-close"
+                        aria-label={t.close}
+                        onClick={onClose}
+                    >
+                        <X size={18} aria-hidden="true" />
+                    </Button>
+                </div>
+
+                <div className="ai-suggestion-canvas-list">
+                    {candidates.map((candidate) => {
+                        const isFollowed = interestedIds.includes(candidate.id);
+                        return (
+                            <div
+                                className="ai-mentioned-card"
+                                key={candidate.id}
+                            >
+                                <div
+                                    className="ai-mentioned-card-info"
+                                    onClick={() => onViewProfile(candidate)}
+                                >
+                                    <Avatar profile={candidate} size="xs" />
+                                    <div className="info-text">
+                                        <strong>{candidate.name}</strong>
+                                        <small>
+                                            {localizeRoleLabel(
+                                                candidate.role,
+                                                t,
+                                            )}{" "}
+                                            · {candidate.mainSkill}
+                                        </small>
+                                    </div>
+                                </div>
+                                <div className="ai-mentioned-card-actions">
+                                    <button
+                                        type="button"
+                                        className={`ai-card-btn follow-btn ${isFollowed ? "followed" : ""}`}
+                                        onClick={() => onFollow(candidate)}
+                                        title={
+                                            isFollowed
+                                                ? "Mutual Interest / Followed"
+                                                : "Follow / Show Interest"
+                                        }
+                                    >
+                                        <Heart
+                                            size={13}
+                                            fill={
+                                                isFollowed
+                                                    ? "var(--danger)"
+                                                    : "none"
+                                            }
+                                            stroke={
+                                                isFollowed
+                                                    ? "var(--danger)"
+                                                    : "currentColor"
+                                            }
+                                        />
+                                        <span>
+                                            {isFollowed
+                                                ? language === "id"
+                                                    ? "Mengikuti"
+                                                    : "Followed"
+                                                : language === "id"
+                                                  ? "Ikuti"
+                                                  : "Follow"}
+                                        </span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="ai-card-btn chat-btn"
+                                        onClick={() => onChat(candidate)}
+                                    >
+                                        <MessageCircle size={13} />
+                                        <span>
+                                            {language === "id"
+                                                ? "Obrolan"
+                                                : "Chat"}
+                                        </span>
+                                    </button>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            </section>
+        </div>,
+        document.body,
     );
 }
 
@@ -10568,7 +10807,7 @@ function NotificationsPage() {
                     );
                     return (
                         <article
-                            className={`notification-card ${notification.read ? "read" : "unread"}`}
+                            className={`notification-card ${notification.read ? "read" : "unread"} ${notification.type === "match_request" ? "match-request-card" : ""}`}
                             key={notification.id}
                             style={{ cursor: "pointer" }}
                             onClick={() => {
@@ -10623,7 +10862,7 @@ function NotificationsPage() {
                                         return (
                                             <>
                                                 <Button
-                                                    variant="secondary"
+                                                    variant="ghost"
                                                     onClick={() =>
                                                         setDetailProfile(
                                                             candidate,
@@ -10655,7 +10894,7 @@ function NotificationsPage() {
                                                     {t.approve}
                                                 </Button>
                                                 <Button
-                                                    variant="secondary"
+                                                    variant="ghostDanger"
                                                     onClick={() =>
                                                         respondToMatchRequest(
                                                             notification,
@@ -10774,7 +11013,7 @@ function NotificationsPage() {
                                           return (
                                               <>
                                                   <Button
-                                                      variant="secondary"
+                                                      variant="ghost"
                                                       onClick={() => {
                                                           setDetailProfile(
                                                               candidate,
@@ -10812,7 +11051,7 @@ function NotificationsPage() {
                                                       {t.approve}
                                                   </Button>
                                                   <Button
-                                                      variant="secondary"
+                                                      variant="ghostDanger"
                                                       onClick={() => {
                                                           respondToMatchRequest(
                                                               selectedNotification,
@@ -10926,6 +11165,7 @@ function ChatWindow({
     const latestOwnMessage = [...messages]
         .reverse()
         .find((chatMessage) => chatMessage.sender === "me");
+    const latestOwnMessageId = latestOwnMessage?.id ?? "";
 
     const updateMatchPreview = (nextMessages: ChatMessage[]) => {
         const latestMessage = nextMessages[nextMessages.length - 1];
@@ -10943,6 +11183,16 @@ function ChatWindow({
     };
 
     const updateMessage = (messageId: string, nextText: string) => {
+        if (messageId !== latestOwnMessageId) {
+            addToast(
+                id ? "Hanya pesan terakhir" : "Latest message only",
+                id
+                    ? "Hanya pesan terakhir milik Anda yang bisa diedit."
+                    : "Only your latest message can be edited.",
+                "info",
+            );
+            return;
+        }
         setChats((current) => {
             const nextMessages = (current[match.id] ?? []).map((chatMessage) =>
                 chatMessage.id === messageId
@@ -10955,6 +11205,16 @@ function ChatWindow({
     };
 
     const deleteMessage = (messageId: string) => {
+        if (messageId !== latestOwnMessageId) {
+            addToast(
+                id ? "Hanya pesan terakhir" : "Latest message only",
+                id
+                    ? "Hanya pesan terakhir milik Anda yang bisa dihapus."
+                    : "Only your latest message can be deleted.",
+                "info",
+            );
+            return;
+        }
         setChats((current) => {
             const nextMessages = (current[match.id] ?? []).filter(
                 (chatMessage) => chatMessage.id !== messageId,
@@ -10985,6 +11245,18 @@ function ChatWindow({
         }
 
         if (editingId) {
+            if (editingId !== latestOwnMessageId) {
+                setEditingId("");
+                setMessage("");
+                addToast(
+                    id ? "Edit dibatalkan" : "Edit cancelled",
+                    id
+                        ? "Pesan itu bukan lagi pesan terakhir Anda."
+                        : "That message is no longer your latest one.",
+                    "info",
+                );
+                return;
+            }
             const originalMessage = messages.find((m) => m.id === editingId);
             const replyPrefixMatch = originalMessage?.text.match(
                 /^(?:Replying to|Membalas) [^:]+: "[\s\S]+?"\n/,
@@ -11268,7 +11540,8 @@ function ChatWindow({
                                 >
                                     <Copy size={13} aria-hidden="true" />
                                 </button>
-                                {chatMessage.sender === "me" ? (
+                                {chatMessage.sender === "me" &&
+                                chatMessage.id === latestOwnMessageId ? (
                                     <>
                                         <button
                                             type="button"
@@ -11746,6 +12019,23 @@ function CandidateCard({
                     </p>
                 </div>
 
+                {!isPreview ? (
+                    <button
+                        type="button"
+                        className="more-info-button"
+                        aria-expanded={expanded}
+                        onPointerDown={(event) => event.stopPropagation()}
+                        onMouseDown={(event) => event.stopPropagation()}
+                        onTouchStart={(event) => event.stopPropagation()}
+                        onClick={(event) => {
+                            event.stopPropagation();
+                            setExpanded((current) => !current);
+                        }}
+                    >
+                        {expanded ? t.lessInfo : t.moreInfo}
+                    </button>
+                ) : null}
+
                 <div className="card-front-meta">
                     <div className="chip-row">
                         {(showAllSkills ? profile.skills : topSkills).map(
@@ -11784,22 +12074,6 @@ function CandidateCard({
                         <span>{experienceLine}</span>
                     </p>
                 </div>
-
-                {!isPreview ? (
-                    <button
-                        type="button"
-                        className="more-info-button"
-                        onPointerDown={(event) => event.stopPropagation()}
-                        onMouseDown={(event) => event.stopPropagation()}
-                        onTouchStart={(event) => event.stopPropagation()}
-                        onClick={(event) => {
-                            event.stopPropagation();
-                            setExpanded((current) => !current);
-                        }}
-                    >
-                        {expanded ? t.lessInfo : t.moreInfo}
-                    </button>
-                ) : null}
 
                 {!isPreview && expanded ? (
                     <div className="candidate-expanded-info card-expanded-content">
