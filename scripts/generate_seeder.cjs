@@ -1,4 +1,5 @@
 const fs = require('fs');
+const path = require('path');
 
 const roles = ['Frontend Developer', 'Backend Developer', 'UI/UX Designer', 'Product Manager', 'Data Analyst', 'IoT Builder', 'Content Creator', 'Business Strategist'];
 const skillsMap = {
@@ -60,5 +61,6 @@ WHERE id = '${id}';
 `;
 }
 
-fs.writeFileSync('seed_massive.sql', sqlUsers + userValues.join(',\n') + '\nON CONFLICT (id) DO NOTHING;\n' + sqlProfiles);
-console.log('Done generating seed_massive.sql');
+const outFile = path.join(__dirname, '..', 'database', 'sql', 'seed_massive.sql');
+fs.writeFileSync(outFile, sqlUsers + userValues.join(',\n') + '\nON CONFLICT (id) DO NOTHING;\n' + sqlProfiles);
+console.log('Done generating ' + outFile);
