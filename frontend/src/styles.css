@@ -2777,7 +2777,32 @@ span.avatar {
   gap: 12px;
 }
 
+.notification-delete-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  z-index: 2;
+  transition: background 150ms, color 150ms;
+}
+
+.notification-delete-btn:hover,
+.notification-delete-btn:focus {
+  background: var(--danger-surface);
+  color: var(--danger);
+}
+
 .notification-card {
+  position: relative;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
@@ -3556,15 +3581,19 @@ span.avatar {
     width: min(960px, 100%);
   }
 
+  .top-bar .mobile-menu-btn {
+    display: none !important;
+  }
+
   .top-logo {
     font-size: 1.08rem;
   }
 
   .app-grid {
     display: grid;
-    width: min(1200px, 100%);
+    width: min(1320px, 100%);
     flex: 1;
-    grid-template-columns: minmax(200px, 240px) minmax(440px, 580px) minmax(200px, 280px);
+    grid-template-columns: minmax(220px, 280px) minmax(540px, 680px) minmax(240px, 320px);
     align-items: start;
     justify-content: center;
     gap: 24px;

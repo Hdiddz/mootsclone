@@ -1,0 +1,379 @@
+  8808	                    </div>
+  8809	                </section>
+  8810	            </div>
+  8811	
+  8812	            {false && settingsOpen ? (
+  8813	                <div
+  8814	                    className="overlay"
+  8815	                    role="presentation"
+  8816	                    onClick={() => setSettingsOpen(false)}
+  8817	                >
+  8818	                    <div
+  8819	                        className="modal-sheet"
+  8820	                        role="dialog"
+  8821	                        aria-modal="true"
+  8822	                        onClick={(e) => e.stopPropagation()}
+  8823	                        style={{
+  8824	                            background: "var(--surface)",
+  8825	                            padding: "24px",
+  8826	                            borderRadius: "var(--radius)",
+  8827	                            width: "min(480px, 90vw)",
+  8828	                            maxHeight: "90vh",
+  8829	                            overflowY: "auto",
+  8830	                            boxShadow: "var(--shadow)",
+  8831	                            display: "flex",
+  8832	                            flexDirection: "column",
+  8833	                            gap: "16px",
+  8834	                        }}
+  8835	                    >
+  8836	                        <h2
+  8837	                            style={{
+  8838	                                margin: 0,
+  8839	                                fontSize: "1.25rem",
+  8840	                                color: "var(--ink)",
+  8841	                            }}
+  8842	                        >
+  8843	                            {t.settingsTitle}
+  8844	                        </h2>
+  8845	
+  8846	                        <div
+  8847	                            className="form-group"
+  8848	                            style={{
+  8849	                                display: "flex",
+  8850	                                flexDirection: "column",
+  8851	                                gap: "6px",
+  8852	                            }}
+  8853	                        >
+  8854	                            <label
+  8855	                                style={{
+  8856	                                    fontSize: "0.88rem",
+  8857	                                    fontWeight: 600,
+  8858	                                    color: "var(--muted)",
+  8859	                                }}
+  8860	                            >
+  8861	                                {t.name}
+  8862	                            </label>
+  8863	                            <input
+  8864	                                type="text"
+  8865	                                defaultValue={profile.name}
+  8866	                                id="settings-name-input"
+  8867	                                className="input-field"
+  8868	                                style={{
+  8869	                                    padding: "10px 12px",
+  8870	                                    borderRadius: "8px",
+  8871	                                    border: "1px solid var(--border)",
+  8872	                                    background: "var(--bg)",
+  8873	                                    color: "var(--ink)",
+  8874	                                }}
+  8875	                            />
+  8876	                        </div>
+  8877	
+  8878	                        <div
+  8879	                            className="form-group"
+  8880	                            style={{
+  8881	                                display: "flex",
+  8882	                                flexDirection: "column",
+  8883	                                gap: "6px",
+  8884	                            }}
+  8885	                        >
+  8886	                            <label
+  8887	                                style={{
+  8888	                                    fontSize: "0.88rem",
+  8889	                                    fontWeight: 600,
+  8890	                                    color: "var(--muted)",
+  8891	                                }}
+  8892	                            >
+  8893	                                {t.photoUrl}
+  8894	                            </label>
+  8895	                            <input
+  8896	                                type="text"
+  8897	                                defaultValue={profile.avatarUrl ?? ""}
+  8898	                                id="settings-avatar-input"
+  8899	                                className="input-field"
+  8900	                                style={{
+  8901	                                    padding: "10px 12px",
+  8902	                                    borderRadius: "8px",
+  8903	                                    border: "1px solid var(--border)",
+  8904	                                    background: "var(--bg)",
+  8905	                                    color: "var(--ink)",
+  8906	                                }}
+  8907	                            />
+  8908	                        </div>
+  8909	
+  8910	                        <div
+  8911	                            className="form-group"
+  8912	                            style={{
+  8913	                                display: "flex",
+  8914	                                flexDirection: "column",
+  8915	                                gap: "6px",
+  8916	                            }}
+  8917	                        >
+  8918	                            <label
+  8919	                                style={{
+  8920	                                    fontSize: "0.88rem",
+  8921	                                    fontWeight: 600,
+  8922	                                    color: "var(--muted)",
+  8923	                                }}
+  8924	                            >
+  8925	                                {t.language}
+  8926	                            </label>
+  8927	                            <select
+  8928	                                defaultValue={language}
+  8929	                                id="settings-language-input"
+  8930	                                style={{
+  8931	                                    padding: "10px 12px",
+  8932	                                    borderRadius: "8px",
+  8933	                                    border: "1px solid var(--border)",
+  8934	                                    background: "var(--bg)",
+  8935	                                    color: "var(--ink)",
+  8936	                                }}
+  8937	                            >
+  8938	                                <option value="en">{t.english}</option>
+  8939	                                <option value="id">{t.indonesian}</option>
+  8940	                            </select>
+  8941	                        </div>
+  8942	
+  8943	                        <div
+  8944	                            className="form-group"
+  8945	                            style={{
+  8946	                                display: "flex",
+  8947	                                flexDirection: "column",
+  8948	                                gap: "6px",
+  8949	                            }}
+  8950	                        >
+  8951	                            <label
+  8952	                                style={{
+  8953	                                    fontSize: "0.88rem",
+  8954	                                    fontWeight: 600,
+  8955	                                    color: "var(--muted)",
+  8956	                                }}
+  8957	                            >
+  8958	                                {t.campus}
+  8959	                            </label>
+  8960	                            <input
+  8961	                                type="text"
+  8962	                                defaultValue={profile.campus}
+  8963	                                id="settings-campus-input"
+  8964	                                className="input-field"
+  8965	                                style={{
+  8966	                                    padding: "10px 12px",
+  8967	                                    borderRadius: "8px",
+  8968	                                    border: "1px solid var(--border)",
+  8969	                                    background: "var(--bg)",
+  8970	                                    color: "var(--ink)",
+  8971	                                }}
+  8972	                            />
+  8973	                        </div>
+  8974	
+  8975	                        <div
+  8976	                            className="form-group"
+  8977	                            style={{
+  8978	                                display: "flex",
+  8979	                                flexDirection: "column",
+  8980	                                gap: "6px",
+  8981	                            }}
+  8982	                        >
+  8983	                            <label
+  8984	                                style={{
+  8985	                                    fontSize: "0.88rem",
+  8986	                                    fontWeight: 600,
+  8987	                                    color: "var(--muted)",
+  8988	                                }}
+  8989	                            >
+  8990	                                {t.program}
+  8991	                            </label>
+  8992	                            <input
+  8993	                                type="text"
+  8994	                                defaultValue={profile.program}
+  8995	                                id="settings-program-input"
+  8996	                                className="input-field"
+  8997	                                style={{
+  8998	                                    padding: "10px 12px",
+  8999	                                    borderRadius: "8px",
+  9000	                                    border: "1px solid var(--border)",
+  9001	                                    background: "var(--bg)",
+  9002	                                    color: "var(--ink)",
+  9003	                                }}
+  9004	                            />
+  9005	                        </div>
+  9006	
+  9007	                        <div
+  9008	                            className="form-group"
+  9009	                            style={{
+  9010	                                display: "flex",
+  9011	                                flexDirection: "column",
+  9012	                                gap: "6px",
+  9013	                            }}
+  9014	                        >
+  9015	                            <label
+  9016	                                style={{
+  9017	                                    fontSize: "0.88rem",
+  9018	                                    fontWeight: 600,
+  9019	                                    color: "var(--muted)",
+  9020	                                }}
+  9021	                            >
+  9022	                                {t.preferredRole}
+  9023	                            </label>
+  9024	                            <input
+  9025	                                type="text"
+  9026	                                defaultValue={profile.role}
+  9027	                                id="settings-role-input"
+  9028	                                className="input-field"
+  9029	                                style={{
+  9030	                                    padding: "10px 12px",
+  9031	                                    borderRadius: "8px",
+  9032	                                    border: "1px solid var(--border)",
+  9033	                                    background: "var(--bg)",
+  9034	                                    color: "var(--ink)",
+  9035	                                }}
+  9036	                            />
+  9037	                        </div>
+  9038	
+  9039	                        <div
+  9040	                            className="form-group"
+  9041	                            style={{
+  9042	                                display: "flex",
+  9043	                                flexDirection: "column",
+  9044	                                gap: "6px",
+  9045	                            }}
+  9046	                        >
+  9047	                            <label
+  9048	                                style={{
+  9049	                                    fontSize: "0.88rem",
+  9050	                                    fontWeight: 600,
+  9051	                                    color: "var(--muted)",
+  9052	                                }}
+  9053	                            >
+  9054	                                {t.mainSkill}
+  9055	                            </label>
+  9056	                            <input
+  9057	                                type="text"
+  9058	                                defaultValue={profile.mainSkill}
+  9059	                                id="settings-skill-input"
+  9060	                                className="input-field"
+  9061	                                style={{
+  9062	                                    padding: "10px 12px",
+  9063	                                    borderRadius: "8px",
+  9064	                                    border: "1px solid var(--border)",
+  9065	                                    background: "var(--bg)",
+  9066	                                    color: "var(--ink)",
+  9067	                                }}
+  9068	                            />
+  9069	                        </div>
+  9070	
+  9071	                        <div
+  9072	                            className="form-group"
+  9073	                            style={{
+  9074	                                display: "flex",
+  9075	                                flexDirection: "column",
+  9076	                                gap: "6px",
+  9077	                            }}
+  9078	                        >
+  9079	                            <label
+  9080	                                style={{
+  9081	                                    fontSize: "0.88rem",
+  9082	                                    fontWeight: 600,
+  9083	                                    color: "var(--muted)",
+  9084	                                }}
+  9085	                            >
+  9086	                                {t.bio}
+  9087	                            </label>
+  9088	                            <textarea
+  9089	                                defaultValue={profile.profileSummary}
+  9090	                                id="settings-bio-input"
+  9091	                                rows={3}
+  9092	                                style={{
+  9093	                                    padding: "10px 12px",
+  9094	                                    borderRadius: "8px",
+  9095	                                    border: "1px solid var(--border)",
+  9096	                                    background: "var(--bg)",
+  9097	                                    color: "var(--ink)",
+  9098	                                    resize: "vertical",
+  9099	                                }}
+  9100	                            />
+  9101	                        </div>
+  9102	
+  9103	                        <div
+  9104	                            style={{
+  9105	                                display: "flex",
+  9106	                                gap: "12px",
+  9107	                                marginTop: "8px",
+  9108	                                justifyContent: "flex-end",
+  9109	                            }}
+  9110	                        >
+  9111	                            <Button
+  9112	                                variant="secondary"
+  9113	                                onClick={() => setSettingsOpen(false)}
+  9114	                            >
+  9115	                                {t.cancel}
+  9116	                            </Button>
+  9117	                            <Button
+  9118	                                variant="primary"
+  9119	                                onClick={() => {
+  9120	                                    const nameEl = document.getElementById(
+  9121	                                        "settings-name-input",
+  9122	                                    ) as HTMLInputElement;
+  9123	                                    const avatarEl = document.getElementById(
+  9124	                                        "settings-avatar-input",
+  9125	                                    ) as HTMLInputElement;
+  9126	                                    const langEl = document.getElementById(
+  9127	                                        "settings-language-input",
+  9128	                                    ) as HTMLSelectElement;
+  9129	                                    const campusEl = document.getElementById(
+  9130	                                        "settings-campus-input",
+  9131	                                    ) as HTMLInputElement;
+  9132	                                    const programEl = document.getElementById(
+  9133	                                        "settings-program-input",
+  9134	                                    ) as HTMLInputElement;
+  9135	                                    const roleEl = document.getElementById(
+  9136	                                        "settings-role-input",
+  9137	                                    ) as HTMLInputElement;
+  9138	                                    const skillEl = document.getElementById(
+  9139	                                        "settings-skill-input",
+  9140	                                    ) as HTMLInputElement;
+  9141	                                    const bioEl = document.getElementById(
+  9142	                                        "settings-bio-input",
+  9143	                                    ) as HTMLTextAreaElement;
+  9144	
+  9145	                                    if (nameEl && langEl) {
+  9146	                                        setProfile((prev) => ({
+  9147	                                            ...prev,
+  9148	                                            name: nameEl.value,
+  9149	                                            avatarUrl: avatarEl
+  9150	                                                ? avatarEl.value
+  9151	                                                : prev.avatarUrl,
+  9152	                                            campus: campusEl
+  9153	                                                ? campusEl.value
+  9154	                                                : prev.campus,
+  9155	                                            program: programEl
+  9156	                                                ? programEl.value
+  9157	                                                : prev.program,
+  9158	                                            role: roleEl
+  9159	                                                ? roleEl.value
+  9160	                                                : prev.role,
+  9161	                                            mainSkill: skillEl
+  9162	                                                ? skillEl.value
+  9163	                                                : prev.mainSkill,
+  9164	                                            profileSummary: bioEl
+  9165	                                                ? bioEl.value
+  9166	                                                : prev.profileSummary,
+  9167	                                        }));
+  9168	                                        setLanguage(
+  9169	                                            langEl.value as "en" | "id",
+  9170	                                        );
+  9171	                                        setSettingsOpen(false);
+  9172	                                    }
+  9173	                                }}
+  9174	                            >
+  9175	                                {t.save}
+  9176	                            </Button>
+  9177	                        </div>
+  9178	                    </div>
+  9179	                </div>
+  9180	            ) : null}
+  9181	            {quickEdit ? (
+  9182	                <ProfileQuickEdit
+  9183	                    section={quickEdit}
+  9184	                    onClose={() => setQuickEdit(null)}
+  9185	                />
+  9186	            ) : null}

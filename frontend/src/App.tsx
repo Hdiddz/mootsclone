@@ -188,6 +188,8 @@ type SymbioStore = {
     clearFilters: () => void;
     markNotificationRead: (notificationId: string) => void;
     markAllNotificationsRead: () => void;
+    deleteNotification: (notificationId: string) => Promise<void>;
+    clearAllNotifications: () => Promise<void>;
     sendMessage: (matchId: string, text: string) => void;
     respondToMatchRequest: (
         notification: NotificationItem,
@@ -891,6 +893,7 @@ function AuthPage() {
 
 import MatchesPage from "./pages/MatchesPage";
 import ProjectsPage from "./pages/ProjectsPage";
+import SettingsPage from "./pages/SettingsPage";
 import LandingPage from "./pages/LandingPage";
 
 function App() {
@@ -2533,6 +2536,54 @@ function App() {
         }
     }, [user?.id, setNotifications]);
 
+    const deleteNotification = useCallback(
+        async (notificationId: string) => {
+            if (!user?.id) return;
+            setNotifications((current) =>
+                current.filter((notification) => notification.id !== notificationId),
+            );
+            try {
+                const { error } = await supabase
+                    .from("notifications")
+                    .delete()
+                    .eq("id", notificationId)
+                    .eq("user_id", user.id);
+                if (error) throw error;
+            } catch (err) {
+                console.error("Error deleting notification:", err);
+                addToast(
+                    language === "id" ? "Gagal menghapus notifikasi" : "Delete failed",
+                    language === "id"
+                        ? "Silakan coba lagi."
+                        : "Please try again.",
+                    "error",
+                );
+            }
+        },
+        [user?.id, setNotifications, addToast, language],
+    );
+
+    const clearAllNotifications = useCallback(async () => {
+        if (!user?.id) return;
+        setNotifications([]);
+        try {
+            const { error } = await supabase
+                .from("notifications")
+                .delete()
+                .eq("user_id", user.id);
+            if (error) throw error;
+        } catch (err) {
+            console.error("Error clearing notifications:", err);
+            addToast(
+                language === "id" ? "Gagal membersihkan notifikasi" : "Clear failed",
+                language === "id"
+                    ? "Silakan coba lagi."
+                    : "Please try again.",
+                "error",
+            );
+        }
+    }, [user?.id, setNotifications, addToast, language]);
+
     const respondToMatchRequest = useCallback(
         async (
             notification: NotificationItem,
@@ -3658,6 +3709,8 @@ function App() {
             clearFilters,
             markNotificationRead,
             markAllNotificationsRead,
+            deleteNotification,
+            clearAllNotifications,
             sendMessage,
             respondToMatchRequest,
             createGroupChat,
@@ -3702,6 +3755,8 @@ function App() {
             incomingInterests,
             markAllNotificationsRead,
             markNotificationRead,
+            deleteNotification,
+            clearAllNotifications,
             matches,
             setMatches,
             notifications,
@@ -3774,6 +3829,7 @@ function App() {
                         element={<NotificationsPage />}
                     />
                     <Route path="/profile" element={<ProfilePage />} />
+                    <Route path="/settings" element={<SettingsPage />} />
                 </Route>
                 <Route path="/terms" element={<TermsPage />} />
                 <Route path="/privacy" element={<PrivacyPage />} />
@@ -3795,7 +3851,6 @@ function AppShell() {
 
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
-    const [settingsOpen, setSettingsOpen] = useState(false);
     const [logoutOpen, setLogoutOpen] = useState(false);
     const [activeFloatingPanel, setActiveFloatingPanel] = useState<
         "ai" | "chat" | null
@@ -3995,10 +4050,6 @@ function AppShell() {
                         <MiniProfile profile={profile} />
                         <SidebarNav
                             onLinkClick={() => setMobileDrawerOpen(false)}
-                            onSettingsClick={() => {
-                                setMobileDrawerOpen(false);
-                                setSettingsOpen(true);
-                            }}
                             onLogoutClick={() => {
                                 setMobileDrawerOpen(false);
                                 setLogoutOpen(true);
@@ -4126,7 +4177,6 @@ function AppShell() {
 
                     <SidebarNav
                         isCollapsed={sidebarCollapsed}
-                        onSettingsClick={() => setSettingsOpen(true)}
                         onLogoutClick={() => setLogoutOpen(true)}
                     />
                     {showFilters && !sidebarCollapsed ? (
@@ -4146,12 +4196,6 @@ function AppShell() {
 
             <FloatingDock activePanel={activeFloatingPanel} onSetPanel={setActiveFloatingPanel} />
 
-            {settingsOpen ? (
-                <SettingsDrawer
-                    onClose={() => setSettingsOpen(false)}
-                    onLogoutRequest={() => setLogoutOpen(true)}
-                />
-            ) : null}
             {logoutOpen ? (
                 <LogoutConfirmModal onClose={() => setLogoutOpen(false)} />
             ) : null}
@@ -4307,7 +4351,7 @@ function TopBar({
     return (
         <header className="top-bar">
             <button
-                className="top-icon-button"
+                className="top-icon-button mobile-menu-btn"
                 aria-label="Open menu"
                 onClick={onMenuClick}
             >
@@ -4315,7 +4359,7 @@ function TopBar({
             </button>
             <Link
                 to="/discover"
-                className="top-logo"
+                className="top-logo mobile-logo"
                 aria-label="Moots discover"
                 style={{ display: "flex", alignItems: "center", gap: "8px" }}
             >
@@ -4367,12 +4411,10 @@ function TopBar({
 function SidebarNav({
     isCollapsed = false,
     onLinkClick,
-    onSettingsClick,
     onLogoutClick,
 }: {
     isCollapsed?: boolean;
     onLinkClick?: () => void;
-    onSettingsClick?: () => void;
     onLogoutClick?: () => void;
 }) {
     const t = useTranslations();
@@ -4380,11 +4422,6 @@ function SidebarNav({
     const handleLogout = () => {
         onLinkClick?.();
         onLogoutClick?.();
-    };
-
-    const handleSettings = () => {
-        onLinkClick?.();
-        onSettingsClick?.();
     };
 
     const getNavLabel = (to: string) => {
@@ -4433,14 +4470,15 @@ function SidebarNav({
                     </NavLink>
                 );
             })}
-            <button
-                onClick={handleSettings}
-                className="button-logout side-menu-button"
+            <NavLink
+                to="/settings"
+                onClick={onLinkClick}
+                className="side-menu-button"
                 title={isCollapsed ? t.settings : undefined}
             >
                 <Settings size={18} aria-hidden="true" />
                 {!isCollapsed && <span>{t.settings}</span>}
-            </button>
+            </NavLink>
             <button
                 onClick={handleLogout}
                 className="button-logout side-menu-button danger"
@@ -4453,7 +4491,7 @@ function SidebarNav({
     );
 }
 
-type SettingsSection =
+export type SettingsSection =
     | "profile"
     | "account"
     | "preferences"
@@ -8549,17 +8587,14 @@ function ProfilePage() {
         setLanguage,
         user,
     } = useSymbio();
-    const [settingsOpen, setSettingsOpen] = useState(false);
-    const [settingsSection, setSettingsSection] =
-        useState<SettingsSection | null>(null);
     const [quickEdit, setQuickEdit] = useState<QuickEditSection | null>(null);
     const [qrOpen, setQrOpen] = useState(false);
     const [logoutOpen, setLogoutOpen] = useState(false);
     const t = useTranslations();
+    const navigate = useNavigate();
 
     const openSettings = (section: SettingsSection | null) => {
-        setSettingsSection(section);
-        setSettingsOpen(true);
+        navigate("/settings", { state: { section } });
     };
     const editPencil = (section: QuickEditSection) => (
         <button
@@ -8774,11 +8809,11 @@ function ProfilePage() {
                 </section>
             </div>
 
-            {false && settingsOpen ? (
+            {false ? (
                 <div
                     className="overlay"
                     role="presentation"
-                    onClick={() => setSettingsOpen(false)}
+                    onClick={() => {}}
                 >
                     <div
                         className="modal-sheet"
@@ -9075,7 +9110,7 @@ function ProfilePage() {
                         >
                             <Button
                                 variant="secondary"
-                                onClick={() => setSettingsOpen(false)}
+                                onClick={() => {}}
                             >
                                 {t.cancel}
                             </Button>
@@ -9133,7 +9168,6 @@ function ProfilePage() {
                                         setLanguage(
                                             langEl.value as "en" | "id",
                                         );
-                                        setSettingsOpen(false);
                                     }
                                 }}
                             >
@@ -9142,13 +9176,6 @@ function ProfilePage() {
                         </div>
                     </div>
                 </div>
-            ) : null}
-            {settingsOpen ? (
-                <SettingsDrawer
-                    onClose={() => setSettingsOpen(false)}
-                    onLogoutRequest={() => setLogoutOpen(true)}
-                    initialSection={settingsSection}
-                />
             ) : null}
             {quickEdit ? (
                 <ProfileQuickEdit
@@ -9445,6 +9472,8 @@ function NotificationsPage() {
         notifications,
         markNotificationRead,
         markAllNotificationsRead,
+        deleteNotification,
+        clearAllNotifications,
         respondToMatchRequest,
         language,
         interestedIds,
@@ -9458,6 +9487,11 @@ function NotificationsPage() {
     const [detailProfile, setDetailProfile] = useState<CandidateProfile | null>(
         null,
     );
+    const [confirmConfig, setConfirmConfig] = useState<{
+        title: string;
+        message: string;
+        onConfirm: () => void;
+    } | null>(null);
     const t = useTranslations();
 
     return (
@@ -9466,13 +9500,31 @@ function NotificationsPage() {
                 eyebrow={t.alertsEyebrow}
                 title={t.alertsDesc}
                 action={
-                    <Button
-                        variant="secondary"
-                        onClick={markAllNotificationsRead}
-                        disabled={!unreadCount}
-                    >
-                        {t.markAllRead}
-                    </Button>
+                    <div style={{ display: "flex", gap: "8px" }}>
+                        <Button
+                            variant="secondary"
+                            onClick={markAllNotificationsRead}
+                            disabled={!unreadCount}
+                        >
+                            {t.markAllRead}
+                        </Button>
+                        <Button
+                            variant="ghostDanger"
+                            onClick={() => {
+                                setConfirmConfig({
+                                    title: t.clearAll,
+                                    message: t.clearNotificationsConfirm,
+                                    onConfirm: async () => {
+                                        await clearAllNotifications();
+                                        setConfirmConfig(null);
+                                    }
+                                });
+                            }}
+                            disabled={notifications.length === 0}
+                        >
+                            {t.clearAll}
+                        </Button>
+                    </div>
                 }
             />
             <div className="notification-list">
@@ -9510,6 +9562,23 @@ function NotificationsPage() {
                                     {t.markRead}
                                 </Button>
                             ) : null}
+                            <button
+                                className="notification-delete-btn"
+                                aria-label={t.deleteNotification}
+                                onClick={async (e) => {
+                                    e.stopPropagation();
+                                    setConfirmConfig({
+                                        title: t.deleteNotification,
+                                        message: t.deleteNotificationConfirm,
+                                        onConfirm: async () => {
+                                            await deleteNotification(notification.id);
+                                            setConfirmConfig(null);
+                                        }
+                                    });
+                                }}
+                            >
+                                <Trash2 size={16} />
+                            </button>
                             {notification.type === "match_request" ? (
                                 <div
                                     className="notification-request-actions"
@@ -9769,6 +9838,14 @@ function NotificationsPage() {
                     onClose={() => setDetailProfile(null)}
                 />
             ) : null}
+            {confirmConfig && (
+                <ConfirmModal
+                    title={confirmConfig.title}
+                    message={confirmConfig.message}
+                    onConfirm={confirmConfig.onConfirm}
+                    onClose={() => setConfirmConfig(null)}
+                />
+            )}
         </div>
     );
 }
@@ -11612,7 +11689,7 @@ export function EmptyState({
     );
 }
 
-function Button({
+export function Button({
     children,
     className = "",
     variant = "secondary",
@@ -11847,7 +11924,7 @@ function FormSection({
     );
 }
 
-function PhotoUploadField({
+export function PhotoUploadField({
     label,
     value,
     position,
@@ -12493,7 +12570,7 @@ function PhotoUploadField({
     );
 }
 
-function TextField({
+export function TextField({
     label,
     value,
     onChange,
@@ -12519,7 +12596,7 @@ function TextField({
     );
 }
 
-function TextAreaField({
+export function TextAreaField({
     label,
     value,
     onChange,
@@ -12551,7 +12628,7 @@ function TextAreaField({
     );
 }
 
-function SelectField({
+export function SelectField({
     label,
     value,
     onChange,
@@ -12582,7 +12659,7 @@ function SelectField({
     );
 }
 
-function MultiChipField({
+export function MultiChipField({
     label,
     values,
     options,
@@ -12649,7 +12726,7 @@ function MultiChipField({
     );
 }
 
-function SkillChecklist({
+export function SkillChecklist({
     selected,
     onChange,
     helper,
@@ -12742,7 +12819,7 @@ function SkillChecklist({
     );
 }
 
-function ExperienceEditor({
+export function ExperienceEditor({
     experience,
     onChange,
 }: {
@@ -12848,7 +12925,7 @@ function PortfolioEditor({
 }
 
 // Multiple experiences with add/remove (settings).
-function MultiExperienceEditor({
+export function MultiExperienceEditor({
     experiences,
     onChange,
 }: {
@@ -12917,7 +12994,7 @@ function isImagePortfolio(url: string) {
 
 // Renders an uploaded portfolio file: image thumbnail for images, a file chip
 // (with PDF/file icon) otherwise. Used in the editor and on profiles.
-function PortfolioFileDisplay({ link }: { link: PortfolioLink }) {
+export function PortfolioFileDisplay({ link }: { link: PortfolioLink }) {
     if (!link.url) return null;
     if (isImagePortfolio(link.url)) {
         return (
@@ -12953,7 +13030,7 @@ function PortfolioFileDisplay({ link }: { link: PortfolioLink }) {
     );
 }
 
-function PortfolioUploadEditor({
+export function PortfolioUploadEditor({
     links,
     onChange,
     userId,
