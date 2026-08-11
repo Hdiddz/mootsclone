@@ -1546,8 +1546,9 @@ button:disabled {
   --accent: var(--primary);
   position: relative;
   z-index: 1;
-  display: grid;
-  place-items: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
   overflow: hidden;
   line-height: 1;
@@ -1569,7 +1570,7 @@ img.avatar {
 }
 
 span.avatar {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
 }
@@ -2396,6 +2397,10 @@ span.avatar {
   height: 46px !important;
   border-radius: 50% !important;
   flex-shrink: 0 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0 !important;
 }
 
 .match-row.selected {
@@ -5700,6 +5705,7 @@ span.avatar {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
+  justify-content: flex-end;
   gap: 14px;
   pointer-events: none;
 }
@@ -5781,6 +5787,10 @@ span.avatar {
 
 .chat-bubble-panel {
   width: min(340px, calc(100vw - 32px));
+  max-height: min(520px, calc(100dvh - 160px));
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 14px;
@@ -5788,6 +5798,11 @@ span.avatar {
   box-shadow: var(--shadow);
   backdrop-filter: blur(14px);
   animation: assistantFloatIn 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.chat-bubble-panel .compact-list {
+  overflow-y: auto;
+  min-height: 0;
 }
 
 .candidate-card {
@@ -6862,6 +6877,10 @@ span.avatar {
     left: 12px !important;
     width: 42px !important;
     height: 42px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 0 !important;
   }
 
   .match-row b {
@@ -8248,14 +8267,28 @@ span.avatar {
 
 @media (max-width: 767px) {
   .floating-dock {
-    right: 16px;
-    bottom: max(92px, calc(env(safe-area-inset-bottom) + 84px));
+    inset: auto 12px max(12px, calc(env(safe-area-inset-bottom) + 8px)) auto;
+    top: auto;
+    left: auto;
     gap: 10px;
+  }
+
+  .floating-dock.open {
+    inset: 0;
+    z-index: 1000;
   }
 
   .floating-dock-actions {
     gap: 10px;
     padding: 7px;
+    margin-left: auto;
+  }
+
+  .floating-dock.open .floating-dock-actions {
+    position: fixed;
+    right: 12px;
+    bottom: max(12px, calc(env(safe-area-inset-bottom) + 8px));
+    z-index: 1002;
   }
 
   .floating-dock-btn {
@@ -8263,9 +8296,12 @@ span.avatar {
     height: 44px;
   }
 
-  .ai-assistant-panel {
-    width: 100% !important;
-    height: 100% !important;
+  .ai-assistant-panel,
+  .chat-bubble-panel {
+    position: fixed;
+    inset: 0;
+    width: 100vw !important;
+    height: 100dvh !important;
     max-height: 100dvh !important;
     border: 0 !important;
     border-radius: 0 !important;
@@ -8273,6 +8309,7 @@ span.avatar {
     padding-bottom: max(12px, env(safe-area-inset-bottom)) !important;
     gap: 10px !important;
     overflow: hidden !important;
+    z-index: 1001;
   }
 
   .ai-assistant-panel h2 {
