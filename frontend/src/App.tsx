@@ -4144,16 +4144,7 @@ function AppShell() {
                 {!isChatRoute ? <BottomNav unreadCount={unreadCount} /> : null}
             </main>
 
-            <AiAssistantBubble
-                isOpen={activeFloatingPanel === "ai"}
-                onToggle={(open) => setActiveFloatingPanel(open ? "ai" : null)}
-            />
-            <FollowChatBubble
-                isOpen={activeFloatingPanel === "chat"}
-                onToggle={(open) =>
-                    setActiveFloatingPanel(open ? "chat" : null)
-                }
-            />
+            <FloatingDock activePanel={activeFloatingPanel} onSetPanel={setActiveFloatingPanel} />
 
             {settingsOpen ? (
                 <SettingsDrawer
@@ -5572,13 +5563,50 @@ function ProfileQrModal({
     );
 }
 
-function FollowChatBubble({
-    isOpen,
-    onToggle,
+function FloatingDock({
+    activePanel,
+    onSetPanel,
 }: {
-    isOpen: boolean;
-    onToggle: (open: boolean) => void;
+    activePanel: "ai" | "chat" | null;
+    onSetPanel: (panel: "ai" | "chat" | null) => void;
 }) {
+    const { matches } = useSymbio();
+    const totalUnread = matches.reduce((sum, m) => sum + m.unread, 0);
+    const isAiOpen = activePanel === "ai";
+    const isChatOpen = activePanel === "chat";
+
+    return (
+        <div className={`floating-dock ${activePanel ? "open" : ""}`}>
+            {isChatOpen ? <FollowChatBubblePanel onClose={() => onSetPanel(null)} /> : null}
+            {isAiOpen ? <AiAssistantBubblePanel onClose={() => onSetPanel(null)} /> : null}
+            <div className="floating-dock-actions">
+                <button
+                    type="button"
+                    className={`floating-dock-btn ai-dock-btn ${isAiOpen ? "active" : ""}`}
+                    aria-label="Open AI assistant"
+                    aria-pressed={isAiOpen}
+                    onClick={() => onSetPanel(isAiOpen ? null : "ai")}
+                >
+                    <Sparkles size={20} aria-hidden="true" />
+                </button>
+                <button
+                    type="button"
+                    className={`floating-dock-btn chat-dock-btn ${isChatOpen ? "active" : ""}`}
+                    aria-label="Open followed user chat"
+                    aria-pressed={isChatOpen}
+                    onClick={() => onSetPanel(isChatOpen ? null : "chat")}
+                >
+                    <MessageCircle size={20} aria-hidden="true" />
+                    {totalUnread > 0 ? (
+                        <span className="floating-dock-badge">{totalUnread}</span>
+                    ) : null}
+                </button>
+            </div>
+        </div>
+    );
+}
+
+function FollowChatBubblePanel({ onClose }: { onClose: () => void }) {
     const { matches } = useSymbio();
     const t = useTranslations();
     const chatItems = matches
@@ -5611,88 +5639,67 @@ function FollowChatBubble({
     const totalUnread = matches.reduce((sum, m) => sum + m.unread, 0);
 
     return (
-        <div className={`chat-bubble ${isOpen ? "open" : ""}`}>
-            {isOpen ? (
-                <section
-                    className="chat-bubble-panel"
-                    aria-label="Followed user chat list"
+        <section
+            className="chat-bubble-panel"
+            aria-label="Followed user chat list"
+        >
+            <div className="rail-heading">
+                <h2>{t.chatFollowed}</h2>
+                <button
+                    className="text-link"
+                    onClick={onClose}
                 >
-                    <div className="rail-heading">
-                        <h2>{t.chatFollowed}</h2>
-                        <button
-                            className="text-link"
-                            onClick={() => onToggle(false)}
+                    {t.closePanel}
+                </button>
+            </div>
+            <div className="compact-list">
+                {chatItems.length ? (
+                    chatItems.map((item) => (
+                        <Link
+                            className="compact-row"
+                            to={`/chat/${item.match.id}`}
+                            key={item.match.id}
+                            onClick={onClose}
                         >
-                            {t.closePanel}
-                        </button>
-                    </div>
-                    <div className="compact-list">
-                        {chatItems.length ? (
-                            chatItems.map((item) => (
-                                <Link
-                                    className="compact-row"
-                                    to={`/chat/${item.match.id}`}
-                                    key={item.match.id}
-                                    onClick={() => onToggle(false)}
+                            {item.isGroup ? (
+                                <span
+                                    className="avatar avatar-xs group-avatar-xs"
+                                    style={{
+                                        display: "grid",
+                                        placeItems: "center",
+                                        background:
+                                            "var(--primary-soft)",
+                                        color: "var(--primary-strong)",
+                                        borderRadius: "50%",
+                                        border: "1px solid var(--border)",
+                                    }}
                                 >
-                                    {item.isGroup ? (
-                                        <span
-                                            className="avatar avatar-xs group-avatar-xs"
-                                            style={{
-                                                display: "grid",
-                                                placeItems: "center",
-                                                background:
-                                                    "var(--primary-soft)",
-                                                color: "var(--primary-strong)",
-                                                borderRadius: "50%",
-                                                border: "1px solid var(--border)",
-                                            }}
-                                        >
-                                            <Users size={14} />
-                                        </span>
-                                    ) : (
-                                        <Avatar
-                                            profile={item.candidate!}
-                                            size="xs"
-                                        />
-                                    )}
-                                    <span>
-                                        <strong>{item.name}</strong>
-                                        <small>{item.latestMessage}</small>
-                                    </span>
-                                    {item.match.unread > 0 ? (
-                                        <em>{item.match.unread}</em>
-                                    ) : null}
-                                </Link>
-                            ))
-                        ) : (
-                            <p className="muted-text">{t.noChatUsers}</p>
-                        )}
-                    </div>
-                </section>
-            ) : null}
-            <button
-                className="chat-bubble-button"
-                type="button"
-                aria-label="Open followed user chat"
-                onClick={() => onToggle(!isOpen)}
-            >
-                <MessageCircle size={24} aria-hidden="true" />
-                {totalUnread > 0 ? (
-                    <span className="chat-bubble-badge">{totalUnread}</span>
-                ) : null}
-            </button>
-        </div>
+                                    <Users size={14} />
+                                </span>
+                            ) : (
+                                <Avatar
+                                    profile={item.candidate!}
+                                    size="xs"
+                                />
+                            )}
+                            <span>
+                                <strong>{item.name}</strong>
+                                <small>{item.latestMessage}</small>
+                            </span>
+                            {item.match.unread > 0 ? (
+                                <em>{item.match.unread}</em>
+                            ) : null}
+                        </Link>
+                    ))
+                ) : (
+                    <p className="muted-text">{t.noChatUsers}</p>
+                )}
+            </div>
+        </section>
     );
 }
 
-function AiAssistantBubble({
-    isOpen,
-    onToggle,
-}: {
-    isOpen: boolean;
-    onToggle: (open: boolean) => void;
-}) {
+function AiAssistantBubblePanel({ onClose }: { onClose: () => void }) {
     const {
         language,
         matches,
@@ -5741,7 +5748,7 @@ function AiAssistantBubble({
                 !m.id.startsWith("local"),
         );
         if (existing) {
-            onToggle(false);
+            onClose();
             navigate(`/chat/${existing.id}`);
             return;
         }
@@ -5771,7 +5778,7 @@ function AiAssistantBubble({
                               ...prev,
                           ],
                 );
-                onToggle(false);
+                onClose();
                 navigate(`/chat/${matchId}`);
             }
         } catch (err) {
@@ -5841,7 +5848,7 @@ function AiAssistantBubble({
     };
 
     useEffect(() => {
-        if (isOpen) {
+        if (true) {
             supabase
                 .from("ai_conversations")
                 .select("role, message")
@@ -5852,10 +5859,10 @@ function AiAssistantBubble({
                     }
                 });
         }
-    }, [isOpen]);
+    }, [true]);
 
     useEffect(() => {
-        if (!isOpen || !responseRef.current) {
+        if (!true || !responseRef.current) {
             return;
         }
 
@@ -5869,7 +5876,7 @@ function AiAssistantBubble({
                 behavior: "smooth",
             });
         });
-    }, [history.length, isOpen, loading]);
+    }, [history.length, true, loading]);
 
     const presets = [
         {
@@ -5908,7 +5915,7 @@ function AiAssistantBubble({
             return;
         }
 
-        onToggle(true);
+        onClose();
         setQuery("");
         setLoading(true);
 
@@ -6002,12 +6009,10 @@ ${otherProfiles
     };
 
     return (
-        <div className={`ai-assistant-bubble ${isOpen ? "open" : ""}`}>
-            {isOpen ? (
-                <section
-                    className="ai-assistant-panel"
-                    aria-label={t.aiAssistantTitle}
-                >
+        <section
+            className="ai-assistant-panel"
+            aria-label={t.aiAssistantTitle}
+        >
                     <header>
                         <div>
                             <h2>
@@ -6027,7 +6032,7 @@ ${otherProfiles
                             <button
                                 type="button"
                                 aria-label={t.close}
-                                onClick={() => onToggle(false)}
+                                onClick={onClose}
                             >
                                 <X size={18} aria-hidden="true" />
                             </button>
@@ -6316,47 +6321,7 @@ ${otherProfiles
                         </button>
                     </form>
                 </section>
-            ) : null}
-            <button
-                className="ai-assistant-button"
-                data-tour="ai"
-                type="button"
-                aria-label={t.aiAssistantTitle}
-                onClick={() => onToggle(!isOpen)}
-            >
-                <Sparkles size={23} aria-hidden="true" />
-            </button>
-
-            {detailProfile ? (
-                <CandidateDetailSheet
-                    profile={detailProfile}
-                    onClose={() => setDetailProfile(null)}
-                />
-            ) : null}
-
-            {suggestionCanvas ? (
-                <AiSuggestionCanvas
-                    title={suggestionCanvas.title}
-                    candidates={suggestionCanvas.candidates}
-                    interestedIds={interestedIds}
-                    language={language}
-                    onClose={() => setSuggestionCanvas(null)}
-                    onViewProfile={(candidate) => setDetailProfile(candidate)}
-                    onFollow={handleFollow}
-                    onChat={startChat}
-                />
-            ) : null}
-
-            {confirmConfig && (
-                <ConfirmModal
-                    title={confirmConfig.title}
-                    message={confirmConfig.message}
-                    onConfirm={confirmConfig.onConfirm}
-                    onClose={() => setConfirmConfig(null)}
-                />
-            )}
-        </div>
-    );
+            )
 }
 
 function AiSuggestionCanvas({
